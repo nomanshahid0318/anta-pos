@@ -620,8 +620,6 @@ function editProduct(bc){
   if($('p-orig'))$('p-orig').value=p.OriginalPrice||0;
   if($('p-ret'))$('p-ret').value=p.Retail||0;
   if($('p-ro'))$('p-ro').value=p.Reorder||5;
-  const wh=(DATA.warehouse||[]).find(w=>String(w.Barcode)===String(p.Barcode));
-  if($('p-op'))$('p-op').value=wh?(+wh.OnHand||0):0;
 }
 async function fetchAndRenderProductsPage(){
   // The only function that hits the server for Product Master. Fetches
@@ -672,7 +670,6 @@ function showAddProd(){
   if($('p-br'))$('p-br').value='ANTA';
   if($('p-cat'))$('p-cat').selectedIndex=0;
   if($('p-gender'))$('p-gender').value='';
-  if($('p-op'))$('p-op').value=0;
   if($('p-ro'))$('p-ro').value=5;
   if($('add-prod-form'))$('add-prod-form').style.display='flex';
   if($('p-bc'))$('p-bc').focus();
@@ -688,7 +685,7 @@ async function saveProd(){
     barcode:bc,name:nm,brand:$('p-br').value,category:$('p-cat').value,size:$('p-sz').value,
     color:$('p-color')?.value||'',department:$('p-dept')?.value||'',season:$('p-season')?.value||'',gender:$('p-gender')?.value||'',
     cost:+$('p-cost').value||0,retail:+$('p-ret').value||0,reorder:+($('p-ro')?.value)||5,
-    opening:+($('p-op')?.value||0),qty:+($('p-op')?.value||0),active:true,
+    active:true,
   };
   const origVal=($('p-orig')&&$('p-orig').value||'').trim();
   if(origVal)body.originalPrice=+origVal;
@@ -704,15 +701,15 @@ async function downloadProdTemplate(){
   const genders=['Men','Women','Kids','Unisex'];
   if(typeof ExcelJS==='undefined'){
     // Fallback: plain CSV (no dropdowns) if ExcelJS failed to load (e.g. offline)
-    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['Barcode,Name,Brand,Category,Department,Season,Gender,Size,Color,Cost,Original Price,Retail,Reorder,Qty\n8001000000009,ANTA Sample Shoe,ANTA,Running,Footwear,SS26,Men,42,White,120,180,180,5,25\n'],{type:'text/csv'}));a.download='products_template.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['Barcode,Name,Brand,Category,Department,Season,Gender,Size,Color,Cost,Original Price,Retail,Reorder\n8001000000009,ANTA Sample Shoe,ANTA,Running,Footwear,SS26,Men,42,White,120,180,180,5\n'],{type:'text/csv'}));a.download='products_template.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     return;
   }
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('Products');
-  const headers=['Barcode','Name','Brand','Category','Department','Season','Gender','Size','Color','Cost','Original Price','Retail','Reorder','Qty'];
+  const headers=['Barcode','Name','Brand','Category','Department','Season','Gender','Size','Color','Cost','Original Price','Retail','Reorder'];
   ws.addRow(headers);
   ws.getRow(1).font={bold:true};
-  ws.addRow(['8001000000009','ANTA Sample Shoe','ANTA','Running','Footwear','SS26','Men','42','White',120,180,180,5,25]);
+  ws.addRow(['8001000000009','ANTA Sample Shoe','ANTA','Running','Footwear','SS26','Men','42','White',120,180,180,5]);
   ws.columns.forEach(c=>c.width=15);
   const catCol='D',genderCol='G',lastRow=1000;
   for(let r=2;r<=lastRow;r++){
@@ -835,7 +832,6 @@ async function uploadProducts(file){
     const get=f=>pickField(rowNorm,FIELD_KEYS[f]);
     const barcode=cleanId(get('barcode'));
     const name=String(get('name')||'').trim();
-    const qtyRaw=get('qty');
     if(!barcode){
       skipped++;
       logRows.push({barcode:'(blank)',name:name||'(blank)',status:'failed',reason:'missing Barcode in file — row skipped before upload'});
@@ -846,7 +842,7 @@ async function uploadProducts(file){
       logRows.push({barcode,name:'(blank)',status:'failed',reason:'missing Name in file — row skipped before upload'});
       return;
     }
-    const item={barcode,name,brand:get('brand')||'ANTA',category:get('category')||'',department:get('department')||'',season:get('season')||'',gender:get('gender')||'',size:get('size')||'',color:get('color')||'',cost:+(get('cost')||0),retail:+(get('retail')||0),reorder:+(get('reorder')||5),opening:+(qtyRaw||0),qty:+(qtyRaw||0),active:true};
+    const item={barcode,name,brand:get('brand')||'ANTA',category:get('category')||'',department:get('department')||'',season:get('season')||'',gender:get('gender')||'',size:get('size')||'',color:get('color')||'',cost:+(get('cost')||0),retail:+(get('retail')||0),reorder:+(get('reorder')||5),active:true};
     const origPriceRaw=get('originalprice');
     if(origPriceRaw!==''&&origPriceRaw!==undefined)item.originalPrice=+origPriceRaw||0;
     if(byBarcode.has(barcode)){
@@ -1120,7 +1116,7 @@ async function exportProducts(){
   toast('⏳ Preparing export — fetching full product catalog…','info');
   const all=await api('/api/products?active_only=false');
   if(!Array.isArray(all)){toast('❌ Export failed','error');return;}
-  _csvDownload(all,[['Barcode','barcode'],['Name','name'],['Brand','brand'],['Category','category'],['Department','department'],['Season','season'],['Gender','gender'],['Size','size'],['Color','color'],['Cost','cost'],['Original Price','originalPrice'],['Retail','retail'],['Reorder','reorder'],['Qty','opening']],'products_'+today()+'.csv');
+  _csvDownload(all,[['Barcode','barcode'],['Name','name'],['Brand','brand'],['Category','category'],['Department','department'],['Season','season'],['Gender','gender'],['Size','size'],['Color','color'],['Cost','cost'],['Original Price','originalPrice'],['Retail','retail'],['Reorder','reorder']],'products_'+today()+'.csv');
 }
 function saveBSEntries(){}function exportBS(){toast('Use browser print','info');}
 function cfPreset(){const p=($('cf-period')||{}).value||'month',d=today();if(!$('cf-from'))return;if(p==='year'){$('cf-from').value=d.slice(0,4)+'-01-01';$('cf-to').value=d;}else{$('cf-from').value=d.slice(0,7)+'-01';$('cf-to').value=d;}}
