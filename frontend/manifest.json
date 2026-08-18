@@ -1,0 +1,15 @@
+{
+  "name": "ANTA Shoes — POS",
+  "short_name": "ANTA POS",
+  "description": "ANTA Shoes point-of-sale — works offline, syncs when back online",
+  "start_url": "/pos/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#e5384d",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANTA Shoes — POS System</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;background:linear-gradient(135deg,#0a1628,#1a3a6b);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px}
+.wrap{max-width:920px;width:100%}
+.logo{width:72px;height:72px;background:#e63946;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:32px;margin:0 auto 16px}
+h1{text-align:center;font-size:28px;margin-bottom:6px}
+.sub{text-align:center;opacity:.75;font-size:14px;margin-bottom:32px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:28px;text-decoration:none;color:#fff;transition:.2s;display:block}
+.card:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}
+.card h2{font-size:20px;margin:10px 0 8px}
+.card p{font-size:13px;opacity:.8;line-height:1.5}
+.badge{display:inline-block;font-size:10px;font-weight:800;padding:4px 8px;border-radius:999px;background:#e63946}
+.badge.blue{background:#2196F3}
+.pins{margin-top:22px;background:rgba(0,0,0,.2);border-radius:12px;padding:14px 18px;font-size:12px;line-height:1.7}
+.foot{text-align:center;margin-top:28px;font-size:12px;opacity:.55}
+</style></head><body>
+<div class="wrap">
+  <div class="logo">A</div>
+  <h1>ANTA Shoes System v4</h1>
+  <p class="sub">Store POS + Head Office · Database · No Google Sheets</p>
+  <div class="grid">
+    <a class="card" href="/pos/"><span class="badge">STORE</span><h2>🛒 Store POS</h2><p>Sales, returns, exchange, claims, receive GRN, inventory, expenses, reports.</p></a>
+    <a class="card" href="/ho/"><span class="badge blue">HEAD OFFICE</span><h2>🏢 Head Office</h2><p>Warehouse, supplier GRN, send to stores, P&L, balance sheet, cash flow, suppliers, capital, admin.</p></a>
+  </div>
+  <div class="pins"><b>Default PINs</b><br>Store 1 cashier <b>1111</b> · manager <b>1199</b> · HO admin <b>0000</b><br>API: <a href="/docs" style="color:#90caf9">/docs</a></div>
+  <div class="foot">ANTA Shoes Libya</div>
+</div></body></html>

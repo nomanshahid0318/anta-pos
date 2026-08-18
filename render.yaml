@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: anta-pos
+    env: python
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "python run_web.py --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: ANTA_SECRET_KEY
+        generateValue: true
+      - key: ANTA_DATABASE_URL
+        sync: false
+      - key: ANTA_CORS_ORIGINS
+        value: "*"

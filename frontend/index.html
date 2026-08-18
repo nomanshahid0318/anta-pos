@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANTA Shoes — POS v4</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#e5384d">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="stylesheet" href="/css/styles.css">
+<style>
+/* v4 enhancements */
+.api-badge{display:inline-flex;align-items:center;gap:6px;font-size:10px;padding:3px 8px;border-radius:999px;background:var(--green-light);color:var(--green);font-weight:700}
+.role-badge{font-size:9px;text-transform:uppercase;letter-spacing:.04em;opacity:.85}
+@media (max-width:900px){
+  #sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);z-index:50;transition:.2s}
+  #sidebar.open{transform:translateX(0)}
+  #main{margin-left:0!important;width:100%}
+  .menu-toggle{display:inline-flex!important}
+}
+.menu-toggle{display:none;border:0;background:transparent;font-size:20px;cursor:pointer;margin-right:8px}
+#content{padding-bottom:40px}
+.table-wrap{overflow-x:auto}
+</style>
+<style id="rtl-style">html[dir=rtl]{direction:rtl}html[dir=rtl] #sidebar{border-right:none;border-left:1px solid var(--border,#e5e7eb)}html[dir=rtl] .nav-item{text-align:right}@media print{.no-print{display:none!important}body *{visibility:hidden}#inv-modal,#inv-modal *,#handover-print-modal,#handover-print-modal *{visibility:visible}#inv-modal,#handover-print-modal{position:absolute;left:0;top:0}#handover-print-modal{display:block!important}}</style>
+</head>
+<body>
+
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">A</div>
+    <div class="login-title" id="login-title-text" data-i18n="login_title">POS</div>
+    <div class="login-sub" data-i18n="login_sub">Select store and enter PIN</div>
+    <div style="margin-top:12px;font-size:12px"><a href="/" style="color:var(--accent2)">← Portal</a> · <a href="/ho/" style="color:var(--accent2)">Head Office</a></div>
+    <select class="store-select-login" id="login-store"></select>
+    <div class="pin-display" id="pin-display">----</div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn danger" onclick="pinClear()">⌫</button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="pinSubmit()">✓</button>
+    </div>
+    <div id="login-error" style="color:var(--red);font-size:12px;display:none">❌ Wrong PIN — try again</div>
+    <div style="font-size:11px;color:var(--gray4);margin-top:12px">PINs: S1 cashier 1111 · manager 1199 · Admin(HO) 0000</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+<div id="sidebar">
+  <div class="brand">
+    <div class="brand-logo" id="brand-logo">A</div>
+    <div><div class="brand-text" id="brand-text">POS</div><div class="brand-sub" id="sb-store">POS</div></div>
+  </div>
+  <div class="sync-bar">
+    <div class="dot offline" id="sync-dot"></div>
+    <div><div id="sync-label" style="font-size:10px">Connecting...</div><div id="sync-last" style="font-size:9px;opacity:.6">—</div><div id="pending-sync-badge" style="display:none;font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:6px;padding:2px 6px;margin-top:3px"></div></div>
+  </div>
+  <div class="user-bar">
+    <div class="user-info"><span id="user-name">—</span><span class="user-role" id="user-role">—</span></div>
+    <div class="logout-btn" onclick="logout()" data-i18n="logout">Logout</div>
+  </div>
+  <nav>
+    <div class="nav-sec" data-i18n="main">Main</div>
+    <div class="nav-item active" onclick="show('dashboard')" data-screen="dashboard"><span class="ico">📊</span><span class="nav-label" data-i18n="dashboard">Dashboard</span></div>
+    <div class="nav-item" onclick="show('sale')" data-screen="sale"><span class="ico">🛒</span><span class="nav-label" data-i18n="sale">New Sale</span></div>
+    <div class="nav-sec" data-i18n="transactions">Transactions</div>
+    <div class="nav-item" onclick="show('returns')" data-screen="returns"><span class="ico">↩️</span><span class="nav-label" data-i18n="returns">Returns</span></div>
+    <div class="nav-item" onclick="show('exchange')" data-screen="exchange"><span class="ico">🔄</span><span class="nav-label" data-i18n="exchange">Exchange</span></div>
+    <div class="nav-item" onclick="show('claims')" data-screen="claims"><span class="ico">⚠️</span><span class="nav-label" data-i18n="claims">Claims</span></div>
+    <div class="nav-sec" data-i18n="stock">Stock</div>
+    <div class="nav-item" onclick="show('grn')" data-screen="grn"><span class="ico">📥</span><span class="nav-label" data-i18n="grn">Receive Stock (GRN)</span> <span class="nav-badge" id="grn-badge">0</span></div>
+    <div class="nav-item" onclick="show('inventory')" data-screen="inventory"><span class="ico">📦</span><span class="nav-label" data-i18n="inventory">Inventory</span> <span class="nav-badge" id="low-badge">0</span></div>
+    <div class="nav-sec">Reports</div>
+    <div class="nav-item" onclick="show('reports')" data-screen="reports"><span class="ico">📈</span><span class="nav-label" data-i18n="reports">Reports</span></div>
+    <div class="nav-item" onclick="show('handover')" data-screen="handover"><span class="ico">💵</span><span class="nav-label">Day End / Cash Handover</span></div>
+    <div class="nav-sec">Settings</div>
+    <div class="nav-item" onclick="show('settings')" data-screen="settings"><span class="ico">⚙️</span><span class="nav-label" data-i18n="settings">Settings</span></div>
+  </nav>
+  <div class="sidebar-footer">Queue: <span id="q-count">0</span> | <span id="shift-t">—</span></div>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <div class="topbar-title" id="screen-title">Dashboard</div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-ghost btn-sm" id="lang-toggle" onclick="toggleLang()">AR / EN</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:10px"><div class="dot offline" id="top-dot"></div><span id="top-sync" data-i18n="offline">Offline</span></div>
+    <div id="clock" style="font-size:11px;color:var(--gray4)"></div>
+    <button class="btn btn-primary btn-sm" onclick="show('sale')">➕ New Sale</button>
+    <button class="btn btn-ghost btn-sm" onclick="syncNow()">🔄 Sync</button>
+  </div>
+  <div id="content">
+
+  <!-- DASHBOARD -->
+  <div id="screen-dashboard" class="screen active">
+    <div id="q-bar" class="queue-bar hidden">⚠️ Offline: <span id="q-bar-n">0</span> pending — will sync when connected</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" onclick="openRecipientPicker('whatsapp')">📤 WhatsApp Sales Report</button>
+      <button class="btn btn-ghost btn-sm" onclick="openRecipientPicker('email')">✉️ Email Sales Report</button>
+    </div>
+    <div id="recipient-picker" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeRecipientPicker()">
+      <div class="modal" style="width:380px">
+        <div class="modal-title" id="recipient-picker-title">Send Sales Report</div>
+        <div id="recipient-list" style="margin-bottom:10px"></div>
+        <div style="display:flex;gap:7px;margin-bottom:12px">
+          <input class="form-input" id="new-recipient-input" placeholder="Add number or email...">
+          <button class="btn btn-ghost btn-sm" onclick="addRecipient()">➕ Add</button>
+        </div>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-primary btn-full" onclick="confirmSendReport()">📤 Send to Selected</button>
+          <button class="btn btn-ghost" onclick="closeRecipientPicker()">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Today Sales</div><div class="kpi-value" id="d-sales">LYD 0</div><div class="kpi-sub" id="d-inv">0 invoices</div></div>
+      <div class="kpi blue"><div class="kpi-label">Net Revenue</div><div class="kpi-value" id="d-net">LYD 0</div><div class="kpi-sub">after returns</div></div>
+      <div class="kpi green"><div class="kpi-label">Units Sold</div><div class="kpi-value" id="d-qty">0</div><div class="kpi-sub">today</div></div>
+      <div class="kpi amber"><div class="kpi-label">Avg Basket</div><div class="kpi-value" id="d-atv">LYD 0</div><div class="kpi-sub">per invoice</div></div>
+      <div class="kpi purple"><div class="kpi-label">Returns</div><div class="kpi-value" id="d-ret">LYD 0</div><div class="kpi-sub" id="d-retc">0 returns</div></div>
+      <div class="kpi"><div class="kpi-label">Cash</div><div class="kpi-value" id="d-cash">LYD 0</div><div class="kpi-sub">cash sales</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+      <div class="card"><div class="card-title">Recent Transactions</div>
+        <table><thead><tr><th data-i18n-th="invoice_col">Invoice</th><th data-i18n-th="time_col">Time</th><th data-i18n-th="customer_col">Customer</th><th data-i18n-th="payment_col">Payment</th><th data-i18n-th="total_col">Total</th><th>☁️</th></tr></thead>
+        <tbody id="d-txns"></tbody></table>
+      </div>
+      <div class="card"><div class="card-title">⚠️ Low Stock</div><div id="d-low" style="font-size:11px"></div></div>
+    </div>
+  </div>
+
+  <!-- SALE -->
+  <div id="screen-sale" class="screen" style="height:calc(100vh - 100px)">
+    <div class="sale-layout">
+      <div class="cart-area">
+        <div class="cart-hdr">
+          <div><div style="font-size:13px;font-weight:800;color:var(--navy)">🛒 New Sale</div><div style="font-size:10px;color:var(--gray4)" id="inv-num">INV-—</div></div>
+          <input class="form-input" style="width:140px;padding:5px 8px;font-size:11px" id="cust-name" placeholder="Customer name">
+        </div>
+        <div style="padding:9px 13px;background:var(--gray0);border-bottom:1px solid var(--gray2)">
+          <div class="relative">
+            <input class="form-input barcode" id="bc-input" placeholder="📷 Scan barcode or search products..." autocomplete="off" oninput="searchProd(this.value)" onkeydown="bcKey(event)" style="font-size:12px">
+            <div id="search-drop" class="search-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--gray2);border-top:none;border-radius:0 0 8px 8px;max-height:300px;overflow-y:auto;z-index:100"></div>
+          </div>
+        </div>
+        <div class="cart-items" id="cart-items">
+          <div class="cart-empty"><div style="font-size:44px">🛒</div><div style="font-weight:700;color:var(--gray3)">Cart empty</div><div style="font-size:11px;color:var(--gray3)" data-i18n="scan_barcode">Scan barcode to start</div></div>
+        </div>
+        <div class="cart-footer">
+          <div class="cart-row"><span data-i18n-keep="subtotal">Subtotal</span><span id="c-sub">LYD 0.00</span></div>
+          <div class="cart-row"><span data-i18n-keep="discount">Discount <input type="number" id="g-disc" min="0" max="100" value="0" style="width:40px;padding:1px 5px;border:1px solid var(--gray2);border-radius:4px;font-size:10px" onchange="refreshPromoPricing().then(()=>calcCart())">%</span><span id="c-disc" style="color:var(--red)">-LYD 0.00</span></div>
+          <div id="c-promo" style="display:none;font-size:11px;color:var(--green);margin:4px 0;font-weight:700"></div>
+          <div class="cart-row big"><span data-i18n-keep="total">TOTAL</span><span id="c-total">LYD 0.00</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px">
+            <button class="btn btn-ghost btn-full" onclick="clearCart()">🗑 Clear</button>
+            <button class="btn btn-primary btn-full btn-lg" onclick="openPay()">💳 Charge</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="overflow-y:auto;margin:0;display:flex;flex-direction:column">
+        <div class="card-title" style="margin-bottom:9px">📦 Quick Products</div>
+        <div style="font-size:11px;color:var(--gray4);margin-bottom:9px;padding:0 13px">Click any product to add to cart</div>
+        <div id="quick-prods" style="display:grid;gap:6px;padding:0 13px;flex:1;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RETURNS -->
+  <div id="screen-returns" class="screen">
+    <div style="max-width:680px">
+      <div class="card"><div class="card-title" data-i18n-card="process_return">↩️ Process Return</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="r-bc" placeholder="Scan barcode"></div>
+          <div class="form-group"><label class="form-label">Original Invoice #</label><input class="form-input" id="r-inv" placeholder="INV-1001"></div>
+        </div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="r-qty" value="1" min="1"></div>
+          <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="r-amt" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Method</label><select class="form-input" id="r-method"></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">Reason</label>
+          <select class="form-input" id="r-reason"><option>Defective/Damaged</option><option>Wrong size</option><option>Customer change of mind</option><option>Wrong product</option><option>Other</option></select>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doReturn()">✅ Process Return</button>
+      </div>
+      <div class="card"><div class="card-title">Recent Returns</div>
+        <table><thead><tr><th>Ref</th><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>☁️</th></tr></thead>
+        <tbody id="ret-list"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXCHANGE -->
+  <div id="screen-exchange" class="screen">
+    <div style="max-width:800px">
+      <div class="card"><div class="card-title">🔄 Exchange</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+          <div style="background:var(--red-light);border-radius:8px;padding:13px">
+            <div style="font-size:11px;font-weight:800;color:var(--red);margin-bottom:9px">📤 OLD ITEM (returning)</div>
+            <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="ex-old-bc" placeholder="Scan old item" oninput="exLookup('old',this.value)"></div>
+            <div id="ex-old-nm" style="font-size:10px;color:var(--gray4);margin-top:-8px;margin-bottom:7px"></div>
+            <div class="grid-2">
+              <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="ex-old-qty" value="1" oninput="exCalc()"></div>
+              <div class="form-group"><label class="form-label">Price</label><input class="form-input" type="number" id="ex-old-pr" oninput="exCalc()"></div>
+            </div>
+          </div>
+          <div style="background:var(--green-light);border-radius:8px;padding:13px">
+            <div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:9px">📥 NEW ITEM (selling)</div>
+            <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="ex-new-bc" placeholder="Scan new item" oninput="exLookup('new',this.value)"></div>
+            <div id="ex-new-nm" style="font-size:10px;color:var(--gray4);margin-top:-8px;margin-bottom:7px"></div>
+            <div class="grid-2">
+              <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="ex-new-qty" value="1" oninput="exCalc()"></div>
+              <div class="form-group"><label class="form-label">Price</label><input class="form-input" type="number" id="ex-new-pr" oninput="exCalc()"></div>
+            </div>
+          </div>
+        </div>
+        <div class="mt" style="background:var(--gray0);border-radius:8px;padding:11px;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:10px;color:var(--gray4)">Difference</div><div id="ex-diff" style="font-size:19px;font-weight:900;color:var(--navy)">LYD 0.00</div><div id="ex-diff-note" style="font-size:9px;color:var(--gray4)">—</div></div>
+          <select class="form-input" id="ex-pay" style="width:150px"></select>
+        </div>
+        <div class="form-group mt"><label class="form-label">Customer</label><input class="form-input" id="ex-cust" placeholder="Optional"></div>
+        <button class="btn btn-primary btn-full mt" onclick="doExchange()">✅ Complete Exchange</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLAIMS -->
+  <div id="screen-claims" class="screen">
+    <div style="max-width:680px">
+      <div class="card"><div class="card-title">⚠️ Claims & Damage</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="cl-bc" placeholder="Scan" oninput="clLookup(this.value)"></div>
+          <div class="form-group"><label class="form-label">Product</label><input class="form-input" id="cl-name" readonly style="background:var(--gray0)"></div>
+        </div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="cl-qty" value="1" min="1"></div>
+          <div class="form-group"><label class="form-label">Type</label><select class="form-input" id="cl-type"><option>Damage Writeoff</option><option>Supplier Claim</option><option>Theft</option><option>Other</option></select></div>
+          <div class="form-group"><label class="form-label">Value</label><input class="form-input" id="cl-val" readonly style="background:var(--gray0)"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Supplier</label><input class="form-input" id="cl-sup" placeholder="If supplier claim"></div>
+        <button class="btn btn-primary btn-full" onclick="doClaim()">⚠️ Record Claim</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRN RECEIVE -->
+  <div id="screen-grn" class="screen">
+    <div style="max-width:800px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+          <div class="card-title" style="margin:0">📥 Receive Stock from HO</div>
+          <button class="btn btn-blue btn-sm" onclick="grnActiveTab==='pending'?loadGRNs():loadGRNHistory()">🔄 Refresh</button>
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:13px">
+          <button class="btn btn-sm" id="grn-tab-pending" onclick="switchGRNTab('pending')">📥 Pending</button>
+          <button class="btn btn-ghost btn-sm" id="grn-tab-history" onclick="switchGRNTab('history')">📋 Receive History</button>
+        </div>
+        <div id="grn-list"><div style="text-align:center;padding:24px;color:var(--gray3);font-size:12px">Loading from HO...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div id="screen-inventory" class="screen">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">📦 Inventory</div>
+        <div style="display:flex;gap:7px">
+          <input class="form-input" style="width:190px;padding:5px 9px" id="inv-search" placeholder="🔍 Search..." oninput="renderInv()">
+          <select class="form-input" style="width:120px;padding:5px 9px" id="inv-filter" onchange="renderInv()">
+            <option value="all">All</option><option value="low">Low Stock</option><option value="out">Out of Stock</option>
+          </select>
+        </div>
+      </div>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>GRN In</th><th>Sold</th><th>Returns</th><th>Claims</th><th>ON HAND</th><th>Reorder</th><th>Status</th></tr></thead>
+      <tbody id="inv-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="screen-reports" class="screen">
+    <div class="date-filter">
+      <select class="form-input" style="width:120px;padding:6px 9px" id="rpt-preset" onchange="rptPreset()">
+        <option value="today">Today</option><option value="yesterday">Yesterday</option>
+        <option value="week">This Week</option><option value="month">This Month</option>
+        <option value="custom">Custom Range</option>
+      </select>
+      <input type="date" id="rpt-from" class="form-input" style="width:140px;padding:6px 9px">
+      <input type="date" id="rpt-to"   class="form-input" style="width:140px;padding:6px 9px">
+      <button class="btn btn-blue btn-sm" onclick="loadReports()">🔍 Search</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportRpt()">⬇️ Export</button>
+    </div>
+    <div class="kpi-grid" id="rpt-kpis"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card"><div class="card-title">Payment Breakdown</div><div id="rpt-pay"></div></div>
+      <div class="card"><div class="card-title">Top Products</div><div id="rpt-prod"></div></div>
+    </div>
+    <div class="card"><div class="card-title">Transactions</div>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th data-i18n-th="invoice_col">Invoice</th><th>Date</th><th data-i18n-th="time_col">Time</th><th data-i18n-th="customer_col">Customer</th><th>Items</th><th>Units</th><th>Products</th><th data-i18n-keep="subtotal">Subtotal</th><th>Discount</th><th class="profit-col" style="display:none">Profit</th><th data-i18n-th="payment_col">Payment</th><th data-i18n-th="total_col">Total</th></tr></thead>
+      <tbody id="rpt-txns"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- DAY END / CASH HANDOVER -->
+  <div id="screen-handover" class="screen">
+    <div style="max-width:640px">
+      <div class="card">
+        <div class="card-title">💵 Day-End Cash Handover</div>
+        <p style="font-size:11px;color:var(--gray4);margin-bottom:13px">Aaj ki sales se ek handover form banega — cash aur bank sales ka total. Submit karne ke baad accountant physical cash count karke ise "Received" mark karega.</p>
+        <button class="btn btn-primary btn-full" onclick="generateHandover()">📋 Generate Today's Handover Form</button>
+        <div id="handover-preview" style="margin-top:14px"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+          <div class="card-title" style="margin:0">📋 Handover History (this store)</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadHandoverHistory()">🔄 Refresh</button>
+        </div>
+        <div id="handover-history"><div style="text-align:center;padding:18px;color:var(--gray3);font-size:12px">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="screen-settings" class="screen">
+    <div style="max-width:600px">
+      <div class="card" style="border:2px solid var(--accent2)">
+        <div class="card-title" style="color:var(--accent2)">🗄️ Database Server</div>
+        <div style="font-size:12px;color:var(--gray4);margin-bottom:10px" data-i18n="db_connected">Connected to local SQLite/PostgreSQL API — no Google Sheets required.</div>
+        <div class="form-group"><label class="form-label" data-i18n-label="api_base_url">API Base URL</label><input class="form-input" id="api-url" placeholder="http://127.0.0.1:8765"></div>
+        <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn btn-blue" onclick="testConn()" data-i18n-btn="test_connection">🔌 Test Connection</button>
+          <button class="btn btn-green" onclick="reloadCatalog()" data-i18n-btn="reload_catalog">📦 Reload Catalog</button>
+          <button class="btn btn-ghost" onclick="ensureStock()" data-i18n-btn="init_stock">📥 Init Store Stock</button>
+        </div>
+        <div id="conn-res" style="margin-top:9px;font-size:12px;display:none"></div>
+        <div id="server-info" style="margin-top:8px;font-size:11px;color:var(--gray4)"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n-card="payment_methods">🏦 Payment Methods</div>
+        <div id="banks-list" style="margin-bottom:10px;font-size:12px"></div>
+        <button class="btn btn-ghost btn-sm" onclick="reloadCatalog()" data-i18n-btn="reload_banks">🔄 Reload Banks</button>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n-card="store_settings">⚙️ Store Settings</div>
+        <div class="form-group"><label class="form-label" data-i18n="pos_name">POS / Receipt Name</label><input class="form-input" id="s-pos-name" placeholder="ANTA POS"></div>
+        <div class="form-group"><label class="form-label" data-i18n="store_name">Store Name</label><input class="form-input" id="s-name"></div>
+        <div class="form-group"><label class="form-label">Return Policy</label><input class="form-input" id="s-policy" value="Exchange within 7 days with receipt."></div>
+        <div class="form-group"><label class="form-label" data-i18n="language">Language</label>
+          <select class="form-input" id="s-lang"><option value="en" data-i18n="lang_en">English</option><option value="ar">العربية</option></select></div>
+        <div style="font-size:11px;color:var(--gray4);margin-bottom:8px" data-i18n="admin_only">Store/POS name: admin only</div>
+        <button class="btn btn-primary" onclick="saveSettings()" data-i18n-btn="save_btn">💾 Save</button>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n-card="activity_log">📋 Activity Log</div>
+        <div id="sync-log" style="font-size:11px;color:var(--gray4)"></div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- end content -->
+</div><!-- end main -->
+</div><!-- end app -->
+
+<!-- PAYMENT MODAL -->
+<div id="pay-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-title" data-i18n-modal="collect_payment">💳 Collect Payment</div>
+    <div style="background:var(--gray0);border-radius:8px;padding:13px;text-align:center;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--gray4)" data-i18n="amount_due">Amount Due</div>
+      <div style="font-size:30px;font-weight:900;color:var(--navy)" id="pay-due">LYD 0.00</div>
+    </div>
+    <div class="pay-methods" id="pay-grid"></div>
+    <div id="cash-sec" style="display:none">
+      <div class="form-group"><label class="form-label" data-i18n-label="cash_received">Cash Received</label>
+        <input class="form-input" type="number" id="cash-rec" placeholder="0.00" oninput="calcChange()" style="font-size:17px;font-weight:700">
+      </div>
+      <div class="change-box" id="change-box" style="display:none">
+        <div style="font-size:11px;color:var(--green);font-weight:700" data-i18n="chg">CHANGE</div>
+        <div style="font-size:22px;font-weight:900;color:var(--green)" id="change-amt">LYD 0.00</div>
+      </div>
+    </div>
+    <div id="ref-sec" style="display:none;margin-top:10px">
+      <div class="form-group"><label class="form-label" data-i18n-label="txn_ref">Transaction Reference # (from device)</label>
+        <input class="form-input" id="pay-ref" placeholder="e.g. TXN123456">
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:14px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closePay()" data-i18n-btn="cancel">Cancel</button>
+      <button class="btn btn-primary" style="flex:2" onclick="completeSale()" data-i18n-btn="complete_sale">✅ Complete Sale</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVOICE MODAL -->
+<div id="inv-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="width:480px">
+    <div id="inv-content"></div>
+    <div style="display:flex;gap:7px;margin-top:14px" class="no-print">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('inv-modal').style.display='none'" data-i18n-btn="close">Close</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="window.print()" data-i18n-btn="print_btn">🖨️ Print</button>
+      <button class="btn btn-blue" style="flex:1" onclick="printThermal()" data-i18n-btn="thermal_btn">🧾 Thermal ESC/POS</button>
+    </div>
+  </div>
+</div>
+
+<!-- HANDOVER PRINT (hidden on-screen, only shown inside @media print) -->
+<div id="handover-print-modal" style="display:none"></div>
+
+<div id="toast"></div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.3/JsBarcode.all.min.js"></script>
+<script src="/js/app.js?v=20260810h"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

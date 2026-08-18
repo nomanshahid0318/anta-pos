@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANTA Shoes — POS v3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0a1628;--blue:#1a3a6b;--accent:#e63946;--accent2:#2196F3;
+  --green:#2d6a4f;--green-light:#d8f3dc;--red:#c1121f;--red-light:#ffe5e5;
+  --amber:#f59e0b;--amber-light:#fff3cd;--gray0:#f8f9fa;--gray1:#e9ecef;
+  --gray2:#dee2e6;--gray3:#adb5bd;--gray4:#6c757d;--gray5:#343a40;
+  --sidebar:220px;--radius:10px;--shadow:0 2px 12px rgba(0,0,0,.10);
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gray0);color:var(--gray5)}
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy),var(--blue));display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-box{background:#fff;border-radius:16px;padding:36px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center}
+.login-logo{width:72px;height:72px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:28px;margin:0 auto 16px}
+.login-title{font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--gray4);margin-bottom:24px}
+.pin-display{font-size:32px;font-weight:800;letter-spacing:8px;color:var(--navy);background:var(--gray0);border-radius:10px;padding:14px;margin-bottom:16px;min-height:60px}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.pin-btn{padding:16px;border:2px solid var(--gray2);border-radius:10px;font-size:20px;font-weight:700;cursor:pointer;background:#fff;transition:.15s;color:var(--navy)}
+.pin-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.pin-btn.danger{border-color:var(--red);color:var(--red)}
+.pin-btn.danger:hover{background:var(--red);color:#fff}
+.store-select-login{width:100%;padding:10px;border:2px solid var(--gray2);border-radius:8px;font-size:13px;margin-bottom:16px;cursor:pointer}
+/* MAIN */
+#app{display:flex;height:100vh;overflow:hidden}
+#sidebar{width:var(--sidebar);background:var(--navy);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.brand{padding:16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px}
+.brand-logo{width:38px;height:38px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:14px;flex-shrink:0}
+.brand-text{color:#fff;font-size:12px;font-weight:700}.brand-sub{color:rgba(255,255,255,.45);font-size:10px}
+.sync-bar{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:6px;font-size:10px;color:rgba(255,255,255,.7)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot.online{background:#4caf50;box-shadow:0 0 5px #4caf50}.dot.offline{background:#f44336}.dot.syncing{background:#ff9800;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.user-bar{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between}
+.user-info{color:rgba(255,255,255,.8);font-size:11px}
+.user-role{font-size:9px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px;margin-left:4px}
+.logout-btn{color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,.2);padding:2px 8px;border-radius:4px}
+.logout-btn:hover{color:#fff;border-color:#fff}
+nav{flex:1;padding:6px 0}
+.nav-sec{padding:7px 12px 3px;color:rgba(255,255,255,.3);font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 16px;cursor:pointer;color:rgba(255,255,255,.7);font-size:12px;transition:.15s;border-left:3px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.12);color:#fff;border-left-color:var(--accent)}
+.nav-item .ico{font-size:15px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px}
+.sidebar-footer{padding:10px 12px;border-top:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);font-size:10px}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{background:#fff;padding:9px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--gray2);flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.topbar-title{font-size:15px;font-weight:700;color:var(--navy);flex:1}
+#content{flex:1;overflow-y:auto;padding:18px}
+.screen{display:none}.screen.active{display:block}
+.card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:15px;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:700;color:var(--gray4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:#fff;border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);border-left:4px solid var(--accent)}
+.kpi.blue{border-left-color:var(--accent2)}.kpi.green{border-left-color:var(--green)}.kpi.amber{border-left-color:var(--amber)}.kpi.purple{border-left-color:#9c27b0}
+.kpi-label{font-size:9px;color:var(--gray4);font-weight:700;text-transform:uppercase;margin-bottom:3px}
+.kpi-value{font-size:20px;font-weight:800;color:var(--navy)}
+.kpi-sub{font-size:9px;color:var(--gray4);margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--gray0);padding:7px 9px;text-align:left;font-size:10px;font-weight:700;color:var(--gray4);text-transform:uppercase;border-bottom:2px solid var(--gray2)}
+td{padding:7px 9px;border-bottom:1px solid var(--gray1);vertical-align:middle}
+tr:hover td{background:var(--gray0)}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-green{background:var(--green-light);color:var(--green)}.badge-red{background:var(--red-light);color:var(--red)}
+.badge-amber{background:var(--amber-light);color:#856404}.badge-blue{background:#e3f2fd;color:#1565c0}.badge-gray{background:var(--gray1);color:var(--gray4)}
+.form-group{margin-bottom:12px}
+.form-label{display:block;font-size:11px;font-weight:700;color:var(--gray5);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+.form-input{width:100%;padding:8px 11px;border:1.5px solid var(--gray2);border-radius:7px;font-size:13px;background:#fff;transition:border .15s}
+.form-input:focus{outline:none;border-color:var(--accent2)}
+.form-input.barcode{font-size:15px;font-weight:700;border-color:var(--accent2);background:#f0f7ff;letter-spacing:2px}
+select.form-input{cursor:pointer}
+.btn{padding:7px 13px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:.15s;display:inline-flex;align-items:center;gap:5px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#c1121f}
+.btn-blue{background:var(--accent2);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-amber{background:var(--amber);color:#fff}
+.btn-ghost{background:var(--gray1);color:var(--gray5)}.btn-ghost:hover{background:var(--gray2)}
+.btn-sm{padding:4px 9px;font-size:11px}.btn-full{width:100%;justify-content:center}.btn-lg{padding:11px 22px;font-size:14px}
+/* SALE */
+.sale-layout{display:grid;grid-template-columns:1fr 300px;gap:14px;height:calc(100vh - 108px)}
+.cart-area{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.cart-hdr{padding:11px 14px;border-bottom:1px solid var(--gray2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.cart-items{flex:1;overflow-y:auto}
+.cart-item{padding:9px 14px;border-bottom:1px solid var(--gray1);display:flex;align-items:center;gap:9px}
+.qty-btn{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--gray2);background:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.cart-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--gray3);gap:8px;padding:30px}
+.cart-footer{padding:12px 14px;border-top:2px solid var(--gray2);background:var(--gray0);flex-shrink:0}
+.cart-row{display:flex;justify-content:space-between;font-size:12px;color:var(--gray4);padding:2px 0}
+.cart-row.big{font-size:17px;font-weight:800;color:var(--navy);padding-top:7px;border-top:1px solid var(--gray2);margin-top:3px}
+/* PAYMENT MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{background:#fff;border-radius:14px;padding:22px;width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-title{font-size:17px;font-weight:800;color:var(--navy);margin-bottom:18px}
+.pay-methods{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
+.pay-method{padding:9px;border:2px solid var(--gray2);border-radius:8px;cursor:pointer;text-align:center;font-size:11px;font-weight:700;transition:.15s}
+.pay-method:hover{border-color:var(--accent2);background:#f0f7ff}
+.pay-method.selected{border-color:var(--accent2);background:#e3f2fd;color:var(--accent2)}
+.pay-ico{font-size:18px;display:block;margin-bottom:3px}
+.change-box{background:var(--green-light);border-radius:8px;padding:11px;text-align:center;margin-top:7px}
+/* SEARCH */
+.search-drop{position:absolute;background:#fff;border:1.5px solid var(--accent2);border-radius:8px;width:100%;z-index:100;box-shadow:var(--shadow);max-height:190px;overflow-y:auto}
+.search-item{padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--gray1);display:flex;align-items:center;gap:9px}
+.search-item:hover{background:var(--gray0)}
+/* GRN RECEIVE */
+.grn-card{border:1.5px solid var(--gray2);border-radius:10px;padding:14px;margin-bottom:10px}
+.grn-card.pending{border-color:var(--amber);background:var(--amber-light)}
+.grn-card.received{border-color:var(--green);background:var(--green-light)}
+/* REPORTS */
+.date-filter{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.bar-wrap{display:flex;align-items:flex-end;gap:4px;height:90px;padding:6px 0}
+.bar-grp{display:flex;flex-direction:column;align-items:center;flex:1}
+.bar{border-radius:4px 4px 0 0;width:100%;min-height:3px}
+.bar-lbl{font-size:8px;color:var(--gray4);margin-top:3px;font-weight:600}
+/* QUEUE */
+.queue-bar{background:var(--amber-light);border:1px solid var(--amber);border-radius:7px;padding:6px 11px;font-size:11px;color:#856404;display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.queue-bar.hidden{display:none}
+.relative{position:relative}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
+.mt{margin-top:11px}.divider{height:1px;background:var(--gray1);margin:11px 0}
+.fw7{font-weight:700}.text-right{text-align:right}.text-green{color:var(--green)}.text-red{color:var(--red)}
+#toast{position:fixed;bottom:18px;right:18px;background:var(--navy);color:#fff;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+@media print{#sidebar,#topbar,.no-print{display:none!important}#content{padding:0}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">A</div>
+    <div class="login-title">ANTA Shoes POS</div>
+    <div class="login-sub">Select store and enter PIN</div>
+    <select class="store-select-login" id="login-store"></select>
+    <div class="pin-display" id="pin-display">----</div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn danger" onclick="pinClear()">⌫</button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn" style="background:var(--navy);color:#fff;border-color:var(--navy)" onclick="pinSubmit()">✓</button>
+    </div>
+    <div id="login-error" style="color:var(--red);font-size:12px;display:none">❌ Wrong PIN — try again</div>
+    <div style="font-size:11px;color:var(--gray4);margin-top:12px">Default PINs: Store1=1111 | Store2=2222 | Store3=3333</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+<div id="sidebar">
+  <div class="brand">
+    <div class="brand-logo">A</div>
+    <div><div class="brand-text">ANTA Shoes</div><div class="brand-sub" id="sb-store">POS</div></div>
+  </div>
+  <div class="sync-bar">
+    <div class="dot offline" id="sync-dot"></div>
+    <div><div id="sync-label" style="font-size:10px">Connecting...</div><div id="sync-last" style="font-size:9px;opacity:.6">—</div></div>
+  </div>
+  <div class="user-bar">
+    <div class="user-info"><span id="user-name">—</span><span class="user-role" id="user-role">—</span></div>
+    <div class="logout-btn" onclick="logout()">Logout</div>
+  </div>
+  <nav>
+    <div class="nav-sec">Main</div>
+    <div class="nav-item active" onclick="show('dashboard')"><span class="ico">📊</span>Dashboard</div>
+    <div class="nav-item" onclick="show('sale')"><span class="ico">🛒</span>New Sale</div>
+    <div class="nav-sec">Transactions</div>
+    <div class="nav-item" onclick="show('returns')"><span class="ico">↩️</span>Returns</div>
+    <div class="nav-item" onclick="show('exchange')"><span class="ico">🔄</span>Exchange</div>
+    <div class="nav-item" onclick="show('claims')"><span class="ico">⚠️</span>Claims</div>
+    <div class="nav-sec">Stock</div>
+    <div class="nav-item" onclick="show('grn')"><span class="ico">📥</span>Receive Stock (GRN) <span class="nav-badge" id="grn-badge">0</span></div>
+    <div class="nav-item" onclick="show('inventory')"><span class="ico">📦</span>Inventory <span class="nav-badge" id="low-badge">0</span></div>
+    <div class="nav-sec">Finance</div>
+    <div class="nav-item" onclick="show('expenses')"><span class="ico">💸</span>Expenses</div>
+    <div class="nav-sec">Reports</div>
+    <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Reports</div>
+    <div class="nav-sec">Settings</div>
+    <div class="nav-item" onclick="show('settings')"><span class="ico">⚙️</span>Settings</div>
+  </nav>
+  <div class="sidebar-footer">Queue: <span id="q-count">0</span> | <span id="shift-t">—</span></div>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <div class="topbar-title" id="screen-title">Dashboard</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:10px"><div class="dot offline" id="top-dot"></div><span id="top-sync">Offline</span></div>
+    <div id="clock" style="font-size:11px;color:var(--gray4)"></div>
+    <button class="btn btn-primary btn-sm" onclick="show('sale')">➕ New Sale</button>
+    <button class="btn btn-ghost btn-sm" onclick="syncNow()">🔄 Sync</button>
+  </div>
+  <div id="content">
+
+  <!-- DASHBOARD -->
+  <div id="screen-dashboard" class="screen active">
+    <div id="q-bar" class="queue-bar hidden">⚠️ Offline: <span id="q-bar-n">0</span> pending — will sync when connected</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Today Sales</div><div class="kpi-value" id="d-sales">LYD 0</div><div class="kpi-sub" id="d-inv">0 invoices</div></div>
+      <div class="kpi blue"><div class="kpi-label">Net Revenue</div><div class="kpi-value" id="d-net">LYD 0</div><div class="kpi-sub">after returns</div></div>
+      <div class="kpi green"><div class="kpi-label">Units Sold</div><div class="kpi-value" id="d-qty">0</div><div class="kpi-sub">today</div></div>
+      <div class="kpi amber"><div class="kpi-label">Avg Basket</div><div class="kpi-value" id="d-atv">LYD 0</div><div class="kpi-sub">per invoice</div></div>
+      <div class="kpi purple"><div class="kpi-label">Returns</div><div class="kpi-value" id="d-ret">LYD 0</div><div class="kpi-sub" id="d-retc">0 returns</div></div>
+      <div class="kpi"><div class="kpi-label">Cash</div><div class="kpi-value" id="d-cash">LYD 0</div><div class="kpi-sub">cash sales</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+      <div class="card"><div class="card-title">Recent Transactions</div>
+        <table><thead><tr><th>Invoice</th><th>Time</th><th>Customer</th><th>Payment</th><th>Total</th><th>☁️</th></tr></thead>
+        <tbody id="d-txns"></tbody></table>
+      </div>
+      <div class="card"><div class="card-title">⚠️ Low Stock</div><div id="d-low" style="font-size:11px"></div></div>
+    </div>
+  </div>
+
+  <!-- SALE -->
+  <div id="screen-sale" class="screen" style="height:calc(100vh - 100px)">
+    <div class="sale-layout">
+      <div class="cart-area">
+        <div class="cart-hdr">
+          <div><div style="font-size:13px;font-weight:800;color:var(--navy)">🛒 New Sale</div><div style="font-size:10px;color:var(--gray4)" id="inv-num">INV-—</div></div>
+          <input class="form-input" style="width:140px;padding:5px 8px;font-size:11px" id="cust-name" placeholder="Customer name">
+        </div>
+        <div style="padding:9px 13px;background:var(--gray0);border-bottom:1px solid var(--gray2)">
+          <div class="relative">
+            <input class="form-input barcode" id="bc-input" placeholder="📷 Scan barcode..." autocomplete="off" oninput="searchProd(this.value)" onkeydown="bcKey(event)">
+            <div id="search-drop" class="search-drop" style="display:none"></div>
+          </div>
+        </div>
+        <div class="cart-items" id="cart-items">
+          <div class="cart-empty"><div style="font-size:44px">🛒</div><div style="font-weight:700;color:var(--gray3)">Cart empty</div><div style="font-size:11px;color:var(--gray3)">Scan barcode to start</div></div>
+        </div>
+        <div class="cart-footer">
+          <div class="cart-row"><span>Subtotal</span><span id="c-sub">LYD 0.00</span></div>
+          <div class="cart-row"><span>Discount <input type="number" id="g-disc" min="0" max="100" value="0" style="width:40px;padding:1px 5px;border:1px solid var(--gray2);border-radius:4px;font-size:10px" onchange="calcCart()">%</span><span id="c-disc" style="color:var(--red)">-LYD 0.00</span></div>
+          <div class="cart-row big"><span>TOTAL</span><span id="c-total">LYD 0.00</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px">
+            <button class="btn btn-ghost btn-full" onclick="clearCart()">🗑 Clear</button>
+            <button class="btn btn-primary btn-full btn-lg" onclick="openPay()">💳 Charge</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="overflow-y:auto;margin:0"><div class="card-title">Products</div><div id="quick-prods" style="display:grid;gap:6px"></div></div>
+    </div>
+  </div>
+
+  <!-- RETURNS -->
+  <div id="screen-returns" class="screen">
+    <div style="max-width:680px">
+      <div class="card"><div class="card-title">↩️ Process Return</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="r-bc" placeholder="Scan barcode"></div>
+          <div class="form-group"><label class="form-label">Original Invoice #</label><input class="form-input" id="r-inv" placeholder="INV-1001"></div>
+        </div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="r-qty" value="1" min="1"></div>
+          <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="r-amt" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Method</label><select class="form-input" id="r-method"></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">Reason</label>
+          <select class="form-input" id="r-reason"><option>Defective/Damaged</option><option>Wrong size</option><option>Customer change of mind</option><option>Wrong product</option><option>Other</option></select>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doReturn()">✅ Process Return</button>
+      </div>
+      <div class="card"><div class="card-title">Recent Returns</div>
+        <table><thead><tr><th>Ref</th><th>Date</th><th>Product</th><th>Qty</th><th>Amount</th><th>☁️</th></tr></thead>
+        <tbody id="ret-list"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXCHANGE -->
+  <div id="screen-exchange" class="screen">
+    <div style="max-width:800px">
+      <div class="card"><div class="card-title">🔄 Exchange</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+          <div style="background:var(--red-light);border-radius:8px;padding:13px">
+            <div style="font-size:11px;font-weight:800;color:var(--red);margin-bottom:9px">📤 OLD ITEM (returning)</div>
+            <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="ex-old-bc" placeholder="Scan old item" oninput="exLookup('old',this.value)"></div>
+            <div id="ex-old-nm" style="font-size:10px;color:var(--gray4);margin-top:-8px;margin-bottom:7px"></div>
+            <div class="grid-2">
+              <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="ex-old-qty" value="1" oninput="exCalc()"></div>
+              <div class="form-group"><label class="form-label">Price</label><input class="form-input" type="number" id="ex-old-pr" oninput="exCalc()"></div>
+            </div>
+          </div>
+          <div style="background:var(--green-light);border-radius:8px;padding:13px">
+            <div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:9px">📥 NEW ITEM (selling)</div>
+            <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="ex-new-bc" placeholder="Scan new item" oninput="exLookup('new',this.value)"></div>
+            <div id="ex-new-nm" style="font-size:10px;color:var(--gray4);margin-top:-8px;margin-bottom:7px"></div>
+            <div class="grid-2">
+              <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="ex-new-qty" value="1" oninput="exCalc()"></div>
+              <div class="form-group"><label class="form-label">Price</label><input class="form-input" type="number" id="ex-new-pr" oninput="exCalc()"></div>
+            </div>
+          </div>
+        </div>
+        <div class="mt" style="background:var(--gray0);border-radius:8px;padding:11px;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:10px;color:var(--gray4)">Difference</div><div id="ex-diff" style="font-size:19px;font-weight:900;color:var(--navy)">LYD 0.00</div><div id="ex-diff-note" style="font-size:9px;color:var(--gray4)">—</div></div>
+          <select class="form-input" id="ex-pay" style="width:150px"></select>
+        </div>
+        <div class="form-group mt"><label class="form-label">Customer</label><input class="form-input" id="ex-cust" placeholder="Optional"></div>
+        <button class="btn btn-primary btn-full mt" onclick="doExchange()">✅ Complete Exchange</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLAIMS -->
+  <div id="screen-claims" class="screen">
+    <div style="max-width:680px">
+      <div class="card"><div class="card-title">⚠️ Claims & Damage</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="cl-bc" placeholder="Scan" oninput="clLookup(this.value)"></div>
+          <div class="form-group"><label class="form-label">Product</label><input class="form-input" id="cl-name" readonly style="background:var(--gray0)"></div>
+        </div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Qty</label><input class="form-input" type="number" id="cl-qty" value="1" min="1"></div>
+          <div class="form-group"><label class="form-label">Type</label><select class="form-input" id="cl-type"><option>Damage Writeoff</option><option>Supplier Claim</option><option>Theft</option><option>Other</option></select></div>
+          <div class="form-group"><label class="form-label">Value</label><input class="form-input" id="cl-val" readonly style="background:var(--gray0)"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Supplier</label><input class="form-input" id="cl-sup" placeholder="If supplier claim"></div>
+        <button class="btn btn-primary btn-full" onclick="doClaim()">⚠️ Record Claim</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRN RECEIVE -->
+  <div id="screen-grn" class="screen">
+    <div style="max-width:800px">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+          <div class="card-title" style="margin:0">📥 Receive Stock from HO</div>
+          <button class="btn btn-blue btn-sm" onclick="loadGRNs()">🔄 Refresh</button>
+        </div>
+        <div id="grn-list"><div style="text-align:center;padding:24px;color:var(--gray3);font-size:12px">Loading from HO...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div id="screen-inventory" class="screen">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">📦 Inventory</div>
+        <div style="display:flex;gap:7px">
+          <input class="form-input" style="width:190px;padding:5px 9px" id="inv-search" placeholder="🔍 Search..." oninput="renderInv()">
+          <select class="form-input" style="width:120px;padding:5px 9px" id="inv-filter" onchange="renderInv()">
+            <option value="all">All</option><option value="low">Low Stock</option><option value="out">Out of Stock</option>
+          </select>
+        </div>
+      </div>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>GRN In</th><th>Sold</th><th>Returns</th><th>Claims</th><th>ON HAND</th><th>Reorder</th><th>Status</th></tr></thead>
+      <tbody id="inv-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- EXPENSES -->
+  <div id="screen-expenses" class="screen">
+    <div style="max-width:700px">
+      <div class="card"><div class="card-title">💸 Record Expense</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="exp-date"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-input" id="exp-cat">
+              <option>Rent</option><option>Salaries</option><option>Utilities</option>
+              <option>Advertising</option><option>Maintenance</option><option>Transport</option>
+              <option>Cleaning</option><option>Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="exp-desc" placeholder="Details..."></div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="exp-amt" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Payment Method</label><select class="form-input" id="exp-pay"></select></div>
+          <div class="form-group"><label class="form-label">Reference #</label><input class="form-input" id="exp-ref" placeholder="Optional"></div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="saveExpense()">💾 Save Expense</button>
+      </div>
+      <div class="card"><div class="card-title">Recent Expenses</div>
+        <table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Payment</th><th>☁️</th></tr></thead>
+        <tbody id="exp-list"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="screen-reports" class="screen">
+    <div class="date-filter">
+      <select class="form-input" style="width:120px;padding:6px 9px" id="rpt-preset" onchange="rptPreset()">
+        <option value="today">Today</option><option value="yesterday">Yesterday</option>
+        <option value="week">This Week</option><option value="month">This Month</option>
+        <option value="custom">Custom Range</option>
+      </select>
+      <input type="date" id="rpt-from" class="form-input" style="width:140px;padding:6px 9px">
+      <input type="date" id="rpt-to"   class="form-input" style="width:140px;padding:6px 9px">
+      <button class="btn btn-blue btn-sm" onclick="loadReports()">🔍 Search</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportRpt()">⬇️ Export</button>
+    </div>
+    <div class="kpi-grid" id="rpt-kpis"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card"><div class="card-title">Payment Breakdown</div><div id="rpt-pay"></div></div>
+      <div class="card"><div class="card-title">Top Products</div><div id="rpt-prod"></div></div>
+    </div>
+    <div class="card"><div class="card-title">Transactions</div>
+      <table><thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Payment</th><th>Items</th><th>Total</th><th>☁️</th></tr></thead>
+      <tbody id="rpt-txns"></tbody></table>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="screen-settings" class="screen">
+    <div style="max-width:600px">
+      <div class="card" style="border:2px solid var(--accent2)">
+        <div class="card-title" style="color:var(--accent2)">☁️ Google Sheets Sync</div>
+        <div class="form-group"><label class="form-label">Apps Script URL</label><input class="form-input" id="gs-url" placeholder="https://script.google.com/macros/s/..."></div>
+        <div class="form-group"><label class="form-label">Secret Key</label><input class="form-input" id="gs-key" placeholder="ANTA2026SECRET" type="password"></div>
+        <div style="display:flex;gap:7px;margin-top:9px">
+          <button class="btn btn-blue" onclick="testConn()">🔌 Test</button>
+          <button class="btn btn-green" onclick="loadProductsFromSheets()">📦 Load Products</button>
+          <button class="btn btn-ghost" onclick="pushAll()">⬆️ Push All</button>
+        </div>
+        <div id="conn-res" style="margin-top:9px;font-size:12px;display:none"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏦 Payment Methods</div>
+        <div id="banks-list" style="margin-bottom:10px;font-size:12px"></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadBanks()">🔄 Reload from HO</button>
+      </div>
+      <div class="card">
+        <div class="card-title">⚙️ Store Settings</div>
+        <div class="form-group"><label class="form-label">Store Name</label><input class="form-input" id="s-name"></div>
+        <div class="form-group"><label class="form-label">Return Policy</label><input class="form-input" id="s-policy" value="Exchange within 7 days with receipt."></div>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 Save</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Sync Log</div>
+        <div id="sync-log" style="font-size:11px;color:var(--gray4)"></div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- end content -->
+</div><!-- end main -->
+</div><!-- end app -->
+
+<!-- PAYMENT MODAL -->
+<div id="pay-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-title">💳 Collect Payment</div>
+    <div style="background:var(--gray0);border-radius:8px;padding:13px;text-align:center;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--gray4)">Amount Due</div>
+      <div style="font-size:30px;font-weight:900;color:var(--navy)" id="pay-due">LYD 0.00</div>
+    </div>
+    <div class="pay-methods" id="pay-grid"></div>
+    <div id="cash-sec" style="display:none">
+      <div class="form-group"><label class="form-label">Cash Received</label>
+        <input class="form-input" type="number" id="cash-rec" placeholder="0.00" oninput="calcChange()" style="font-size:17px;font-weight:700">
+      </div>
+      <div class="change-box" id="change-box" style="display:none">
+        <div style="font-size:11px;color:var(--green);font-weight:700">CHANGE</div>
+        <div style="font-size:22px;font-weight:900;color:var(--green)" id="change-amt">LYD 0.00</div>
+      </div>
+    </div>
+    <div id="ref-sec" style="display:none;margin-top:10px">
+      <div class="form-group"><label class="form-label">Transaction Reference # (from device)</label>
+        <input class="form-input" id="pay-ref" placeholder="e.g. TXN123456">
+      </div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:14px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closePay()">Cancel</button>
+      <button class="btn btn-primary" style="flex:2" onclick="completeSale()">✅ Complete Sale</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVOICE MODAL -->
+<div id="inv-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="width:480px">
+    <div id="inv-content"></div>
+    <div style="display:flex;gap:7px;margin-top:14px" class="no-print">
+      <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('inv-modal').style.display='none'">Close</button>
+      <button class="btn btn-blue" style="flex:1" onclick="window.print()">🖨️ Print</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG & STATE
+// ═══════════════════════════════════════════
+let CFG = {
+  url: localStorage.getItem('anta_url') || '',
+  key: localStorage.getItem('anta_key') || 'ANTA2026SECRET',
+};
+let DB = {
+  products:[], transactions:[], returns:[], exchanges:[], claims:[], expenses:[],
+  settings:{storeName:'Store 1 — Tripoli', storeId:'s1', policy:'Exchange within 7 days with receipt.', currency:'LYD'},
+  nextInv:1, shiftStart:new Date().toISOString()
+};
+let BANKS = [{id:'cash',name:'Cash',device:'',ico:'💵'}];
+let STORES = [];
+let currentUser = null;
+let cart = [];
+let selPay = 'Cash';
+let syncQueue = [];
+let isOnline = false;
+let isSyncing = false;
+let syncLog = [];
+let pinEntry = '';
+
+function loadState(){
+  try{
+    const s=localStorage.getItem('anta_pos_v3'); if(s) DB={...DB,...JSON.parse(s)};
+    const b=localStorage.getItem('anta_banks_v3'); if(b) BANKS=JSON.parse(b);
+    const q=localStorage.getItem('anta_queue_v3'); if(q) syncQueue=JSON.parse(q);
+    const l=localStorage.getItem('anta_log_v3'); if(l) syncLog=JSON.parse(l);
+    CFG.url=localStorage.getItem('anta_url')||'';
+    CFG.key=localStorage.getItem('anta_key')||'ANTA2026SECRET';
+  }catch(e){}
+}
+function saveState(){ try{localStorage.setItem('anta_pos_v3',JSON.stringify(DB));}catch(e){} }
+function saveQueue(){ try{localStorage.setItem('anta_queue_v3',JSON.stringify(syncQueue));}catch(e){} }
+function saveBanks(){ try{localStorage.setItem('anta_banks_v3',JSON.stringify(BANKS));}catch(e){} }
+
+// ═══════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════
+async function api(action, payload={}){
+  if(!CFG.url) return null;
+  try{
+    const body = JSON.stringify({action, key:CFG.key, ...payload});
+    const res = await fetch(CFG.url, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body: body
+    });
+    const text = await res.text();
+    try{ return JSON.parse(text); }
+    catch(e){ console.log('Parse error:', text.slice(0,200)); return null; }
+  }catch(e){ console.log('API error:', e.message); return null; }
+}
+async function apiGet(action, params=''){
+  if(!CFG.url) return null;
+  try{
+    const res=await fetch(`${CFG.url}?action=${action}&key=${CFG.key}${params?'&'+params:''}`);
+    return await res.json();
+  }catch(e){return null;}
+}
+
+// ═══════════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════════
+async function initLogin(){
+  // Load stores
+  const stored = localStorage.getItem('anta_stores');
+  if(stored) STORES=JSON.parse(stored);
+  if(!STORES.length) STORES=[{StoreID:'s1',Name:'Store 1 — Tripoli'},{StoreID:'s2',Name:'Store 2 — Benghazi'},{StoreID:'s3',Name:'Store 3 — Misrata'}];
+  const sel=document.getElementById('login-store');
+  sel.innerHTML=STORES.map(s=>`<option value="${s.StoreID}">${s.Name}</option>`).join('');
+  // Try to load stores from sheets
+  if(CFG.url){
+    const res=await apiGet('stores');
+    if(res&&res.data&&res.data.length){
+      STORES=res.data;
+      localStorage.setItem('anta_stores',JSON.stringify(STORES));
+      sel.innerHTML=STORES.map(s=>`<option value="${s.StoreID}">${s.Name}</option>`).join('');
+    }
+  }
+}
+
+function pinPress(d){
+  if(pinEntry.length>=4) return;
+  pinEntry+=d;
+  document.getElementById('pin-display').textContent='●'.repeat(pinEntry.length)+'—'.repeat(4-pinEntry.length);
+}
+function pinClear(){
+  pinEntry=pinEntry.slice(0,-1);
+  document.getElementById('pin-display').textContent='●'.repeat(pinEntry.length)+'—'.repeat(4-pinEntry.length);
+}
+async function pinSubmit(){
+  if(!pinEntry){ document.getElementById('login-error').style.display='block'; return; }
+  const storeId=document.getElementById('login-store').value;
+  const storeName=STORES.find(s=>s.StoreID===storeId)?.Name||storeId;
+  // Try online verification first
+  if(CFG.url){
+    const res=await api('verify_pin',{storeId,pin:pinEntry});
+    if(res&&res.status==='ok'){
+      doLogin(res.user,storeId,storeName); return;
+    }
+  }
+  // Fallback: default PINs
+  const defaults={'s1':'1111','s2':'2222','s3':'3333','HO':'1234'};
+  if(defaults[storeId]===pinEntry){
+    doLogin({name:'Cashier',role:'cashier',storeId,storeName},storeId,storeName);
+  } else {
+    document.getElementById('login-error').style.display='block';
+    pinEntry='';
+    document.getElementById('pin-display').textContent='----';
+  }
+}
+function doLogin(user,storeId,storeName){
+  currentUser=user;
+  DB.settings.storeId=storeId;
+  DB.settings.storeName=storeName;
+  saveState();
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('sb-store').textContent=storeName;
+  document.getElementById('user-name').textContent=user.name||'Cashier';
+  document.getElementById('user-role').textContent=user.role||'cashier';
+  document.getElementById('shift-t').textContent=new Date().toTimeString().slice(0,5);
+  initApp();
+}
+function logout(){
+  if(confirm('Log out?')){
+    currentUser=null; pinEntry='';
+    document.getElementById('pin-display').textContent='----';
+    document.getElementById('app').style.display='none';
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('login-error').style.display='none';
+  }
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function fmt(n){return'LYD '+(+n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function fmtN(n){return(+n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function today(){return new Date().toISOString().split('T')[0];}
+function timeNow(){return new Date().toTimeString().slice(0,5);}
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=type==='error'?'var(--red)':type==='warn'?'#856404':type==='info'?'var(--accent2)':'var(--navy)';
+  t.style.display='block';
+  setTimeout(()=>t.style.display='none',3000);
+}
+function getProd(bc){return DB.products.find(p=>p.barcode===bc||p.name.toLowerCase().includes(bc.toLowerCase()));}
+function getStock(bc){
+  const p=DB.products.find(pr=>pr.barcode===bc); if(!p) return 0;
+  const sold=DB.transactions.filter(t=>t.type==='sale').reduce((s,t)=>s+(t.items||[]).filter(i=>i.barcode===bc).reduce((a,i)=>a+i.qty,0),0);
+  const rets=DB.returns.filter(r=>r.barcode===bc).reduce((s,r)=>s+r.qty,0);
+  const exOut=DB.exchanges.filter(e=>e.oldBarcode===bc).reduce((s,e)=>s+e.oldQty,0);
+  const exIn=DB.exchanges.filter(e=>e.newBarcode===bc).reduce((s,e)=>s+e.newQty,0);
+  const cl=DB.claims.filter(c=>c.barcode===bc).reduce((s,c)=>s+c.qty,0);
+  return(p.opening||0)-sold+rets-exOut+exIn-cl;
+}
+function syncIcon(ok){return ok?'<span class="badge badge-green">☁️</span>':'<span class="badge badge-gray">📴</span>';}
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+function show(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const s=document.getElementById('screen-'+name); if(s) s.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'")) n.classList.add('active');});
+  const titles={dashboard:'Dashboard',sale:'New Sale',returns:'Returns',exchange:'Exchange',claims:'Claims & Damage',grn:'Receive Stock (GRN)',inventory:'Inventory',expenses:'Expenses',reports:'Reports',settings:'Settings'};
+  document.getElementById('screen-title').textContent=titles[name]||name;
+  if(name==='dashboard') renderDash();
+  if(name==='sale'){renderQuick();setTimeout(()=>document.getElementById('bc-input').focus(),80);}
+  if(name==='inventory') renderInv();
+  if(name==='reports'){rptPreset();loadReports();}
+  if(name==='grn') loadGRNs();
+  if(name==='returns') renderRetList();
+  if(name==='expenses') renderExpList();
+  if(name==='settings'){
+    document.getElementById('gs-url').value=CFG.url;
+    document.getElementById('gs-key').value=CFG.key;
+    document.getElementById('s-name').value=DB.settings.storeName||'';
+    document.getElementById('s-policy').value=DB.settings.policy||'';
+    renderBanksList(); updateSyncLog();
+  }
+}
+
+// ═══════════════════════════════════════════
+// SYNC
+// ═══════════════════════════════════════════
+async function syncRecord(action,payload){
+  const res=await api(action,payload);
+  if(res&&(res.status==='ok'||res.status==='duplicate')){
+    addLog(action,'✅'); return true;
+  }
+  syncQueue.push({action,payload,ts:new Date().toISOString()});
+  saveQueue(); updateQueueUI(); addLog(action,'📴 queued'); return false;
+}
+async function processQueue(){
+  if(isSyncing||!syncQueue.length||!CFG.url) return;
+  isSyncing=true; setSyncStatus('syncing','Syncing queue...');
+  const failed=[];
+  for(const item of syncQueue){
+    const res=await api(item.action,item.payload);
+    if(res&&(res.status==='ok'||res.status==='duplicate')) addLog(item.action,'✅ queued sync');
+    else failed.push(item);
+  }
+  syncQueue=failed; saveQueue(); isSyncing=false; updateQueueUI();
+  setSyncStatus(failed.length?'online':'online', failed.length?failed.length+' still pending':'All synced');
+}
+async function syncNow(){ await processQueue(); toast('🔄 Sync complete!'); }
+async function pushAll(){
+  if(!CFG.url){toast('Set URL first','error');return;}
+  toast('Pushing all data...','info');
+  for(const t of DB.transactions) await api('push_sale',{transaction:t});
+  for(const r of DB.returns) await api('push_return',{returnData:r});
+  for(const p of DB.products) await api('push_product',{product:p});
+  await processQueue();
+  toast('✅ All data pushed!');
+}
+function setSyncStatus(state,label){
+  const dots=[document.getElementById('sync-dot'),document.getElementById('top-dot')];
+  dots.forEach(d=>{if(d)d.className='dot '+state;});
+  const lbl=document.getElementById('sync-label'); if(lbl) lbl.textContent=state==='online'?'🟢 Live':state==='syncing'?'🔄 Syncing':'🔴 Offline';
+  const top=document.getElementById('top-sync'); if(top) top.textContent=state==='online'?'Online':state==='syncing'?'Syncing':'Offline';
+  const last=document.getElementById('sync-last'); if(last&&label) last.textContent=label;
+  isOnline=state==='online';
+}
+function updateQueueUI(){
+  const n=syncQueue.length;
+  document.getElementById('q-count').textContent=n;
+  const bar=document.getElementById('q-bar');
+  if(bar){bar.classList.toggle('hidden',n===0);const bn=document.getElementById('q-bar-n');if(bn)bn.textContent=n;}
+}
+function addLog(action,status){
+  syncLog.unshift({t:new Date().toTimeString().slice(0,8),action,status});
+  try{localStorage.setItem('anta_log_v3',JSON.stringify(syncLog.slice(0,50)));}catch(e){}
+}
+function updateSyncLog(){
+  const el=document.getElementById('sync-log'); if(!el) return;
+  el.innerHTML=syncLog.slice(0,10).map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--gray1);display:flex;gap:8px"><span style="color:var(--gray3)">${l.t}</span><span>${l.action}</span><span>${l.status}</span></div>`).join('')||'<div style="color:var(--gray3);padding:8px;text-align:center">No sync activity</div>';
+}
+// Check connection every 30s
+setInterval(async()=>{
+  if(!CFG.url) return;
+  const res=await apiGet('ping');
+  if(res&&res.status==='ok'){if(!isOnline){isOnline=true;setSyncStatus('online','Auto-reconnected');processQueue();}}
+  else{if(isOnline){isOnline=false;setSyncStatus('offline','Connection lost');}}
+},30000);
+
+// ═══════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════
+function renderDash(){
+  const d=today();
+  const tt=DB.transactions.filter(t=>t.date===d&&t.type==='sale');
+  const ts=tt.reduce((s,t)=>s+t.total,0);
+  const tq=tt.reduce((s,t)=>s+t.items.reduce((a,i)=>a+i.qty,0),0);
+  const tr=DB.returns.filter(r=>r.date===d); const trv=tr.reduce((s,r)=>s+r.amount,0);
+  const cash=tt.filter(t=>t.payment==='Cash').reduce((s,t)=>s+t.total,0);
+  const inv=tt.length; const atv=inv?ts/inv:0;
+  document.getElementById('d-sales').textContent=fmt(ts);
+  document.getElementById('d-inv').textContent=inv+' invoices';
+  document.getElementById('d-net').textContent=fmt(ts-trv);
+  document.getElementById('d-qty').textContent=tq;
+  document.getElementById('d-atv').textContent=fmt(atv);
+  document.getElementById('d-ret').textContent=fmt(trv);
+  document.getElementById('d-retc').textContent=tr.length+' returns';
+  document.getElementById('d-cash').textContent=fmt(cash);
+  const low=DB.products.filter(p=>getStock(p.barcode)<=p.reorder);
+  document.getElementById('low-badge').textContent=low.length;
+  document.getElementById('d-low').innerHTML=low.slice(0,5).map(p=>{const s=getStock(p.barcode);return`<div style="padding:5px 0;border-bottom:1px solid var(--gray1);display:flex;justify-content:space-between;font-size:11px"><span style="font-weight:600;flex:1">${p.name.slice(0,28)}</span><span class="badge ${s<=0?'badge-red':'badge-amber'}">${s<=0?'OUT':s}</span></div>`;}).join('')||'<div style="color:var(--gray3);font-size:11px;padding:8px">All stock OK ✅</div>';
+  document.getElementById('d-txns').innerHTML=[...DB.transactions].reverse().slice(0,7).map(t=>`<tr><td class="fw7">${t.id}</td><td>${t.time||'—'}</td><td>${t.customer}</td><td>${t.payment}</td><td class="fw7">${fmt(t.total)}</td><td>${syncIcon(t.synced)}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No transactions today</td></tr>';
+  updateQueueUI();
+}
+
+// ═══════════════════════════════════════════
+// SALE
+// ═══════════════════════════════════════════
+function renderQuick(){
+  const _sp = DB.settings.storeId ? DB.settings.storeId.toUpperCase() : 'S1';
+  document.getElementById('inv-num').textContent = _sp + '-' + String(DB.nextInv).padStart(4,'0');
+  const d=document.getElementById('quick-prods');
+  d.innerHTML=DB.products.filter(p=>p.active!=='N').map(p=>{const s=getStock(p.barcode);return`<div onclick="addToCart('${p.barcode}')" style="padding:9px;border:1.5px solid var(--gray2);border-radius:8px;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.borderColor='var(--accent2)';this.style.background='#f0f7ff'" onmouseout="this.style.borderColor='var(--gray2)';this.style.background='#fff'"><div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:1px">${p.name}</div><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:800;color:var(--accent)">${fmt(p.retail)}</span><span class="badge ${s<=0?'badge-red':s<=p.reorder?'badge-amber':'badge-green'}">${s<=0?'OUT':s}</span></div></div>`;}).join('');
+}
+function searchProd(v){
+  const sr=document.getElementById('search-drop');
+  if(!v||v.length<2){sr.style.display='none';return;}
+  const m=DB.products.filter(p=>p.barcode.includes(v)||p.name.toLowerCase().includes(v.toLowerCase())).slice(0,6);
+  if(!m.length){sr.style.display='none';return;}
+  sr.innerHTML=m.map(p=>{const s=getStock(p.barcode);return`<div class="search-item" onclick="addToCart('${p.barcode}');document.getElementById('bc-input').value='';document.getElementById('search-drop').style.display='none'"><div><div style="font-size:11px;font-weight:700;color:var(--navy)">${p.name}</div><div style="font-size:9px;color:var(--gray4)">${p.barcode} · Stock: ${s}</div></div><div style="font-size:12px;font-weight:800;color:var(--accent);margin-left:auto">${fmt(p.retail)}</div></div>`;}).join('');
+  sr.style.display='block';
+}
+function bcKey(e){if(e.key==='Enter'){const v=e.target.value.trim();if(v){addToCart(v);e.target.value='';document.getElementById('search-drop').style.display='none';}}}
+function addToCart(bc){
+  const p=DB.products.find(pr=>pr.barcode===bc||pr.name.toLowerCase()===bc.toLowerCase());
+  if(!p){toast('❌ Not found: '+bc,'error');return;}
+  const s=getStock(p.barcode);
+  if(s<=0){toast('⚠️ Out of stock','warn');return;}
+  const ex=cart.find(i=>i.barcode===p.barcode);
+  if(ex){if(ex.qty>=s){toast('⚠️ Max stock: '+s,'warn');return;}ex.qty++;}
+  else cart.push({barcode:p.barcode,name:p.name,qty:1,price:p.retail,cost:parseFloat(p.cost)||0,discount:0});
+  renderCart(); toast('✅ '+p.name.slice(0,25));
+}
+function renderCart(){
+  const ci=document.getElementById('cart-items');
+  if(!cart.length){ci.innerHTML='<div class="cart-empty"><div style="font-size:44px">🛒</div><div style="font-weight:700;color:var(--gray3)">Cart empty</div></div>';}
+  else ci.innerHTML=cart.map((item,idx)=>`<div class="cart-item"><div style="flex:1"><div style="font-size:11px;font-weight:700;color:var(--navy)">${item.name}</div><div style="font-size:10px;color:var(--gray4)">${fmt(item.price)} · <input type="number" value="${item.discount}" min="0" max="100" style="width:35px;font-size:9px;border:1px solid var(--gray2);border-radius:3px;padding:1px 3px" onchange="cart[${idx}].discount=+this.value;calcCart()">% disc</div></div><div style="display:flex;align-items:center;gap:5px"><button class="qty-btn" onclick="chQty(${idx},-1)">−</button><span style="font-weight:700;min-width:18px;text-align:center">${item.qty}</span><button class="qty-btn" onclick="chQty(${idx},1)">+</button></div><div style="text-align:right"><div style="font-size:12px;font-weight:700;color:var(--navy)">${fmt(item.price*item.qty*(1-item.discount/100))}</div><div style="font-size:9px;cursor:pointer;color:var(--red)" onclick="cart.splice(${idx},1);renderCart()">✕</div></div></div>`).join('');
+  calcCart();
+}
+function chQty(idx,d){const item=cart[idx];const s=getStock(item.barcode);const n=item.qty+d;if(n<=0){cart.splice(idx,1);renderCart();return;}if(n>s){toast('⚠️ Max: '+s,'warn');return;}item.qty=n;renderCart();}
+function clearCart(){if(cart.length&&confirm('Clear cart?')){cart=[];document.getElementById('g-disc').value=0;renderCart();}}
+function calcCart(){
+  const disc=+document.getElementById('g-disc').value||0;
+  const sub=cart.reduce((s,i)=>s+i.price*i.qty*(1-i.discount/100),0);
+  const da=sub*disc/100; const total=sub-da;
+  document.getElementById('c-sub').textContent=fmt(sub);
+  document.getElementById('c-disc').textContent='-'+fmt(da);
+  document.getElementById('c-total').textContent=fmt(total);
+  return{sub,da,total,disc};
+}
+function openPay(){
+  if(!cart.length){toast('❌ Cart empty','error');return;}
+  const{total}=calcCart();
+  document.getElementById('pay-due').textContent=fmt(total);
+  const pg=document.getElementById('pay-grid');
+  pg.innerHTML=BANKS.filter(b=>b.active!=='N').map(b=>`<div class="pay-method ${b.name===selPay?'selected':''}" onclick="setPay('${b.name}')"><span class="pay-ico">${b.ico||'💳'}</span>${b.name}${b.device?`<div style="font-size:8px;opacity:.6">${b.device}</div>`:''}</div>`).join('');
+  document.getElementById('cash-sec').style.display=selPay==='Cash'?'block':'none';
+  document.getElementById('ref-sec').style.display=selPay!=='Cash'?'block':'none';
+  document.getElementById('cash-rec').value='';
+  document.getElementById('change-box').style.display='none';
+  document.getElementById('pay-ref').value='';
+  document.getElementById('pay-modal').style.display='flex';
+}
+function setPay(m){
+  selPay=m;
+  document.querySelectorAll('.pay-method').forEach(el=>el.classList.toggle('selected',el.getAttribute('onclick').includes("'"+m+"'")));
+  document.getElementById('cash-sec').style.display=m==='Cash'?'block':'none';
+  document.getElementById('ref-sec').style.display=m!=='Cash'?'block':'none';
+}
+function calcChange(){const{total}=calcCart();const r=+document.getElementById('cash-rec').value||0;const ch=r-total;const cb=document.getElementById('change-box');cb.style.display=r>0?'block':'none';document.getElementById('change-amt').textContent=fmt(Math.max(ch,0));cb.style.background=ch<0?'var(--red-light)':'var(--green-light)';document.getElementById('change-amt').style.color=ch<0?'var(--red)':'var(--green)';}
+function closePay(){document.getElementById('pay-modal').style.display='none';}
+async function completeSale(){
+  const{sub,da,total,disc}=calcCart();
+  if(selPay==='Cash'){const r=+document.getElementById('cash-rec').value||0;if(r<total){toast('❌ Insufficient cash','error');return;}}
+  const storePrefix = DB.settings.storeId ? DB.settings.storeId.toUpperCase() : 'S1';
+  const id = storePrefix + '-' + String(DB.nextInv++).padStart(4,'0');
+  const txn={id,date:today(),time:timeNow(),store:DB.settings.storeName,storeId:DB.settings.storeId,customer:document.getElementById('cust-name').value||'Walk-in',items:cart.map(i=>({barcode:i.barcode,name:i.name,qty:i.qty,price:i.price,cost:i.cost,discount:i.discount,lineTotal:i.price*i.qty*(1-i.discount/100)})),subtotal:sub,globalDiscount:disc,discount:da,total,payment:selPay,payRef:document.getElementById('pay-ref').value||'',type:'sale',synced:false};
+  DB.transactions.push(txn); saveState(); closePay(); showInvoice(txn);
+  cart=[]; document.getElementById('g-disc').value=0; document.getElementById('cust-name').value='';
+  renderCart(); renderQuick(); toast('✅ Sale complete! '+id);
+  const ok=await syncRecord('push_sale',{transaction:txn});
+  if(ok){txn.synced=true;saveState();}
+}
+function showInvoice(txn){
+  document.getElementById('inv-content').innerHTML=`
+    <div style="text-align:center;padding-bottom:14px;border-bottom:2px solid var(--gray2);margin-bottom:14px">
+      <div style="width:60px;height:60px;background:var(--navy);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;margin:0 auto 8px">A</div>
+      <div style="font-size:17px;font-weight:900;color:var(--navy)">${DB.settings.storeName}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;margin-bottom:13px">
+      <div><span style="color:var(--gray4)">Invoice:</span> <strong>${txn.id}</strong></div>
+      <div><span style="color:var(--gray4)">Date:</span> ${txn.date} ${txn.time}</div>
+      <div><span style="color:var(--gray4)">Customer:</span> ${txn.customer}</div>
+      <div><span style="color:var(--gray4)">Payment:</span> ${txn.payment}</div>
+    </div>
+    <table style="margin-bottom:8px"><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price</th><th>Disc</th><th>Total</th></tr></thead>
+    <tbody>${(txn.items||[]).map((i,n)=>`<tr><td>${n+1}</td><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td>${fmt(i.price)}</td><td>${i.discount||0}%</td><td style="font-weight:700">${fmt(i.lineTotal)}</td></tr>`).join('')}</tbody></table>
+    <div style="border-top:2px solid var(--navy);padding-top:7px">
+      <div style="display:flex;justify-content:space-between;font-size:11px"><span>Subtotal</span><span>${fmt(txn.subtotal)}</span></div>
+      ${txn.discount>0?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--red)"><span>Discount (${txn.globalDiscount}%)</span><span>-${fmt(txn.discount)}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:900;color:var(--navy);margin-top:5px"><span>TOTAL</span><span>${fmt(txn.total)}</span></div>
+      ${txn.payRef?`<div style="font-size:10px;color:var(--gray4)">Ref: ${txn.payRef}</div>`:''}
+    </div>
+    <div style="text-align:center;margin-top:13px;padding-top:9px;border-top:1px dashed var(--gray2);font-size:10px;color:var(--gray4)">
+      <div style="font-size:20px;font-family:monospace;letter-spacing:3px">||| ${txn.id} |||</div>
+      <div>${DB.settings.policy}</div>
+      <div style="margin-top:3px">Thank you! شكراً لزيارتكم</div>
+    </div>`;
+  document.getElementById('inv-modal').style.display='flex';
+}
+
+// ═══════════════════════════════════════════
+// RETURNS
+// ═══════════════════════════════════════════
+async function doReturn(){
+  const bc=document.getElementById('r-bc').value.trim(); if(!bc){toast('❌ Enter barcode','error');return;}
+  const p=getProd(bc); const ref='RET-'+Date.now();
+  const r={ref,date:today(),time:timeNow(),store:DB.settings.storeName,storeId:DB.settings.storeId,origInvoice:document.getElementById('r-inv').value,barcode:p?p.barcode:bc,productName:p?p.name:bc,qty:+document.getElementById('r-qty').value||1,amount:+document.getElementById('r-amt').value||0,method:document.getElementById('r-method').value,reason:document.getElementById('r-reason').value,synced:false};
+  DB.returns.push(r); saveState(); toast('✅ Return: '+ref);
+  ['r-bc','r-inv','r-amt'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('r-qty').value=1; renderRetList();
+  const ok=await syncRecord('push_return',{returnData:r}); if(ok){r.synced=true;saveState();}
+}
+function renderRetList(){
+  document.getElementById('ret-list').innerHTML=[...DB.returns].reverse().slice(0,20).map(r=>`<tr><td class="fw7">${r.ref}</td><td>${r.date}</td><td>${r.productName}</td><td>${r.qty}</td><td class="fw7 text-red">-${fmt(r.amount)}</td><td>${syncIcon(r.synced)}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No returns</td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// EXCHANGE
+// ═══════════════════════════════════════════
+function exLookup(side,v){const p=getProd(v);document.getElementById('ex-'+side+'-nm').textContent=p?'✅ '+p.name:v.length>2?'❌ Not found':'';if(p)document.getElementById('ex-'+side+'-pr').value=p.retail;exCalc();}
+function exCalc(){const op=(+document.getElementById('ex-old-pr').value||0)*(+document.getElementById('ex-old-qty').value||1);const np=(+document.getElementById('ex-new-pr').value||0)*(+document.getElementById('ex-new-qty').value||1);const d=np-op;document.getElementById('ex-diff').textContent=fmt(Math.abs(d));document.getElementById('ex-diff').style.color=d>0?'var(--red)':d<0?'var(--green)':'var(--navy)';document.getElementById('ex-diff-note').textContent=d>0?'⬆ Customer pays':d<0?'⬇ Refund':'No diff';}
+async function doExchange(){
+  const ob=document.getElementById('ex-old-bc').value.trim();const nb=document.getElementById('ex-new-bc').value.trim();
+  if(!ob||!nb){toast('❌ Enter both barcodes','error');return;}
+  const op=getProd(ob);const np=getProd(nb);
+  const diff=(+document.getElementById('ex-new-pr').value*(+document.getElementById('ex-new-qty').value))-(+document.getElementById('ex-old-pr').value*(+document.getElementById('ex-old-qty').value));
+  const ref='EXC-'+Date.now();
+  const ex={ref,date:today(),time:timeNow(),store:DB.settings.storeName,storeId:DB.settings.storeId,customer:document.getElementById('ex-cust').value||'Walk-in',oldBarcode:op?op.barcode:ob,oldName:op?op.name:ob,oldQty:+document.getElementById('ex-old-qty').value,newBarcode:np?np.barcode:nb,newName:np?np.name:nb,newQty:+document.getElementById('ex-new-qty').value,diff,payment:document.getElementById('ex-pay').value,synced:false};
+  DB.exchanges.push(ex); saveState(); toast('✅ Exchange: '+ref);
+  ['ex-old-bc','ex-new-bc','ex-cust','ex-old-pr','ex-new-pr'].forEach(id=>document.getElementById(id).value='');
+  ['ex-old-qty','ex-new-qty'].forEach(id=>document.getElementById(id).value=1);
+  ['ex-old-nm','ex-new-nm'].forEach(id=>document.getElementById(id).textContent='');
+  document.getElementById('ex-diff').textContent='LYD 0.00';
+  const ok=await syncRecord('push_exchange',{exchange:ex}); if(ok){ex.synced=true;saveState();}
+}
+
+// ═══════════════════════════════════════════
+// CLAIMS
+// ═══════════════════════════════════════════
+function clLookup(v){const p=getProd(v);document.getElementById('cl-name').value=p?p.name:'';document.getElementById('cl-val').value=p?(p.cost*(+document.getElementById('cl-qty').value||1)).toFixed(2):'';}
+async function doClaim(){
+  const bc=document.getElementById('cl-bc').value.trim();if(!bc){toast('❌ Enter barcode','error');return;}
+  const p=getProd(bc);const qty=+document.getElementById('cl-qty').value||1;
+  const ref='CLM-'+Date.now();
+  const cl={ref,date:today(),time:timeNow(),store:DB.settings.storeName,storeId:DB.settings.storeId,barcode:p?p.barcode:bc,productName:p?p.name:bc,qty,type:document.getElementById('cl-type').value,value:p?p.cost*qty:0,supplier:document.getElementById('cl-sup').value,synced:false};
+  DB.claims.push(cl); saveState(); toast('✅ Claim: '+ref);
+  ['cl-bc','cl-name','cl-val','cl-sup'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cl-qty').value=1;
+  const ok=await syncRecord('push_claim',{claim:cl}); if(ok){cl.synced=true;saveState();}
+}
+
+// ═══════════════════════════════════════════
+// GRN RECEIVE
+// ═══════════════════════════════════════════
+async function loadGRNs(){
+  const gl=document.getElementById('grn-list');
+  gl.innerHTML='<div style="text-align:center;padding:22px;color:var(--gray4);font-size:12px">⏳ Loading from HO...</div>';
+  const res=await apiGet('store_grns',`store=${encodeURIComponent(DB.settings.storeName)}&status=pending`);
+  if(!res||!res.data){
+    gl.innerHTML='<div style="text-align:center;padding:22px;color:var(--gray3);font-size:12px">⚠️ Cannot connect to HO. Check sync settings.<br><button class="btn btn-ghost btn-sm mt" onclick="loadGRNs()">🔄 Retry</button></div>';
+    return;
+  }
+  // Group by GRNID
+  const grouped={};
+  res.data.forEach(line=>{
+    if(!grouped[line.GRNID]) grouped[line.GRNID]={grnId:line.GRNID,date:line.Date,lines:[]};
+    grouped[line.GRNID].lines.push(line);
+  });
+  const grns=Object.values(grouped);
+  document.getElementById('grn-badge').textContent=grns.length;
+  if(!grns.length){gl.innerHTML='<div style="text-align:center;padding:22px;color:var(--gray3);font-size:12px">No pending GRNs from HO ✅</div>';return;}
+  gl.innerHTML=grns.map(g=>`
+    <div class="grn-card pending">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div><div style="font-weight:800;color:var(--navy)">${g.grnId}</div><div style="font-size:11px;color:var(--gray4)">Date: ${g.date} · ${g.lines.length} items</div></div>
+        <button class="btn btn-green btn-sm" onclick="receiveGRN('${g.grnId}',this)">✅ Receive All</button>
+      </div>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>Qty Issued</th><th>Receive Qty</th></tr></thead>
+      <tbody>${g.lines.map(l=>`<tr><td style="font-family:monospace;font-size:10px">${l.Barcode}</td><td>${l.Name}</td><td style="text-align:center">${l.QtyIssued}</td><td><input type="number" value="${l.QtyIssued}" min="0" max="${l.QtyIssued}" id="recv-${g.grnId}-${l.Barcode}" style="width:70px;padding:4px 7px;border:1.5px solid var(--gray2);border-radius:6px;font-size:12px"></td></tr>`).join('')}</tbody></table>
+    </div>`).join('');
+}
+async function receiveGRN(grnId, btn){
+  btn.disabled=true; btn.textContent='⏳ Processing...';
+  const inputs=document.querySelectorAll(`[id^="recv-${grnId}-"]`);
+  let count=0;
+  for(const inp of inputs){
+    const barcode=inp.id.replace(`recv-${grnId}-`,'');
+    const qty=parseInt(inp.value)||0;
+    if(qty>0){
+      await api('receive_grn',{grnId,barcode,qtyReceived:qty,storeId:DB.settings.storeId,storeName:DB.settings.storeName});
+      count++;
+    }
+  }
+  toast(`✅ GRN ${grnId} received — ${count} items`);
+  loadGRNs();
+}
+
+// ═══════════════════════════════════════════
+// INVENTORY
+// ═══════════════════════════════════════════
+function renderInv(){
+  const search=(document.getElementById('inv-search').value||'').toLowerCase();
+  const filter=document.getElementById('inv-filter').value;
+  const tb=document.getElementById('inv-table');
+  const rows=DB.products.filter(p=>{
+    if(search&&!p.name.toLowerCase().includes(search)&&!p.barcode.includes(search)) return false;
+    const s=getStock(p.barcode);
+    if(filter==='low'&&s>p.reorder) return false;
+    if(filter==='out'&&s>0) return false;
+    return true;
+  });
+  tb.innerHTML=rows.map(p=>{
+    const s=getStock(p.barcode);
+    const sold=DB.transactions.filter(t=>t.type==='sale').reduce((a,t)=>a+(t.items||[]).filter(i=>i.barcode===p.barcode).reduce((b,i)=>b+i.qty,0),0);
+    const rets=DB.returns.filter(r=>r.barcode===p.barcode).reduce((a,r)=>a+r.qty,0);
+    const cl=DB.claims.filter(c=>c.barcode===p.barcode).reduce((a,c)=>a+c.qty,0);
+    const st=s<=0?'<span class="badge badge-red">OUT</span>':s<=p.reorder?'<span class="badge badge-amber">LOW</span>':'<span class="badge badge-green">OK</span>';
+    return`<tr><td style="font-family:monospace;font-size:10px">${p.barcode}</td><td class="fw7">${p.name}</td><td>${p.opening||0}</td><td class="text-red">${sold}</td><td class="text-green">${rets}</td><td>${cl}</td><td style="font-weight:800;font-size:13px;color:${s<=0?'var(--red)':s<=p.reorder?'var(--amber)':'var(--navy)'}">${s}</td><td>${p.reorder}</td><td>${st}</td></tr>`;
+  }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:18px">No products</td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// EXPENSES
+// ═══════════════════════════════════════════
+async function saveExpense(){
+  const amt=+document.getElementById('exp-amt').value||0;
+  if(!amt){toast('❌ Enter amount','error');return;}
+  const exp={id:'EXP-'+Date.now(),date:document.getElementById('exp-date').value,storeId:DB.settings.storeId,store:DB.settings.storeName,category:document.getElementById('exp-cat').value,description:document.getElementById('exp-desc').value,amount:amt,payMethod:document.getElementById('exp-pay').value,reference:document.getElementById('exp-ref').value,synced:false};
+  DB.expenses.push(exp); saveState(); toast('✅ Expense saved');
+  ['exp-desc','exp-amt','exp-ref'].forEach(id=>document.getElementById(id).value='');
+  renderExpList();
+  const ok=await syncRecord('push_expense',{expense:exp}); if(ok){exp.synced=true;saveState();}
+}
+function renderExpList(){
+  document.getElementById('exp-list').innerHTML=[...DB.expenses].reverse().slice(0,20).map(e=>`<tr><td>${e.date}</td><td>${e.category}</td><td>${e.description||'—'}</td><td class="fw7">${fmt(e.amount)}</td><td>${e.payMethod}</td><td>${syncIcon(e.synced)}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No expenses</td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// REPORTS (with back date)
+// ═══════════════════════════════════════════
+function rptPreset(){
+  const p=document.getElementById('rpt-preset').value;
+  const now=new Date(); const d=today();
+  const fld=document.getElementById('rpt-from'); const tld=document.getElementById('rpt-to');
+  if(p==='today'){fld.value=d;tld.value=d;}
+  else if(p==='yesterday'){const y=new Date(now);y.setDate(y.getDate()-1);const yd=y.toISOString().split('T')[0];fld.value=yd;tld.value=yd;}
+  else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());fld.value=ws.toISOString().split('T')[0];tld.value=d;}
+  else if(p==='month'){fld.value=d.slice(0,7)+'-01';tld.value=d;}
+}
+async function loadReports(){
+  const from=document.getElementById('rpt-from').value;
+  const to=document.getElementById('rpt-to').value;
+  // Local filter
+  const txns=DB.transactions.filter(t=>{
+    if(t.type!=='sale') return false;
+    if(from&&t.date<from) return false;
+    if(to&&t.date>to) return false;
+    return true;
+  });
+  const rets=DB.returns.filter(r=>{if(from&&r.date<from)return false;if(to&&r.date>to)return false;return true;});
+  const rev=txns.reduce((s,t)=>s+t.total,0);
+  const ret=rets.reduce((s,r)=>s+r.amount,0);
+  const inv=txns.length; const atv=inv?rev/inv:0;
+  const qty=txns.reduce((s,t)=>s+t.items.reduce((a,i)=>a+i.qty,0),0);
+  document.getElementById('rpt-kpis').innerHTML=[['Revenue',fmt(rev),''],['Net',fmt(rev-ret),'blue'],['Invoices',inv,'green'],['ATV',fmt(atv),'amber'],['Units',qty,'purple'],['Returns',fmt(ret),'']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  // Payment
+  const pm={};txns.forEach(t=>pm[t.payment]=(pm[t.payment]||0)+t.total);
+  document.getElementById('rpt-pay').innerHTML=Object.entries(pm).map(([m,v])=>{const pct=rev?Math.round(v/rev*100):0;return`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>${m}</span><span class="fw7">${fmt(v)} (${pct}%)</span></div><div style="background:var(--gray1);border-radius:4px;height:7px"><div style="background:var(--accent2);width:${pct}%;height:100%;border-radius:4px"></div></div></div>`;}).join('')||'<div style="color:var(--gray3);font-size:11px;padding:14px;text-align:center">No data</div>';
+  // Products
+  const ps={};txns.forEach(t=>(t.items||[]).forEach(i=>{ps[i.name]=ps[i.name]||{r:0,q:0};ps[i.name].r+=i.lineTotal||i.price*i.qty;ps[i.name].q+=i.qty;}));
+  document.getElementById('rpt-prod').innerHTML=Object.entries(ps).sort((a,b)=>b[1].r-a[1].r).slice(0,7).map(([n,d])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--gray1);font-size:11px"><span class="fw7" style="flex:1;color:var(--navy)">${n.slice(0,32)}</span><span style="color:var(--gray4)">x${d.q}</span><span class="fw7" style="margin-left:7px;color:var(--accent2)">${fmt(d.r)}</span></div>`).join('')||'<div style="color:var(--gray3);font-size:11px;padding:14px;text-align:center">No data</div>';
+  // Txn table
+  document.getElementById('rpt-txns').innerHTML=[...txns].reverse().slice(0,40).map(t=>`<tr><td class="fw7">${t.id}</td><td>${t.date}</td><td>${t.customer}</td><td>${t.payment}</td><td>${(t.items||[]).length}</td><td class="fw7">${fmt(t.total)}</td><td>${syncIcon(t.synced)}</td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No transactions</td></tr>';
+}
+function exportRpt(){
+  const txns=DB.transactions.filter(t=>t.type==='sale');
+  const csv=['Invoice,Date,Customer,Payment,Ref,Total,Synced'].concat(txns.map(t=>[t.id,t.date,t.customer,t.payment,t.payRef||'',t.total,t.synced?'Y':'N'].join(','))).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='anta_report_'+today()+'.csv';a.click();
+}
+
+// ═══════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════
+async function testConn(){
+  const url=document.getElementById('gs-url').value.trim();
+  const key=document.getElementById('gs-key').value.trim();
+  CFG.url=url; CFG.key=key;
+  localStorage.setItem('anta_url',url); localStorage.setItem('anta_key',key);
+  const div=document.getElementById('conn-res');
+  div.style.display='block'; div.innerHTML='⏳ Testing...'; div.style.color='var(--gray4)';
+  const res=await apiGet('ping');
+  if(res&&res.status==='ok'){div.innerHTML='✅ Connected! '+res.time;div.style.color='var(--green)';setSyncStatus('online','Connected');toast('✅ Connected!');isOnline=true;processQueue();}
+  else{div.innerHTML='❌ Failed. Check URL and key.';div.style.color='var(--red)';toast('❌ Failed','error');}
+}
+async function loadProductsFromSheets(){
+  if(!CFG.url){toast('Set URL first','error');return;}
+  const res=await apiGet('products');
+  if(!res||!res.data||!res.data.length){toast('No products found','warn');return;}
+  DB.products=res.data.map(r=>({id:'P'+r.Barcode,barcode:String(r.Barcode||'').trim(),name:String(r.Name||'').trim(),brand:String(r.Brand||'ANTA'),category:String(r.Category||'Footwear'),size:String(r.Size||''),cost:parseFloat(r.Cost)||0,retail:parseFloat(r.Retail)||0,reorder:parseInt(r.Reorder)||5,opening:parseInt(r.Opening)||0,active:String(r.Active||'Y').trim()})).filter(p=>p.barcode&&p.name);
+  saveState(); renderQuick();
+  const low=DB.products.filter(p=>getStock(p.barcode)<=p.reorder);
+  document.getElementById('low-badge').textContent=low.length;
+  toast('✅ '+DB.products.length+' products loaded!');
+}
+async function loadBanks(){
+  const res=await apiGet('banks');
+  if(res&&res.data&&res.data.length){
+    BANKS=res.data.map(b=>({id:b.BankID,name:b.Name,device:b.Device||'',active:b.Active,ico:b.Name==='Cash'?'💵':'🏦'}));
+    saveBanks(); renderBanksList(); populatePaySelects(); toast('✅ Banks loaded!');
+  }
+}
+function renderBanksList(){
+  document.getElementById('banks-list').innerHTML=BANKS.filter(b=>b.active!=='N').map(b=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--gray1);font-size:12px"><span class="fw7">${b.name}</span>${b.device?`<span style="color:var(--gray4);font-size:10px">${b.device}</span>`:''}</div>`).join('')||'<div style="color:var(--gray3);font-size:11px">No banks configured</div>';
+}
+function populatePaySelects(){
+  const opts=BANKS.filter(b=>b.active!=='N').map(b=>`<option>${b.name}</option>`).join('');
+  ['r-method','ex-pay','exp-pay'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=opts;});
+}
+function saveSettings(){
+  DB.settings.storeName=document.getElementById('s-name').value;
+  DB.settings.policy=document.getElementById('s-policy').value;
+  saveState(); toast('✅ Settings saved');
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+function initSample(){
+  if(DB.products.length>0) return;
+  DB.products=[
+    {id:'P001',barcode:'8001000000001',name:'ANTA Running Pro — White/42',brand:'ANTA',category:'Running',size:'White/42',cost:120,retail:250,reorder:5,opening:20,active:'Y'},
+    {id:'P002',barcode:'8001000000002',name:'ANTA Casual Classic — Blue/41',brand:'ANTA',category:'Casual',size:'Blue/41',cost:90,retail:180,reorder:4,opening:15,active:'Y'},
+    {id:'P003',barcode:'8001000000003',name:'ANTA KT Basketball — Black/44',brand:'ANTA',category:'Basketball',size:'Black/44',cost:200,retail:420,reorder:3,opening:8,active:'Y'},
+  ];
+  saveState();
+}
+function initApp(){
+  initSample();
+  updateQueueUI();
+  populatePaySelects();
+  renderDash();
+  renderRetList();
+  renderExpList();
+  rptPreset();
+  document.getElementById('exp-date').value=today();
+  if(CFG.url){
+    testConn().then(()=>{loadProductsFromSheets();loadBanks();loadGRNs();});
+  } else {
+    setSyncStatus('offline','Set URL in Settings');
+  }
+}
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleDateString('en-GB')+' · '+new Date().toTimeString().slice(0,5);}
+setInterval(updateClock,1000); updateClock();
+document.addEventListener('click',e=>{if(!e.target.closest('.relative'))document.getElementById('search-drop').style.display='none';});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')pinSubmit();});
+
+loadState();
+initLogin();
+</script>
+</body>
+</html>
