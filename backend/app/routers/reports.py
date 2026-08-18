@@ -66,11 +66,20 @@ def dashboard(
         pay_map[s.payment] = pay_map.get(s.payment, 0) + (s.total or 0)
 
     # low stock
+    # Only consider products this store has actually received via GRN at
+    # least once (i.e. it has an Inventory row here). A product the store
+    # was never sent is not "low stock" — it's simply not stocked yet —
+    # so looping over the whole company catalog (all stores' products)
+    # was flagging everything as OUT for every store.
     low = []
-    products = db.query(Product).filter(Product.active.is_(True)).all()
     target_store = sid if sid and sid not in ("all", "HO") else user.store_id
     if target_store and target_store != "HO":
-        for p in products:
+        inv_rows = db.query(Inventory).filter(Inventory.store_id == str(target_store)).all()
+        product_map = {p.barcode: p for p in db.query(Product).filter(Product.active.is_(True)).all()}
+        for inv in inv_rows:
+            p = product_map.get(inv.barcode)
+            if not p:
+                continue
             oh = get_stock(db, p.barcode, target_store)
             if oh <= (p.reorder or 5):
                 low.append(
