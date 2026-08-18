@@ -277,7 +277,7 @@ def ensure_opening_stock(
 @router.post("/inventory/recalculate")
 def recalculate_store_inventory(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
     store_id: Optional[str] = None,
 ):
     """Fix a store's inventory after the Product.opening phantom-stock bug:
@@ -289,12 +289,8 @@ def recalculate_store_inventory(
 
     Safe to run more than once; it always recomputes from the same source
     of truth (received GRNs), so it converges to the correct number.
-
-    Store managers (not HO admins) may only recalculate their own store —
-    any store_id they pass is ignored in favor of their own store.
     """
-    is_ho_admin = user.is_admin and user.store_id == "HO"
-    sid = store_id if is_ho_admin else user.store_id
+    sid = store_id
     if not sid or sid == "HO":
         raise HTTPException(status_code=400, detail="Choose a specific store")
 
