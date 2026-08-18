@@ -1215,7 +1215,13 @@ function readExcel(file){return new Promise((resolve,reject)=>{const reader=new 
 function startAutoRefresh(){}
 function updateClock(){if($('clock'))$('clock').textContent=new Date().toLocaleDateString('en-GB')+' · '+new Date().toTimeString().slice(0,5);}
 setInterval(updateClock,1000);updateClock();
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('login-screen')&&$('login-screen').style.display!=='none')pinSubmit();});
+document.addEventListener('keydown',e=>{
+  const ls=$('login-screen');
+  if(!ls||ls.style.display==='none')return;
+  if(e.key==='Enter'){pinSubmit();return;}
+  if(e.key==='Backspace'){e.preventDefault();pinClear();return;}
+  if(/^[0-9]$/.test(e.key)){pinPress(e.key);return;}
+});
 (async function boot(){
   const saved=localStorage.getItem('anta_ho_api'); if(saved)CFG.apiUrl=saved;
   try{await loadBranding();}catch(_e){}

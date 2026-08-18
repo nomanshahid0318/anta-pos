@@ -1718,7 +1718,11 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') pinSubmit();
+  const loginScreen = document.getElementById('login-screen');
+  if (!loginScreen || loginScreen.style.display === 'none') return;
+  if (e.key === 'Enter') { pinSubmit(); return; }
+  if (e.key === 'Backspace') { e.preventDefault(); pinClear(); return; }
+  if (/^[0-9]$/.test(e.key)) { pinPress(e.key); return; }
 });
 
 // boot
