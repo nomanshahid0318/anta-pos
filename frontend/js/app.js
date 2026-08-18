@@ -679,6 +679,9 @@ async function renderDash() {
   if (res && res.ok) {
     const low = res.lowStock || [];
     document.getElementById('low-badge').textContent = low.length;
+    const emptyMsg = res.hasStock
+      ? '<div style="color:var(--gray3);font-size:11px;padding:8px">All stock OK ✅</div>'
+      : '<div style="color:var(--gray3);font-size:11px;padding:8px">No stock</div>';
     document.getElementById('d-low').innerHTML =
       low
         .slice(0, 5)
@@ -686,7 +689,7 @@ async function renderDash() {
           const s = p.onHand;
           return `<div style="padding:5px 0;border-bottom:1px solid var(--gray1);display:flex;justify-content:space-between;font-size:11px"><span style="font-weight:600;flex:1">${(p.name || '').slice(0, 28)}</span><span class="badge ${s <= 0 ? 'badge-red' : 'badge-amber'}">${s <= 0 ? 'OUT' : s}</span></div>`;
         })
-        .join('') || '<div style="color:var(--gray3);font-size:11px;padding:8px">All stock OK ✅</div>';
+        .join('') || emptyMsg;
   }
 
   // queue UI legacy hide

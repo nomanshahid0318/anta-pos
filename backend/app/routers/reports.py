@@ -80,6 +80,7 @@ def dashboard(
     # history, every time this loads — so this is always correct without
     # anyone needing to click a "fix" button.
     low = []
+    has_stock = False
     target_store = sid if sid and sid not in ("all", "HO") else user.store_id
     if target_store and target_store != "HO":
         auto_heal_store_inventory(db, target_store)
@@ -88,6 +89,7 @@ def dashboard(
             .filter(Inventory.store_id == str(target_store), Inventory.grn_in > 0)
             .all()
         )
+        has_stock = len(inv_rows) > 0
         product_map = {p.barcode: p for p in db.query(Product).filter(Product.active.is_(True)).all()}
         for inv in inv_rows:
             p = product_map.get(inv.barcode)
@@ -120,6 +122,7 @@ def dashboard(
         storeBreakdown=list(store_map.values()),
         paymentBreakdown=pay_map,
         lowStock=low[:20],
+        hasStock=has_stock,
         recentSales=[
             {
                 "id": s.invoice_id,

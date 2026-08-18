@@ -318,6 +318,7 @@ class DashboardOut(BaseModel):
     storeBreakdown: list[dict] = Field(default_factory=list)
     paymentBreakdown: dict = Field(default_factory=dict)
     lowStock: list[dict] = Field(default_factory=list)
+    hasStock: bool = False
     recentSales: list[dict] = Field(default_factory=list)
     lastUpdated: str = ""
 
