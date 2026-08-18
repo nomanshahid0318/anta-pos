@@ -274,6 +274,11 @@
 
   <!-- INVENTORY -->
   <div id="screen-inventory" class="screen">
+    <div class="card" style="margin-bottom:14px" data-role="manager">
+      <div class="card-title" style="margin:0 0 6px">🛠️ Fix Store Stock</div>
+      <p style="font-size:11px;color:var(--gray4);margin:0 0 11px">If "GRN In" / stock here is showing the HO Warehouse total instead of only what was actually sent to this store, click below — it rebuilds this store's stock strictly from received Send-to-Store GRNs. Sales, returns, exchanges, and claims are left untouched.</p>
+      <button class="btn btn-primary btn-sm" onclick="fixMyStoreStock(this)">🔄 Recalculate My Store Stock</button>
+    </div>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
         <div class="card-title" style="margin:0">📦 Inventory</div>

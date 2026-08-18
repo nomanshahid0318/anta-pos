@@ -496,6 +496,24 @@ async function ensureStock() {
   } else toast('❌ ' + (res && res.msg ? res.msg : 'Failed'), 'error');
 }
 
+async function fixMyStoreStock(btn) {
+  if (!confirm('Recalculate this store\'s stock? This rebuilds "GRN In" / on-hand strictly from actually-received Send-to-Store GRNs — sales, returns, exchanges, and claims are untouched. Safe, and can be run again anytime.')) return;
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Recalculating…'; }
+  try {
+    const res = await api('/api/inventory/recalculate', { method: 'POST' });
+    if (res && res.ok) {
+      toast(`✅ Fixed — ${res.updated} product(s) corrected`);
+      await reloadCatalog();
+      renderInv();
+    } else {
+      toast('❌ ' + ((res && (res.detail || res.msg)) || 'Recalculate failed'), 'error');
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
 async function loadLocalSales() {
   const res = await api('/api/sales?limit=200');
   if (res && res.data) {
