@@ -5,11 +5,11 @@
 // updates from multiple admins. This only makes the app itself openable
 // offline; every actual save still requires a live connection, same as
 // before.
-const CACHE_NAME = 'anta-ho-shell-v3';
+const CACHE_NAME = 'anta-ho-shell-v4';
 const APP_SHELL = [
   '/ho/',
   '/ho/css/styles.css',
-  '/ho/js/app.js?v=20260810d',
+  '/ho/js/app.js?v=20260818a',
   '/ho/manifest.json',
   '/ho/icon-192.png',
   '/ho/icon-512.png',
