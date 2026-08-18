@@ -325,40 +325,40 @@ function printHandover(h) {
   const bankRows = (h.bankSales || []).map((b) => `<tr><td>${b.bank}</td><td style="text-align:right">${fmt2(b.amount)}</td></tr>`).join('');
   const printedAt = new Date().toLocaleString();
   document.getElementById('handover-print-modal').innerHTML = `
-    <div style="max-width:380px;margin:20px auto;font-family:Arial,sans-serif;font-size:13px;color:#111">
-      <div style="text-align:center;margin-bottom:12px">
-        <div style="font-size:20px;font-weight:900">${brand}</div>
-        <div style="font-size:13px;font-weight:700;margin-top:2px">Day-End Cash Handover</div>
-        <div style="font-size:11px;color:#555">${h.storeName} · ${h.date}</div>
-        <div style="font-size:11px;color:#555">Handover ID: ${h.handoverId}</div>
+    <div style="max-width:720px;margin:0 auto;padding:50px 60px;font-family:Arial,sans-serif;font-size:16px;color:#111;line-height:1.5">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-size:32px;font-weight:900">${brand}</div>
+        <div style="font-size:19px;font-weight:700;margin-top:6px">Day-End Cash Handover</div>
+        <div style="font-size:14px;color:#555;margin-top:4px">${h.storeName} · ${h.date}</div>
+        <div style="font-size:14px;color:#555">Handover ID: ${h.handoverId}</div>
       </div>
-      <div style="border-top:1px dashed #999;border-bottom:1px dashed #999;padding:8px 0;margin-bottom:10px">
-        <table style="width:100%">
-          <tr><td>Invoices</td><td align="right">${h.invoiceCount}</td></tr>
-          <tr><td>Units sold</td><td align="right">${h.unitsSold}</td></tr>
-          <tr><td>Total Sales</td><td align="right"><b>${fmt2(h.totalSales)}</b></td></tr>
-          <tr><td><b>Cash Sales</b></td><td align="right"><b>${fmt2(h.cashSales)}</b></td></tr>
+      <div style="border-top:2px dashed #999;border-bottom:2px dashed #999;padding:18px 0;margin-bottom:22px">
+        <table style="width:100%;font-size:16px;border-collapse:collapse">
+          <tr><td style="padding:8px 0">Invoices</td><td align="right" style="padding:8px 0">${h.invoiceCount}</td></tr>
+          <tr><td style="padding:8px 0">Units sold</td><td align="right" style="padding:8px 0">${h.unitsSold}</td></tr>
+          <tr><td style="padding:8px 0">Total Sales</td><td align="right" style="padding:8px 0"><b>${fmt2(h.totalSales)}</b></td></tr>
+          <tr><td style="padding:8px 0"><b>Cash Sales</b></td><td align="right" style="padding:8px 0"><b>${fmt2(h.cashSales)}</b></td></tr>
           ${bankRows}
-          <tr><td>Returns (info)</td><td align="right">${fmt2(h.returnsTotal)}</td></tr>
+          <tr><td style="padding:8px 0">Returns (info)</td><td align="right" style="padding:8px 0">${fmt2(h.returnsTotal)}</td></tr>
         </table>
       </div>
-      <div style="font-size:11px;color:#555;margin-bottom:18px">Submitted by ${h.submittedBy} at ${h.submittedAt}</div>
+      <div style="font-size:13px;color:#555;margin-bottom:50px">Submitted by ${h.submittedBy} at ${h.submittedAt}</div>
 
-      <div style="margin-top:24px">
-        <div style="margin-bottom:26px">
-          <div style="border-bottom:1px solid #333;height:22px"></div>
-          <div style="font-size:11px;margin-top:3px">Handed Over By (Cashier) — Name &amp; Signature</div>
+      <div style="margin-top:40px">
+        <div style="margin-bottom:60px">
+          <div style="border-bottom:1px solid #333;height:44px"></div>
+          <div style="font-size:14px;margin-top:6px">Handed Over By (Cashier) — Name &amp; Signature</div>
         </div>
-        <div style="margin-bottom:26px">
-          <div style="border-bottom:1px solid #333;height:22px"></div>
-          <div style="font-size:11px;margin-top:3px">Received By (Accountant) — Name &amp; Signature</div>
+        <div style="margin-bottom:60px">
+          <div style="border-bottom:1px solid #333;height:44px"></div>
+          <div style="font-size:14px;margin-top:6px">Received By (Accountant) — Name &amp; Signature</div>
         </div>
-        <table style="width:100%;font-size:11px;margin-top:6px">
-          <tr><td style="width:50%">Cash Counted: ______________</td><td>Date/Time: ______________</td></tr>
-          <tr><td colspan="2" style="padding-top:14px">Notes / Variance: __________________________________</td></tr>
+        <table style="width:100%;font-size:14px;margin-top:20px">
+          <tr><td style="width:50%;padding-bottom:10px">Cash Counted: ______________________</td><td>Date/Time: ______________________</td></tr>
+          <tr><td colspan="2" style="padding-top:30px">Notes / Variance: ________________________________________________</td></tr>
         </table>
       </div>
-      <div style="text-align:center;margin-top:20px;font-size:9px;color:#999">Printed ${printedAt}</div>
+      <div style="text-align:center;margin-top:60px;font-size:11px;color:#999">Printed ${printedAt}</div>
     </div>`;
   setTimeout(() => window.print(), 50);
 }
