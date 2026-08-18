@@ -12,7 +12,7 @@ from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
 from ..models import HOWarehouse, Inventory, Product, StoreGRN, SupplierGRN
 from ..schemas import GRNIssueIn, GRNReceiveIn, SupplierGRNIn
-from ..services.inventory import get_or_create_inv, get_stock, update_ho_warehouse, update_inv
+from ..services.inventory import get_or_create_inv, get_stock, update_ho_warehouse, update_inv, auto_heal_store_inventory
 from ..utils import today_str
 
 router = APIRouter(prefix="/api", tags=["inventory"])
@@ -27,7 +27,7 @@ def list_inventory(
 ):
     """Store inventory listing (POS 'Inventory' screen).
 
-    Two fixes:
+    Three fixes:
     1. Old version ran one Inventory query PER active product (up to
        6,000+ queries on a big catalog) — this is what made the screen
        hang/come back empty. Now: one query for the store's inventory
@@ -36,8 +36,12 @@ def list_inventory(
        (grn_in > 0) are shown — a store's inventory screen shouldn't list
        the entire company-wide catalog with 0 stock for everything it was
        never sent.
+    3. auto_heal_store_inventory silently fixes any stale/incorrect grn_in
+       against real received GRN history every time this loads, so a store
+       always shows exactly what it actually has — no manual fix needed.
     """
     sid = store_id or user.store_id
+    auto_heal_store_inventory(db, sid)
     inv_rows = db.query(Inventory).filter(Inventory.store_id == str(sid)).all()
     received = [r for r in inv_rows if (r.grn_in or 0) > 0]
     if not received:

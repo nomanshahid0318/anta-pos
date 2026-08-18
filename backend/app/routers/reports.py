@@ -11,7 +11,7 @@ from ..auth import CurrentUser, get_current_user
 from ..database import get_db
 from ..models import Inventory, Product, Return, Sale, Setting
 from ..schemas import DashboardOut, ReportOut, SettingsIn
-from ..services.inventory import get_stock
+from ..services.inventory import get_stock, auto_heal_store_inventory
 from ..utils import iso_now, today_str
 
 router = APIRouter(prefix="/api", tags=["reports"])
@@ -66,15 +66,28 @@ def dashboard(
         pay_map[s.payment] = pay_map.get(s.payment, 0) + (s.total or 0)
 
     # low stock
-    # Only consider products this store has actually received via GRN at
-    # least once (i.e. it has an Inventory row here). A product the store
-    # was never sent is not "low stock" — it's simply not stocked yet —
-    # so looping over the whole company catalog (all stores' products)
-    # was flagging everything as OUT for every store.
+    # A product only counts as "stocked here" (and therefore eligible to be
+    # low/out) if this store has actually RECEIVED it via GRN at least once
+    # — i.e. Inventory.grn_in > 0. An Inventory row can also exist as an
+    # empty placeholder (created by the "Init Store Stock" button, which
+    # touches every active product in the catalog with all-zero counters)
+    # without anything ever having been received — that must NOT count as
+    # low/out, or every never-stocked product in the whole catalog shows up
+    # as "OUT" for every store.
+    #
+    # auto_heal_store_inventory also silently fixes any stale/incorrect
+    # grn_in (e.g. left over from a past bug) against real received GRN
+    # history, every time this loads — so this is always correct without
+    # anyone needing to click a "fix" button.
     low = []
     target_store = sid if sid and sid not in ("all", "HO") else user.store_id
     if target_store and target_store != "HO":
-        inv_rows = db.query(Inventory).filter(Inventory.store_id == str(target_store)).all()
+        auto_heal_store_inventory(db, target_store)
+        inv_rows = (
+            db.query(Inventory)
+            .filter(Inventory.store_id == str(target_store), Inventory.grn_in > 0)
+            .all()
+        )
         product_map = {p.barcode: p for p in db.query(Product).filter(Product.active.is_(True)).all()}
         for inv in inv_rows:
             p = product_map.get(inv.barcode)

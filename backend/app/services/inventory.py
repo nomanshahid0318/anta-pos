@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Inventory, HOWarehouse, Product
@@ -126,6 +127,42 @@ def get_stock(db: Session, barcode: str, store_id: str) -> int:
     # store's — falling back to it here was the same bug as in
     # get_or_create_inv above (see the note there).
     return 0
+
+
+def auto_heal_store_inventory(db: Session, store_id: str) -> None:
+    """Silently keep a store's grn_in/on_hand truthful to what it actually
+    received, every time its stock is displayed — no manual action needed.
+
+    A store's Inventory row can end up with a stale/incorrect grn_in (e.g.
+    an old placeholder row from "Init Store Stock", or historical data from
+    a fixed bug). This recomputes grn_in strictly from real, received
+    Send-to-Store GRN history (StoreGRN rows with status='received') and
+    fixes any row that has drifted — before any read of the data. Sales,
+    returns, exchanges, and claims are left untouched (real transaction
+    history). Cheap and idempotent: does nothing once a store is correct.
+    """
+    from ..models import StoreGRN  # local import to avoid a circular import at module load
+
+    if not store_id or store_id == "HO":
+        return
+    received_rows = (
+        db.query(StoreGRN.barcode, func.sum(StoreGRN.qty_received))
+        .filter(StoreGRN.store_id == str(store_id), StoreGRN.status == "received")
+        .group_by(StoreGRN.barcode)
+        .all()
+    )
+    received_by_barcode = {barcode: int(total or 0) for barcode, total in received_rows}
+    inv_rows = db.query(Inventory).filter(Inventory.store_id == str(store_id)).all()
+    dirty = False
+    for row in inv_rows:
+        correct_grn_in = received_by_barcode.get(row.barcode, 0)
+        if (row.grn_in or 0) != correct_grn_in:
+            row.grn_in = correct_grn_in
+            row.recalc()
+            row.updated_at = _now()
+            dirty = True
+    if dirty:
+        db.commit()
 
 
 def update_ho_warehouse(db: Session, barcode: str, name: str, qty: int, direction: str) -> HOWarehouse:
