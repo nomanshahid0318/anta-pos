@@ -8,6 +8,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -344,9 +345,19 @@ def inventory_all_count(db: Annotated[Session, Depends(get_db)], user: Annotated
 GRN_CHUNK_SIZE = 500
 
 
-def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, existing_wh: dict, existing_products: dict, seen_new_barcodes: set) -> float:
+def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, existing_wh: dict, existing_products: dict, seen_new_barcodes: set, store_qty_map: dict) -> float:
     """Apply one Supplier GRN line to the session (no commit). Returns the
     line's total cost. Raises on failure — caller decides how to handle it.
+
+    Costing: weighted average. Every purchase recomputes Product.cost as
+    (old total qty already held x old cost + new qty x new unit cost) /
+    new total qty — "old total qty" is everything the company currently
+    holds for this barcode (HO Warehouse + every store's Inventory,
+    combined, since Product.cost is one company-wide figure used
+    everywhere: COGS in the P&L, and stock valuation on the Balance Sheet
+    for both warehouse and store stock). This keeps cost accurate even
+    when the same product is bought again later at a different price,
+    instead of freezing at whatever the first-ever purchase cost was.
     """
     tc = (line.qty or 0) * (line.cost or 0)
     db.add(SupplierGRN(
@@ -355,6 +366,9 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
         total_cost=tc, notes=body.notes or "",
     ))
     wh = existing_wh.get(line.barcode)
+    old_wh_qty = int(wh.on_hand or 0) if wh else 0
+    old_store_qty = int(store_qty_map.get(line.barcode, 0) or 0)
+    old_total_qty = max(0, old_wh_qty) + max(0, old_store_qty)
     if wh:
         wh.supplier_in = (wh.supplier_in or 0) + int(line.qty or 0)
         wh.recalc()
@@ -366,14 +380,24 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
         wh.recalc()
         db.add(wh)
         existing_wh[line.barcode] = wh
+    new_qty = int(line.qty or 0)
+    new_cost = float(line.cost or 0)
     prod = existing_products.get(line.barcode)
     if not prod and line.barcode not in seen_new_barcodes:
-        prod = Product(barcode=line.barcode, name=line.name or line.barcode, cost=line.cost or 0, retail=0, active=True)
+        prod = Product(barcode=line.barcode, name=line.name or line.barcode, cost=new_cost, retail=0, active=True)
         db.add(prod)
         existing_products[line.barcode] = prod
         seen_new_barcodes.add(line.barcode)
-    elif prod and line.cost and (not prod.cost or prod.cost == 0):
-        prod.cost = line.cost
+    elif prod and new_cost > 0:
+        old_cost = float(prod.cost or 0)
+        total_qty = old_total_qty + new_qty
+        if total_qty > 0 and old_total_qty > 0 and old_cost > 0:
+            prod.cost = round((old_total_qty * old_cost + new_qty * new_cost) / total_qty, 4)
+        else:
+            # Nothing currently held (or no prior cost on record) — nothing
+            # to average against, so this purchase's price simply becomes
+            # the cost.
+            prod.cost = new_cost
     return tc
 
 
@@ -406,12 +430,18 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
         chunk_barcodes = list({l.barcode for l in chunk})
         existing_products = {p.barcode: p for p in db.query(Product).filter(Product.barcode.in_(chunk_barcodes)).all()}
         existing_wh = {w.barcode: w for w in db.query(HOWarehouse).filter(HOWarehouse.barcode.in_(chunk_barcodes)).all()}
+        store_qty_map = dict(
+            db.query(Inventory.barcode, func.sum(Inventory.on_hand))
+            .filter(Inventory.barcode.in_(chunk_barcodes))
+            .group_by(Inventory.barcode)
+            .all()
+        )
         seen_new_barcodes = set()
 
         try:
             chunk_cost = 0.0
             for line in chunk:
-                chunk_cost += _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes)
+                chunk_cost += _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes, store_qty_map)
             db.commit()
             total_cost += chunk_cost
             count += len(chunk)
@@ -424,7 +454,7 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
             seen_new_barcodes = set()
             for line in chunk:
                 try:
-                    tc = _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes)
+                    tc = _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes, store_qty_map)
                     db.commit()
                     total_cost += tc
                     count += 1
