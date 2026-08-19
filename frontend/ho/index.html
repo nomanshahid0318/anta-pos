@@ -482,10 +482,11 @@ body{display:flex;height:100vh;overflow:hidden}
           <select class="form-input" style="width:150px;padding:5px 9px" id="exp-store-filter"><option value="all">All Stores</option></select>
           <select class="form-input" style="width:120px;padding:5px 9px" id="exp-month-filter"><option value="">All Months</option></select>
           <button class="btn btn-ghost btn-sm" onclick="loadExpenses()">🔍 Filter</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportExpenses()">⬇️ Export</button>
         </div>
       </div>
       <div class="kpi-grid" id="exp-kpis"></div>
-      <table><thead><tr><th>Date</th><th>Store</th><th>Category</th><th>Description</th><th>Amount</th><th>Payment</th></tr></thead>
+      <table><thead><tr><th>Date</th><th>Store</th><th>Category</th><th>Description</th><th>Amount</th><th>Payment</th><th data-role="admin,accountant">Actions</th></tr></thead>
       <tbody id="exp-table"></tbody></table>
     </div>
   </div>
@@ -852,13 +853,19 @@ body{display:flex;height:100vh;overflow:hidden}
       </div>
       <div>
         <div class="card">
-          <div class="card-title">📊 Supplier Balances</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="card-title" style="margin:0">📊 Supplier Balances</div>
+            <button class="btn btn-ghost btn-sm" onclick="exportSupplierBalances()">⬇️ Export</button>
+          </div>
           <table><thead><tr><th>Supplier</th><th>Terms</th><th>Total Invoiced</th><th>Total Paid</th><th>Balance Due</th><th>Status</th></tr></thead>
           <tbody id="sup-balances"></tbody></table>
         </div>
         <div class="card">
-          <div class="card-title">📋 Recent Transactions</div>
-          <table><thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th>Amount</th><th>Ref</th></tr></thead>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="card-title" style="margin:0">📋 Recent Transactions</div>
+            <button class="btn btn-ghost btn-sm" onclick="exportSupplierTxns()">⬇️ Export</button>
+          </div>
+          <table><thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th>Amount</th><th>Ref</th><th>Actions</th></tr></thead>
           <tbody id="sup-txns"></tbody></table>
         </div>
       </div>
@@ -870,8 +877,11 @@ body{display:flex;height:100vh;overflow:hidden}
     <div style="max-width:800px">
       <div class="kpi-grid" id="cap-kpis"></div>
       <div class="card">
-        <div class="card-title">💎 Capital Statement</div>
-        <table><thead><tr><th>Item</th><th>Date</th><th>Description</th><th class="text-right">Amount (LYD)</th></tr></thead>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="card-title" style="margin:0">💎 Capital Statement</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportCapital()">⬇️ Export</button>
+        </div>
+        <table><thead><tr><th>Item</th><th>Date</th><th>Description</th><th class="text-right">Amount (LYD)</th><th>Actions</th></tr></thead>
         <tbody id="cap-table"></tbody></table>
       </div>
       <div class="card">
@@ -900,8 +910,11 @@ body{display:flex;height:100vh;overflow:hidden}
     <div style="max-width:1000px">
       <div class="kpi-grid" id="fa-kpis"></div>
       <div class="card">
-        <div class="card-title">🏗️ Fixed Assets Register</div>
-        <p style="font-size:11px;color:var(--gray4);margin:0 0 11px">Durable, non-trading purchases only (shop decor, furniture, equipment, vehicles, POS hardware). Not for resale — stock for resale goes through Supplier GRN instead. Each asset depreciates straight-line over its useful life; the book value shown here automatically flows into the Balance Sheet, and the depreciation expense automatically flows into the P&L Statement.</p>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="card-title" style="margin:0">🏗️ Fixed Assets Register</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportFixedAssets()">⬇️ Export</button>
+        </div>
+        <p style="font-size:11px;color:var(--gray4);margin:8px 0 11px">Durable, non-trading purchases only (shop decor, furniture, equipment, vehicles, POS hardware). Not for resale — stock for resale goes through Supplier GRN instead. Each asset depreciates straight-line over its useful life; the book value shown here automatically flows into the Balance Sheet, and the depreciation expense automatically flows into the P&L Statement.</p>
         <div class="table-wrapper" style="overflow-x:auto">
         <table><thead><tr><th>Name</th><th>Category</th><th>Store</th><th>Purchased</th><th>Cost</th><th>Monthly Depr.</th><th>Accum. Depr.</th><th>Book Value</th><th>Status</th><th data-role="admin,accountant">Actions</th></tr></thead>
         <tbody id="fa-table"></tbody></table>

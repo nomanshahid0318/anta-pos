@@ -50,6 +50,7 @@ class CapitalEntry(Base):
     type: Mapped[str] = mapped_column(String(32))
     amount: Mapped[float] = mapped_column(Float, default=0.0)
     description: Mapped[str] = mapped_column(String(255), default="")
+    cf_item_id: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
@@ -102,6 +103,7 @@ class FixedAsset(Base):
     useful_life_years: Mapped[float] = mapped_column(Float, default=5.0)
     method: Mapped[str] = mapped_column(String(32), default="straight-line")
     notes: Mapped[str] = mapped_column(String(255), default="")
+    cf_item_id: Mapped[str] = mapped_column(String(64), default="")
     disposed: Mapped[bool] = mapped_column(Boolean, default=False)
     disposed_date: Mapped[str] = mapped_column(String(16), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

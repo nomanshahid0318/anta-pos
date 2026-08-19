@@ -894,7 +894,7 @@ async function uploadProducts(file){
 }
 function plPreset(){const p=($('pl-period')||{}).value||'month',d=today(),now=new Date();if(!$('pl-from'))return;if(p==='today'){$('pl-from').value=d;$('pl-to').value=d;}else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());$('pl-from').value=ws.toISOString().split('T')[0];$('pl-to').value=d;}else if(p==='month'){$('pl-from').value=d.slice(0,7)+'-01';$('pl-to').value=d;}else{$('pl-from').value=d.slice(0,4)+'-01-01';$('pl-to').value=d;}}
 async function loadPL(){const qs=new URLSearchParams();if($('pl-from')?.value)qs.set('from',$('pl-from').value);if($('pl-to')?.value)qs.set('to',$('pl-to').value);if($('pl-store')?.value)qs.set('store',$('pl-store').value);const pl=await api('/api/ho/pl?'+qs);if(!pl||!pl.ok){toast('P&L failed','error');return;}if($('pl-kpis'))$('pl-kpis').innerHTML=[['Revenue',fmt(pl.revenue),''],['COGS',fmt(pl.cogs),'amber'],['Gross Profit',fmt(pl.grossProfit),'green'],['GM%',((pl.grossMargin||0)*100).toFixed(1)+'%','blue'],['Expenses',fmt(pl.totalExpenses),'purple'],['EBITDA',fmt(pl.ebitda),'teal'],['Depreciation',fmt(pl.depreciationExpense||0),'amber'],['Net Profit',fmt(pl.netProfit),'green']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');const rows=[['Net Revenue','netRevenue'],['COGS','cogs'],['Gross Profit','grossProfit'],['Gross Margin %','grossMargin',true],['Total Expenses','totalExpenses'],['EBITDA','ebitda'],['Depreciation Expense','depreciationExpense'],['Net Profit','netProfit']];if($('pl-table'))$('pl-table').innerHTML=rows.map(([label,key,pct])=>`<tr style="${key==='ebitda'||key==='grossProfit'||key==='netProfit'?'font-weight:800;background:var(--gray0)':''}"><td>${label}</td><td class="text-right fw7">${pct?((pl[key]||0)*100).toFixed(1)+'%':fmt(pl[key]||0)}</td><td class="text-right">${pct?'':pl.netRevenue?((pl[key]||0)/pl.netRevenue*100).toFixed(1)+'%':'—'}</td></tr>`).join('');}
-async function loadExpenses(){const el=$('exp-ho-table')||$('exp-table');if(!el)return;const qs=new URLSearchParams();const sid=$('exp-store-filter')&&$('exp-store-filter').value;if(sid&&sid!=='all')qs.set('store_id',sid);const res=await api('/api/expenses?limit=300'+(qs.toString()?'&'+qs.toString():''));const rows=(res&&res.data)||DATA.expenses||[];DATA.expenses=rows.map(e=>({...e,Date:e.date||e.Date,Amount:e.amount!=null?e.amount:e.Amount,Store:e.store||e.Store,StoreID:e.storeId||e.StoreID,Category:e.category||e.Category,Description:e.description||e.Description||'',PayMethod:e.payMethod||e.PayMethod||''}));el.innerHTML=DATA.expenses.map(e=>`<tr><td>${e.Date||''}</td><td>${e.Store||''}</td><td>${e.Category||''}</td><td>${e.Description||''}</td><td class="fw7">${fmt(e.Amount||0)}</td><td>${e.PayMethod||''}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3)">No expenses</td></tr>';}
+async function loadExpenses(){const el=$('exp-ho-table')||$('exp-table');if(!el)return;const qs=new URLSearchParams();const sid=$('exp-store-filter')&&$('exp-store-filter').value;if(sid&&sid!=='all')qs.set('store_id',sid);const res=await api('/api/expenses?limit=300'+(qs.toString()?'&'+qs.toString():''));const rows=(res&&res.data)||DATA.expenses||[];DATA.expenses=rows.map(e=>({...e,Date:e.date||e.Date,Amount:e.amount!=null?e.amount:e.Amount,Store:e.store||e.Store,StoreID:e.storeId||e.StoreID,Category:e.category||e.Category,Description:e.description||e.Description||'',PayMethod:e.payMethod||e.PayMethod||''}));el.innerHTML=DATA.expenses.map(e=>`<tr><td>${e.Date||''}</td><td>${e.Store||''}</td><td>${e.Category||''}</td><td>${e.Description||''}</td><td class="fw7">${fmt(e.Amount||0)}</td><td>${e.PayMethod||''}</td><td data-role="admin,accountant"><button class="btn btn-ghost btn-sm" onclick="editExpense('${e.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3)">No expenses</td></tr>';applyRoleUI();}
 
 function rptPreset(){const p=($('rpt-preset')||{}).value||'today',d=today(),now=new Date();if(!$('rpt-from'))return;if(p==='today'){$('rpt-from').value=d;$('rpt-to').value=d;}else if(p==='yesterday'){const y=new Date(now);y.setDate(y.getDate()-1);const yd=y.toISOString().split('T')[0];$('rpt-from').value=yd;$('rpt-to').value=yd;}else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());$('rpt-from').value=ws.toISOString().split('T')[0];$('rpt-to').value=d;}else{$('rpt-from').value=d.slice(0,7)+'-01';$('rpt-to').value=d;}}
 async function loadReports(){const qs=new URLSearchParams();if($('rpt-from')?.value)qs.set('from',$('rpt-from').value);if($('rpt-to')?.value)qs.set('to',$('rpt-to').value);if($('rpt-store')?.value&&$('rpt-store').value!=='all')qs.set('store',$('rpt-store').value);const res=await api('/api/reports?'+qs);if(!res||!res.ok){toast('Report failed','error');return;}window.__lastReport=res;if($('rpt-kpis'))$('rpt-kpis').innerHTML=[['Revenue',fmt(res.revenue),''],['Net',fmt(res.net),'blue'],['Invoices',res.invoices,'green'],['ATV',fmt(res.atv),'amber'],['Units',res.units,'purple'],['Cost',fmt(res.totalCost||0),''],['Profit',fmt(res.totalProfit||0),'green'],['Margin',(res.margin||0)+'%','teal'],['Returns',fmt(res.returns),'']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');const pm=res.paymentBreakdown||{},rev=res.revenue||0;if($('rpt-pay'))$('rpt-pay').innerHTML=Object.entries(pm).map(([m,v])=>{const pct=rev?Math.round(v/rev*100):0;return`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px"><span>${m}</span><span class="fw7">${fmt(v)} (${pct}%)</span></div><div style="background:var(--gray1);border-radius:4px;height:7px"><div style="background:var(--accent2);width:${pct}%;height:100%;border-radius:4px"></div></div></div>`;}).join('')||'<div style="color:var(--gray3);padding:14px;text-align:center">No data</div>';if($('rpt-prod'))$('rpt-prod').innerHTML=(res.productBreakdown||[]).map(p=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--gray1);font-size:11px"><span class="fw7">${p.name}</span><span>${p.qty} · ${fmt(p.revenue)}</span></div>`).join('')||'<div style="color:var(--gray3);padding:14px;text-align:center">No data</div>';if($('rpt-txns'))$('rpt-txns').innerHTML=(res.transactions||[]).slice(0,150).map(x=>`<tr><td class="fw7">${x.id}</td><td>${x.date||''}</td><td>${x.time||''}</td><td>${x.store||''}</td><td>${x.customer||''}</td><td style="text-align:center">${x.items||0}</td><td style="text-align:center">${x.units||0}</td><td style="font-size:10px;max-width:220px">${x.productList||''}</td><td>${fmt(x.subtotal||0)}</td><td>${fmt(x.discount||0)}</td><td>${fmt(x.cost||0)}</td><td class="fw7" style="color:var(--green)">${fmt(x.profit||0)}</td><td>${x.margin||0}%</td><td>${x.payment||''}</td><td>${x.payRef||''}</td><td class="fw7">${fmt(x.total||0)}</td></tr>`).join('')||'<tr><td colspan="16" style="text-align:center;color:var(--gray3);padding:14px">None</td></tr>';}
@@ -1100,7 +1100,15 @@ function renderBanks(){const el=$('banks-table')||$('b-table');if(el)el.innerHTM
 function showAddBank(){if($('bank-form')){$('bank-form').style.display='flex';['b-nm','b-acc','b-dev'].forEach(id=>{if($(id))$(id).value='';});if($('b-act'))$('b-act').value='Y';}}function editBank(){}
 function closeBankForm(){if($('bank-form'))$('bank-form').style.display='none';}
 async function saveBank(){const body={name:$('b-nm').value.trim(),account_no:$('b-acc')?.value||'',device:$('b-dev')?.value||'',active:($('b-act')?.value||'Y')==='Y'};if(!body.name){toast('Name required','error');return;}const res=await api('/api/banks',{method:'POST',body});if(res&&res.bank_id){toast('✅ Bank saved');closeBankForm();await loadAll();renderBanks();}else toast('❌ '+((res&&res.msg)||'Failed'),'error');}
-async function loadBalanceSheet(){const res=await api('/api/ho/balance-sheet');if(!res||!res.ok){toast('BS failed','error');return;}const row=i=>`<tr><td>${i.label}${i.auto?' <span style="font-size:9px;color:var(--accent2)">auto</span>':''}</td><td class="text-right fw7">${fmt(i.value)}</td></tr>`;const set=(id,h)=>{if($(id))$(id).innerHTML=h;};const setT=(id,v)=>{if($(id))$(id).textContent=v;};set('bs-current-assets',(res.currentAssets||[]).map(row).join(''));set('bs-fixed-assets',(res.fixedAssets||[]).length?(res.fixedAssets||[]).map(row).join(''):'<tr><td style="color:var(--gray3);font-size:11px">No fixed assets</td><td></td></tr>');set('bs-liabilities',(res.liabilities||[]).map(row).join(''));set('bs-equity',(res.equity||[]).map(row).join(''));setT('bs-total-assets',fmt(res.totalAssets||0));setT('bs-total-liab',fmt(res.totalLiabilities||0));setT('bs-total-equity',fmt(res.totalEquity||0));setT('bs-total-le',fmt(res.totalLiabEquity||0));}
+async function loadBalanceSheet(){const res=await api('/api/ho/balance-sheet');if(!res||!res.ok){toast('BS failed','error');return;}window.__bsData=res;const row=i=>`<tr><td>${i.label}${i.auto?' <span style="font-size:9px;color:var(--accent2)">auto</span>':` <button class="btn btn-ghost btn-sm" style="padding:1px 5px;font-size:10px" onclick="deleteBSEntry('${i.id}')" title="Delete">🗑️</button>`}</td><td class="text-right fw7">${fmt(i.value)}</td></tr>`;const set=(id,h)=>{if($(id))$(id).innerHTML=h;};const setT=(id,v)=>{if($(id))$(id).textContent=v;};set('bs-current-assets',(res.currentAssets||[]).map(row).join(''));set('bs-fixed-assets',(res.fixedAssets||[]).length?(res.fixedAssets||[]).map(row).join(''):'<tr><td style="color:var(--gray3);font-size:11px">No fixed assets</td><td></td></tr>');set('bs-liabilities',(res.liabilities||[]).map(row).join(''));set('bs-equity',(res.equity||[]).map(row).join(''));setT('bs-total-assets',fmt(res.totalAssets||0));setT('bs-total-liab',fmt(res.totalLiabilities||0));setT('bs-total-equity',fmt(res.totalEquity||0));setT('bs-total-le',fmt(res.totalLiabEquity||0));}
+
+async function deleteBSEntry(id){
+  if(!id){return;}
+  if(!confirm('Delete this Balance Sheet entry? This cannot be undone.'))return;
+  const res=await api(`/api/ho/bs-entries/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadBalanceSheet();}
+  else toast('❌ Failed','error');
+}
 async function saveBSEntry(){const type=$('bse-type').value,desc=$('bse-desc').value.trim(),amt=parseFloat($('bse-amt').value)||0,date=$('bse-date')?.value||today();if(!desc||!amt){toast('Fill fields','error');return;}const res=await api('/api/ho/bs-entries',{method:'POST',body:{type,description:desc,amount:amt,date}});if(res&&res.ok){toast('✅ Saved');['bse-desc','bse-amt'].forEach(id=>{if($(id))$(id).value='';});loadBalanceSheet();}else toast('❌ Failed','error');}
 function _csvDownload(rows,header,filename){
   const esc=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
@@ -1119,32 +1127,101 @@ async function exportProducts(){
   if(!Array.isArray(all)){toast('❌ Export failed','error');return;}
   _csvDownload(all,[['Barcode','barcode'],['Name','name'],['Brand','brand'],['Category','category'],['Department','department'],['Season','season'],['Gender','gender'],['Size','size'],['Color','color'],['Cost','cost'],['Original Price','originalPrice'],['Retail','retail'],['Reorder','reorder']],'products_'+today()+'.csv');
 }
-function saveBSEntries(){}function exportBS(){toast('Use browser print','info');}
+function saveBSEntries(){}
+function exportBS(){
+  const bs=window.__bsData;
+  if(!bs){toast('Load the Balance Sheet first','error');return;}
+  const rows=[
+    ...(bs.currentAssets||[]).map(i=>({section:'Current Assets',...i})),
+    ...(bs.fixedAssets||[]).map(i=>({section:'Fixed Assets',...i})),
+    ...(bs.liabilities||[]).map(i=>({section:'Liabilities',...i})),
+    ...(bs.equity||[]).map(i=>({section:'Equity',...i})),
+  ];
+  _csvDownload(rows,[['Section','section'],['Item','label'],['Amount','value']],'balance_sheet_'+today()+'.csv');
+}
 function cfPreset(){const p=($('cf-period')||{}).value||'month',d=today();if(!$('cf-from'))return;if(p==='year'){$('cf-from').value=d.slice(0,4)+'-01-01';$('cf-to').value=d;}else{$('cf-from').value=d.slice(0,7)+'-01';$('cf-to').value=d;}}
-async function loadCashFlow(){const qs=new URLSearchParams();if($('cf-from')?.value)qs.set('from',$('cf-from').value);if($('cf-to')?.value)qs.set('to',$('cf-to').value);qs.set('opening',String(parseFloat($('cf-opening-input')?.value)||0));const res=await api('/api/ho/cashflow?'+qs);if(!res||!res.ok){toast('CF failed','error');return;}const row=i=>`<tr><td>${i.label}</td><td class="text-right fw7" style="color:${i.value>=0?'var(--green)':'var(--red)'}">${fmt(i.value)}</td></tr>`;const set=(id,h)=>{if($(id))$(id).innerHTML=h;};const setT=(id,v,c)=>{if($(id)){$(id).textContent=v;if(c)$(id).style.color=c;}};set('cf-operating',(res.operating||[]).map(row).join(''));setT('cf-op-total',fmt(res.operatingTotal||0),(res.operatingTotal||0)>=0?'var(--green)':'var(--red)');set('cf-investing',(res.investing||[]).length?(res.investing||[]).map(row).join(''):'<tr><td style="color:var(--gray3);font-size:11px">No entries</td><td></td></tr>');setT('cf-inv-total',fmt(res.investingTotal||0));set('cf-financing',(res.financing||[]).length?(res.financing||[]).map(row).join(''):'<tr><td style="color:var(--gray3);font-size:11px">No entries</td><td></td></tr>');setT('cf-fin-total',fmt(res.financingTotal||0));setT('cf-opening',fmt(res.opening||0));setT('cf-net',fmt(res.netCashFlow||0),(res.netCashFlow||0)>=0?'#4caf50':'#f44336');setT('cf-closing',fmt(res.closing||0));if($('cf-status'))$('cf-status').textContent=(res.closing||0)>=0?'✅ Positive':'⚠️ Negative';}
+async function loadCashFlow(){const qs=new URLSearchParams();if($('cf-from')?.value)qs.set('from',$('cf-from').value);if($('cf-to')?.value)qs.set('to',$('cf-to').value);qs.set('opening',String(parseFloat($('cf-opening-input')?.value)||0));const res=await api('/api/ho/cashflow?'+qs);if(!res||!res.ok){toast('CF failed','error');return;}window.__cfData=res;const row=i=>`<tr><td>${i.label}</td><td class="text-right fw7" style="color:${i.value>=0?'var(--green)':'var(--red)'}">${fmt(i.value)}</td></tr>`;const rowDel=i=>`<tr><td>${i.label} <button class="btn btn-ghost btn-sm" style="padding:1px 5px;font-size:10px" onclick="deleteCFEntry('${i.id}')" title="Delete">🗑️</button></td><td class="text-right fw7" style="color:${i.value>=0?'var(--green)':'var(--red)'}">${fmt(i.value)}</td></tr>`;const set=(id,h)=>{if($(id))$(id).innerHTML=h;};const setT=(id,v,c)=>{if($(id)){$(id).textContent=v;if(c)$(id).style.color=c;}};set('cf-operating',(res.operating||[]).map(row).join(''));setT('cf-op-total',fmt(res.operatingTotal||0),(res.operatingTotal||0)>=0?'var(--green)':'var(--red)');set('cf-investing',(res.investing||[]).length?(res.investing||[]).map(rowDel).join(''):'<tr><td style="color:var(--gray3);font-size:11px">No entries</td><td></td></tr>');setT('cf-inv-total',fmt(res.investingTotal||0));set('cf-financing',(res.financing||[]).length?(res.financing||[]).map(rowDel).join(''):'<tr><td style="color:var(--gray3);font-size:11px">No entries</td><td></td></tr>');setT('cf-fin-total',fmt(res.financingTotal||0));setT('cf-opening',fmt(res.opening||0));setT('cf-net',fmt(res.netCashFlow||0),(res.netCashFlow||0)>=0?'#4caf50':'#f44336');setT('cf-closing',fmt(res.closing||0));if($('cf-status'))$('cf-status').textContent=(res.closing||0)>=0?'✅ Positive':'⚠️ Negative';}
+
+async function deleteCFEntry(id){
+  if(!id){return;}
+  if(!confirm('Delete this Cash Flow entry? If it was auto-created from a Capital or Fixed Asset entry, that source entry will lose its cash-flow link (edit it again to recreate it). This cannot be undone.'))return;
+  const res=await api(`/api/ho/cf-items/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadCashFlow();}
+  else toast('❌ Failed','error');
+}
 async function addCFItem(type){const d=$(type==='investing'?'cf-inv-desc':'cf-fin-desc'),a=$(type==='investing'?'cf-inv-amt':'cf-fin-amt');if(!d||!a||!d.value)return;const res=await api('/api/ho/cf-items',{method:'POST',body:{section:type,label:d.value,value:parseFloat(a.value)||0}});if(res&&res.ok){d.value='';a.value='';loadCashFlow();toast('✅ Added');}}
-function calcCF(){loadCashFlow();}function saveCFItems(){}function exportCF(){toast('Use browser print','info');}
+function calcCF(){loadCashFlow();}
+function saveCFItems(){}
+function exportCF(){
+  const cf=window.__cfData;
+  if(!cf){toast('Load the Cash Flow statement first','error');return;}
+  const rows=[
+    ...(cf.operating||[]).map(i=>({section:'Operating',...i})),
+    ...(cf.investing||[]).map(i=>({section:'Investing',...i})),
+    ...(cf.financing||[]).map(i=>({section:'Financing',...i})),
+  ];
+  _csvDownload(rows,[['Section','section'],['Item','label'],['Amount','value']],'cash_flow_'+today()+'.csv');
+}
 async function saveSupplier(){const name=$('sup-name').value.trim();if(!name){toast('Enter name','error');return;}const res=await api('/api/ho/suppliers',{method:'POST',body:{name,contact:$('sup-contact').value,limit:parseFloat($('sup-limit').value)||0,terms:$('sup-terms').value}});if(res&&res.ok){toast('✅ Supplier saved');['sup-name','sup-contact','sup-limit'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 async function saveSupplierTxn(){const supId=$('sup-txn-supplier').value,amt=parseFloat($('sup-txn-amt').value)||0;if(!supId||!amt){toast('Select supplier + amount','error');return;}const res=await api('/api/ho/supplier-txns',{method:'POST',body:{supplierId:supId,date:$('sup-txn-date').value,type:$('sup-txn-type').value,amount:amt,ref:$('sup-txn-ref').value}});if(res&&res.ok){toast('✅ Recorded');['sup-txn-amt','sup-txn-ref'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 function populateSupplierSelect(){if($('sup-txn-supplier'))$('sup-txn-supplier').innerHTML=suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}
 function renderSupplierAccounts(){if($('sup-balances'))$('sup-balances').innerHTML=suppliers.map(b=>`<tr><td class="fw7">${b.name}</td><td>${b.terms||''}</td><td>${fmt(b.invoiced||0)}</td><td class="text-green">${fmt(b.paid||0)}</td><td class="fw7" style="color:${b.balance>0?'var(--red)':b.balance<0?'var(--green)':'var(--navy)'}">${fmt(Math.abs(b.balance||0))} ${b.balance>0?'DUE':b.balance<0?'CREDIT':''}</td><td><span class="badge ${b.balance<=0?'badge-green':'badge-amber'}">${b.balance<=0?'Paid':'Pending'}</span></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No suppliers</td></tr>';
-if($('sup-txns'))$('sup-txns').innerHTML=supplierTxns.slice(0,15).map(t=>`<tr><td>${t.date}</td><td>${t.supplierName}</td><td><span class="badge ${t.type==='payment'?'badge-green':'badge-amber'}">${t.type}</span></td><td class="fw7">${fmt(t.amount)}</td><td>${t.ref||'—'}</td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:16px">No txns</td></tr>';populateSupplierSelect();}
-function saveSuppliers(){}function saveSupplierTxns(){}function getSupplierTxns(){return supplierTxns;}function getSupplierBalances(){return suppliers;}
-async function saveCapitalEntry(){const type=$('cap-type').value,date=$('cap-date').value,amt=parseFloat($('cap-amt').value)||0,desc=$('cap-desc').value.trim();if(!amt||!desc){toast('Fill fields','error');return;}const res=await api('/api/ho/capital',{method:'POST',body:{type,date,amount:amt,description:desc}});if(res&&res.ok){toast('✅ Saved');['cap-amt','cap-desc'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderCapital();}else toast('❌ Failed','error');}
-function renderCapital(){const invested=capitalEntries.filter(c=>c.type==='investment').reduce((a,c)=>a+(+c.amount||0),0);const withdrawn=capitalEntries.filter(c=>c.type==='withdrawal').reduce((a,c)=>a+(+c.amount||0),0);const loans=capitalEntries.filter(c=>c.type==='loan').reduce((a,c)=>a+(+c.amount||0),0);const loanRepaid=capitalEntries.filter(c=>c.type==='loan-repay').reduce((a,c)=>a+(+c.amount||0),0);const netProfit=(DATA.dashboard?.netRevenue||0)-DATA.expenses.reduce((a,e)=>a+(+e.Amount||0),0);const totalEquity=invested-withdrawn+loans-loanRepaid+netProfit;if($('cap-kpis'))$('cap-kpis').innerHTML=[['Total Invested',fmt(invested),'green'],['Total Withdrawn',fmt(withdrawn),''],['Net Loans',fmt(loans-loanRepaid),'amber'],['Net Profit',fmt(netProfit),'blue'],['Total Equity',fmt(totalEquity),'purple']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');if($('cap-table'))$('cap-table').innerHTML=capitalEntries.map(c=>{const isOut=c.type==='withdrawal'||c.type==='loan-repay';return`<tr><td><span class="badge badge-blue">${c.type}</span></td><td>${c.date}</td><td>${c.desc}</td><td class="text-right fw7" style="color:${isOut?'var(--red)':'var(--green)'}">${isOut?'-':'+'} ${fmt(c.amount)}</td></tr>`;}).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:16px">No entries</td></tr>';}
+if($('sup-txns'))$('sup-txns').innerHTML=supplierTxns.slice(0,15).map(t=>`<tr><td>${t.date}</td><td>${t.supplierName}</td><td><span class="badge ${t.type==='payment'?'badge-green':'badge-amber'}">${t.type}</span></td><td class="fw7">${fmt(t.amount)}</td><td>${t.ref||'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="deleteSupplierTxn('${t.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No txns</td></tr>';populateSupplierSelect();}
 
+async function deleteSupplierTxn(id){
+  if(!confirm('Delete this supplier transaction? This will change the supplier\'s balance. This cannot be undone.'))return;
+  const res=await api(`/api/ho/supplier-txns/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadAll();renderSupplierAccounts();}
+  else toast('❌ Failed','error');
+}
+function exportSupplierBalances(){
+  _csvDownload(suppliers,[['Supplier','name'],['Terms','terms'],['Total Invoiced','invoiced'],['Total Paid','paid'],['Balance','balance']],'supplier_balances_'+today()+'.csv');
+}
+function exportSupplierTxns(){
+  _csvDownload(supplierTxns,[['Date','date'],['Supplier','supplierName'],['Type','type'],['Amount','amount'],['Reference','ref']],'supplier_transactions_'+today()+'.csv');
+}
+function saveSuppliers(){}function saveSupplierTxns(){}function getSupplierTxns(){return supplierTxns;}function getSupplierBalances(){return suppliers;}
+async function saveCapitalEntry(){const type=$('cap-type').value,date=$('cap-date').value,amt=parseFloat($('cap-amt').value)||0,desc=$('cap-desc').value.trim();if(!amt||!desc){toast('Fill fields','error');return;}const editId=$('cap-editid')?$('cap-editid').value:'';const res=editId?await api(`/api/ho/capital/${encodeURIComponent(editId)}`,{method:'PUT',body:{type,date,amount:amt,description:desc}}):await api('/api/ho/capital',{method:'POST',body:{type,date,amount:amt,description:desc}});if(res&&res.ok){toast(editId?'✅ Updated':'✅ Saved');['cap-amt','cap-desc'].forEach(id=>{if($(id))$(id).value='';});if($('cap-editid'))$('cap-editid').value='';const btn=document.querySelector('[onclick="saveCapitalEntry()"]');if(btn)btn.textContent='💾 Save';await loadAll();renderCapital();}else toast('❌ Failed','error');}
+function renderCapital(){const invested=capitalEntries.filter(c=>c.type==='investment').reduce((a,c)=>a+(+c.amount||0),0);const withdrawn=capitalEntries.filter(c=>c.type==='withdrawal').reduce((a,c)=>a+(+c.amount||0),0);const loans=capitalEntries.filter(c=>c.type==='loan').reduce((a,c)=>a+(+c.amount||0),0);const loanRepaid=capitalEntries.filter(c=>c.type==='loan-repay').reduce((a,c)=>a+(+c.amount||0),0);const netProfit=(DATA.dashboard?.netRevenue||0)-DATA.expenses.reduce((a,e)=>a+(+e.Amount||0),0);const totalEquity=invested-withdrawn+loans-loanRepaid+netProfit;if($('cap-kpis'))$('cap-kpis').innerHTML=[['Total Invested',fmt(invested),'green'],['Total Withdrawn',fmt(withdrawn),''],['Net Loans',fmt(loans-loanRepaid),'amber'],['Net Profit',fmt(netProfit),'blue'],['Total Equity',fmt(totalEquity),'purple']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');if($('cap-table'))$('cap-table').innerHTML=capitalEntries.map(c=>{const isOut=c.type==='withdrawal'||c.type==='loan-repay';return`<tr><td><span class="badge badge-blue">${c.type}</span></td><td>${c.date}</td><td>${c.desc}</td><td class="text-right fw7" style="color:${isOut?'var(--red)':'var(--green)'}">${isOut?'-':'+'} ${fmt(c.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="editCapital('${c.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteCapital('${c.id}')">🗑️</button></td></tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:16px">No entries</td></tr>';}
+
+function editCapital(id){
+  const c=capitalEntries.find(x=>x.id===id);
+  if(!c){toast('Not found','error');return;}
+  if($('cap-type'))$('cap-type').value=c.type;
+  if($('cap-date'))$('cap-date').value=c.date;
+  if($('cap-amt'))$('cap-amt').value=c.amount;
+  if($('cap-desc'))$('cap-desc').value=c.desc;
+  if(!$('cap-editid')){
+    const hidden=document.createElement('input');hidden.type='hidden';hidden.id='cap-editid';
+    document.querySelector('[onclick="saveCapitalEntry()"]').insertAdjacentElement('beforebegin',hidden);
+  }
+  $('cap-editid').value=id;
+  const btn=document.querySelector('[onclick="saveCapitalEntry()"]');
+  if(btn){btn.textContent='💾 Update';btn.scrollIntoView({behavior:'smooth',block:'center'});}
+}
+async function deleteCapital(id){
+  if(!confirm('Delete this capital entry? Its linked Cash Flow entry will also be removed. This cannot be undone.'))return;
+  const res=await api(`/api/ho/capital/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadAll();renderCapital();}
+  else toast('❌ Failed','error');
+}
+function exportCapital(){
+  _csvDownload(capitalEntries,[['Type','type'],['Date','date'],['Description','desc'],['Amount','amount']],'capital_entries_'+today()+'.csv');
+}
+
+let __faList=[];
 async function loadFixedAssets(){
   const res=await api('/api/ho/fixed-assets');
   if(!res||!res.ok){toast('Failed to load fixed assets','error');return;}
+  __faList=res.data||[];
   if($('fa-kpis'))$('fa-kpis').innerHTML=[
     ['Total Cost',fmt(res.totalCost||0),''],
     ['Accumulated Depreciation',fmt(res.totalAccumulatedDepreciation||0),'amber'],
     ['Net Book Value',fmt(res.totalBookValue||0),'green'],
   ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
-  const rows=(res.data||[]);
-  if($('fa-table'))$('fa-table').innerHTML=rows.map(a=>{
+  if($('fa-table'))$('fa-table').innerHTML=__faList.map(a=>{
     const status=a.disposed?'<span class="badge badge-gray">Disposed</span>':(a.fullyDepreciated?'<span class="badge badge-amber">Fully Depreciated</span>':'<span class="badge badge-green">Active</span>');
-    const actions=a.disposed?'—':`<button class="btn btn-ghost btn-sm" onclick="disposeFixedAssetUI('${a.id}')">🗑️ Dispose</button>`;
+    const actions=a.disposed?'—':`<button class="btn btn-ghost btn-sm" onclick="editFixedAsset('${a.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="disposeFixedAssetUI('${a.id}')">📦 Dispose</button> <button class="btn btn-ghost btn-sm" onclick="deleteFixedAssetUI('${a.id}')">🗑️</button>`;
     return `<tr><td class="fw7">${a.name}</td><td>${a.category||''}</td><td>${a.storeId||'HO'}</td><td>${a.purchaseDate}</td><td>${fmt(a.cost)}</td><td>${fmt(a.monthlyDepreciation)}</td><td>${fmt(a.accumulatedDepreciation)}</td><td class="fw7">${fmt(a.bookValue)}</td><td>${status}</td><td data-role="admin,accountant">${actions}</td></tr>`;
   }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--gray3);padding:16px">No fixed assets yet</td></tr>';
   applyRoleUI();
@@ -1160,15 +1237,41 @@ async function saveFixedAsset(){
     purchaseDate:$('fa-date').value||today(), cost, salvageValue:parseFloat($('fa-salvage').value)||0,
     usefulLifeYears:life, notes:$('fa-notes').value.trim(), recordCashOutflow:$('fa-cash').checked,
   };
-  const res=await api('/api/ho/fixed-assets',{method:'POST',body});
+  const editId=$('fa-editid')?$('fa-editid').value:'';
+  const res=editId
+    ? await api(`/api/ho/fixed-assets/${encodeURIComponent(editId)}`,{method:'PUT',body})
+    : await api('/api/ho/fixed-assets',{method:'POST',body});
   if(res&&res.ok){
-    toast('✅ Asset saved');
+    toast(editId?'✅ Asset updated':'✅ Asset saved');
     ['fa-name','fa-notes'].forEach(id=>{if($(id))$(id).value='';});
     if($('fa-cost'))$('fa-cost').value='';
     if($('fa-salvage'))$('fa-salvage').value='0';
     if($('fa-life'))$('fa-life').value='5';
+    if($('fa-editid'))$('fa-editid').value='';
+    const btn=document.querySelector('[onclick="saveFixedAsset()"]');
+    if(btn)btn.textContent='💾 Save Asset';
     await loadFixedAssets();
   } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+
+function editFixedAsset(id){
+  const a=__faList.find(x=>x.id===id);
+  if(!a){toast('Not found','error');return;}
+  if($('fa-name'))$('fa-name').value=a.name;
+  if($('fa-category'))$('fa-category').value=a.category||'Other';
+  if($('fa-store'))$('fa-store').value=a.storeId||'HO';
+  if($('fa-date'))$('fa-date').value=a.purchaseDate;
+  if($('fa-cost'))$('fa-cost').value=a.cost;
+  if($('fa-life'))$('fa-life').value=a.usefulLifeYears;
+  if($('fa-salvage'))$('fa-salvage').value=a.salvageValue||0;
+  if($('fa-notes'))$('fa-notes').value=a.notes||'';
+  if(!$('fa-editid')){
+    const hidden=document.createElement('input');hidden.type='hidden';hidden.id='fa-editid';
+    document.querySelector('[onclick="saveFixedAsset()"]').insertAdjacentElement('beforebegin',hidden);
+  }
+  $('fa-editid').value=id;
+  const btn=document.querySelector('[onclick="saveFixedAsset()"]');
+  if(btn){btn.textContent='💾 Update Asset';btn.scrollIntoView({behavior:'smooth',block:'center'});}
 }
 
 async function disposeFixedAssetUI(assetId){
@@ -1176,6 +1279,15 @@ async function disposeFixedAssetUI(assetId){
   const res=await api(`/api/ho/fixed-assets/${encodeURIComponent(assetId)}/dispose`,{method:'POST'});
   if(res&&res.ok){toast('✅ Marked disposed');await loadFixedAssets();}
   else toast('❌ Failed','error');
+}
+async function deleteFixedAssetUI(assetId){
+  if(!confirm('Delete this asset permanently? Its linked Cash Flow entry will also be removed. This cannot be undone — if you just want to retire it, use Dispose instead.'))return;
+  const res=await api(`/api/ho/fixed-assets/${encodeURIComponent(assetId)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadFixedAssets();}
+  else toast('❌ Failed','error');
+}
+function exportFixedAssets(){
+  _csvDownload(__faList,[['Name','name'],['Category','category'],['Store','storeId'],['Purchase Date','purchaseDate'],['Cost','cost'],['Salvage Value','salvageValue'],['Useful Life (yrs)','usefulLifeYears'],['Monthly Depreciation','monthlyDepreciation'],['Accumulated Depreciation','accumulatedDepreciation'],['Book Value','bookValue'],['Disposed','disposed']],'fixed_assets_'+today()+'.csv');
 }
 function saveCapital(){}
 async function testConn(){const url=($('api-url')&&$('api-url').value.trim())||CFG.apiUrl;CFG.apiUrl=url.replace(/\/$/,'');localStorage.setItem('anta_ho_api',CFG.apiUrl);const div=$('conn-res');if(div){div.style.display='block';div.innerHTML='⏳ Testing...';}const res=await api('/api/health');if(res&&res.ok){if(div){div.innerHTML='✅ Connected! '+res.app+' v'+res.version;div.style.color='var(--green)';}setSyncStatus('online','Connected');toast('✅ Connected');if($('server-info'))$('server-info').textContent='DB: '+(res.db||'sqlite')+' · modules: '+(res.modules||[]).join(',');}else{if(div){div.innerHTML='❌ Failed';div.style.color='var(--red)';}toast('❌ Failed','error');}}
@@ -1406,6 +1518,7 @@ async function saveHoExpense(){
   const amount=parseFloat($('ho-exp-amt')&&$('ho-exp-amt').value)||0;
   if(!amount){toast('Amount required','error');return;}
   const storeSel=$('ho-exp-store');
+  const editId=$('ho-exp-editid')?$('ho-exp-editid').value:'';
   const body={
     date:($('ho-exp-date')&&$('ho-exp-date').value)||today(),
     storeId:(storeSel&&storeSel.value)||'HO',
@@ -1416,17 +1529,50 @@ async function saveHoExpense(){
     payMethod:($('ho-exp-pay')&&$('ho-exp-pay').value)||'Cash',
     reference:($('ho-exp-ref')&&$('ho-exp-ref').value)||''
   };
-  const res=await api('/api/expenses',{method:'POST',body:body});
+  const res=editId
+    ? await api(`/api/expenses/${encodeURIComponent(editId)}`,{method:'PUT',body:body})
+    : await api('/api/expenses',{method:'POST',body:body});
   if(res&&res.ok){
-    toast('Expense saved');
+    toast(editId?'✅ Expense updated':'✅ Expense saved');
     if($('ho-exp-amt'))$('ho-exp-amt').value='';
     if($('ho-exp-desc'))$('ho-exp-desc').value='';
+    if($('ho-exp-editid'))$('ho-exp-editid').value='';
+    const btn=document.querySelector('[onclick="saveHoExpense()"]');
+    if(btn)btn.textContent='💾 Save Expense';
     await loadAll();
     loadExpenses();
   } else {
     const msg=(res&& (res.detail||res.msg)) || 'Failed';
     toast(typeof msg==='string'?msg:'Failed','error');
   }
+}
+function editExpense(id){
+  const e=(DATA.expenses||[]).find(x=>x.id===id);
+  if(!e){toast('Not found','error');return;}
+  if($('ho-exp-date'))$('ho-exp-date').value=e.date||e.Date||today();
+  if($('ho-exp-store'))$('ho-exp-store').value=e.storeId||e.StoreID||'HO';
+  if($('ho-exp-cat'))$('ho-exp-cat').value=e.category||e.Category||'Other';
+  if($('ho-exp-amt'))$('ho-exp-amt').value=e.amount!=null?e.amount:e.Amount;
+  if($('ho-exp-pay'))$('ho-exp-pay').value=e.payMethod||e.PayMethod||'Cash';
+  if($('ho-exp-ref'))$('ho-exp-ref').value=e.reference||'';
+  if($('ho-exp-desc'))$('ho-exp-desc').value=e.description||e.Description||'';
+  if(!$('ho-exp-editid')){
+    const hidden=document.createElement('input');hidden.type='hidden';hidden.id='ho-exp-editid';
+    document.querySelector('[onclick="saveHoExpense()"]').insertAdjacentElement('beforebegin',hidden);
+  }
+  $('ho-exp-editid').value=id;
+  const btn=document.querySelector('[onclick="saveHoExpense()"]');
+  if(btn)btn.textContent='💾 Update Expense';
+  btn.scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function deleteExpense(id){
+  if(!confirm('Delete this expense? This cannot be undone.'))return;
+  const res=await api(`/api/expenses/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadAll();loadExpenses();}
+  else toast('❌ Failed','error');
+}
+function exportExpenses(){
+  _csvDownload(DATA.expenses||[],[['Date','date'],['Store','store'],['Category','category'],['Description','description'],['Amount','amount'],['Payment','payMethod'],['Reference','reference']],'expenses_'+today()+'.csv');
 }
 async function loadPromosHO(){
   const res=await api('/api/promotions');

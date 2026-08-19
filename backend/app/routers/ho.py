@@ -816,6 +816,16 @@ def save_supplier_txn(body: SupplierTxnIn, db: Annotated[Session, Depends(get_db
     return {"ok": True, "status": "ok", "id": tid}
 
 
+@router.delete("/supplier-txns/{txn_id}")
+def delete_supplier_txn(txn_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    row = db.query(SupplierTxn).filter(SupplierTxn.txn_id == txn_id).first()
+    if not row:
+        raise HTTPException(404, "Transaction not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
 @router.get("/capital")
 def list_capital(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
     rows = db.query(CapitalEntry).order_by(CapitalEntry.id.desc()).all()
@@ -826,7 +836,8 @@ def list_capital(db: Annotated[Session, Depends(get_db)], user: Annotated[Curren
 def save_capital(body: CapitalIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
     eid = f"CAP-{int(time.time()*1000)}"
     edate = body.date or today_str()
-    db.add(CapitalEntry(entry_id=eid, date=edate, type=body.type, amount=body.amount, description=body.description or ""))
+    row = CapitalEntry(entry_id=eid, date=edate, type=body.type, amount=body.amount, description=body.description or "")
+    db.add(row)
     # Cash in/out either way — auto-mirror into Cash Flow (Financing) so the
     # Balance Sheet's cash estimate and the Cash Flow Statement both pick
     # this up automatically. No separate manual Cash Flow entry needed.
@@ -837,13 +848,66 @@ def save_capital(body: CapitalIn, db: Annotated[Session, Depends(get_db)], user:
         "loan": "Loan Received", "loan-repay": "Loan Repayment", "retained": "Retained Profit",
     }.get(body.type, body.type)
     if body.type != "retained":  # retained profit isn't a new cash movement — it's already counted via sales/expenses
+        cf_id = f"CF-{int(time.time()*1000)}"
         db.add(CFItem(
-            item_id=f"CF-{int(time.time()*1000)}", section="financing",
+            item_id=cf_id, section="financing",
             label=f"{label} — {body.description}" if body.description else label,
             value=sign * abs(body.amount), date=edate,
         ))
+        row.cf_item_id = cf_id
     db.commit()
     return {"ok": True, "status": "ok", "id": eid}
+
+
+@router.put("/capital/{entry_id}")
+def update_capital(
+    entry_id: str, body: CapitalIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(_admin)],
+):
+    row = db.query(CapitalEntry).filter(CapitalEntry.entry_id == entry_id).first()
+    if not row:
+        raise HTTPException(404, "Entry not found")
+    row.date = body.date or row.date
+    row.type = body.type
+    row.amount = body.amount
+    row.description = body.description or ""
+    # Keep the linked Cash Flow entry in sync instead of leaving a stale one.
+    cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first() if row.cf_item_id else None
+    cash_in_types = ("investment", "loan")
+    sign = 1 if body.type in cash_in_types else -1
+    label = {
+        "investment": "Owner Investment", "withdrawal": "Owner Withdrawal",
+        "loan": "Loan Received", "loan-repay": "Loan Repayment", "retained": "Retained Profit",
+    }.get(body.type, body.type)
+    if body.type == "retained":
+        if cf:
+            db.delete(cf)
+            row.cf_item_id = ""
+    else:
+        new_label = f"{label} — {body.description}" if body.description else label
+        new_value = sign * abs(body.amount)
+        if cf:
+            cf.label, cf.value, cf.date = new_label, new_value, row.date
+        else:
+            cf_id = f"CF-{int(time.time()*1000)}"
+            db.add(CFItem(item_id=cf_id, section="financing", label=new_label, value=new_value, date=row.date))
+            row.cf_item_id = cf_id
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/capital/{entry_id}")
+def delete_capital(entry_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    row = db.query(CapitalEntry).filter(CapitalEntry.entry_id == entry_id).first()
+    if not row:
+        raise HTTPException(404, "Entry not found")
+    if row.cf_item_id:
+        cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first()
+        if cf:
+            db.delete(cf)
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
 
 
 @router.get("/fixed-assets")
@@ -886,18 +950,58 @@ def save_fixed_asset(
         raise HTTPException(400, "Useful life must be greater than 0 years")
     aid = f"FA-{int(time.time()*1000)}"
     pdate = body.purchaseDate or today_str()
-    db.add(FixedAsset(
+    row = FixedAsset(
         asset_id=aid, name=body.name, category=body.category or "Other", store_id=body.storeId or "HO",
         purchase_date=pdate, cost=body.cost, salvage_value=max(0.0, body.salvageValue),
         useful_life_years=body.usefulLifeYears, notes=body.notes or "",
-    ))
+    )
+    db.add(row)
     if body.recordCashOutflow and body.cost > 0:
+        cf_id = f"CF-{int(time.time()*1000)}"
         db.add(CFItem(
-            item_id=f"CF-{int(time.time()*1000)}", section="investing",
+            item_id=cf_id, section="investing",
             label=f"Fixed Asset Purchase — {body.name}", value=-abs(body.cost), date=pdate,
         ))
+        row.cf_item_id = cf_id
     db.commit()
     return {"ok": True, "status": "ok", "id": aid}
+
+
+@router.put("/fixed-assets/{asset_id}")
+def update_fixed_asset(
+    asset_id: str, body: FixedAssetIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    row = db.query(FixedAsset).filter(FixedAsset.asset_id == asset_id).first()
+    if not row:
+        raise HTTPException(404, "Asset not found")
+    if body.cost <= 0:
+        raise HTTPException(400, "Cost must be greater than 0")
+    if body.usefulLifeYears <= 0:
+        raise HTTPException(400, "Useful life must be greater than 0 years")
+    row.name = body.name
+    row.category = body.category or "Other"
+    row.store_id = body.storeId or "HO"
+    row.purchase_date = body.purchaseDate or row.purchase_date
+    row.cost = body.cost
+    row.salvage_value = max(0.0, body.salvageValue)
+    row.useful_life_years = body.usefulLifeYears
+    row.notes = body.notes or ""
+    # Keep the linked Cash Flow entry in sync so the outflow amount always
+    # matches the corrected cost instead of leaving a stale figure behind.
+    cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first() if row.cf_item_id else None
+    if body.recordCashOutflow and body.cost > 0:
+        if cf:
+            cf.label, cf.value, cf.date = f"Fixed Asset Purchase — {body.name}", -abs(body.cost), row.purchase_date
+        else:
+            cf_id = f"CF-{int(time.time()*1000)}"
+            db.add(CFItem(item_id=cf_id, section="investing", label=f"Fixed Asset Purchase — {body.name}", value=-abs(body.cost), date=row.purchase_date))
+            row.cf_item_id = cf_id
+    elif cf:
+        db.delete(cf)
+        row.cf_item_id = ""
+    db.commit()
+    return {"ok": True, "status": "ok"}
 
 
 @router.post("/fixed-assets/{asset_id}/dispose")
@@ -923,6 +1027,10 @@ def delete_fixed_asset(
     row = db.query(FixedAsset).filter(FixedAsset.asset_id == asset_id).first()
     if not row:
         raise HTTPException(404, "Asset not found")
+    if row.cf_item_id:
+        cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first()
+        if cf:
+            db.delete(cf)
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -942,6 +1050,26 @@ def save_bs(body: BSIn, db: Annotated[Session, Depends(get_db)], user: Annotated
     return {"ok": True, "status": "ok", "id": eid}
 
 
+@router.put("/bs-entries/{entry_id}")
+def update_bs(entry_id: str, body: BSIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    row = db.query(BSEntry).filter(BSEntry.entry_id == entry_id).first()
+    if not row:
+        raise HTTPException(404, "Entry not found")
+    row.date, row.type, row.description, row.amount = body.date or row.date, body.type, body.description, body.amount
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/bs-entries/{entry_id}")
+def delete_bs(entry_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    row = db.query(BSEntry).filter(BSEntry.entry_id == entry_id).first()
+    if not row:
+        raise HTTPException(404, "Entry not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
 @router.get("/cf-items")
 def list_cf(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
     rows = db.query(CFItem).order_by(CFItem.id.desc()).all()
@@ -954,6 +1082,26 @@ def save_cf(body: CFIn, db: Annotated[Session, Depends(get_db)], user: Annotated
     db.add(CFItem(item_id=iid, section=body.section, label=body.label, value=body.value, date=body.date or today_str()))
     db.commit()
     return {"ok": True, "status": "ok", "id": iid}
+
+
+@router.put("/cf-items/{item_id}")
+def update_cf(item_id: str, body: CFIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    row = db.query(CFItem).filter(CFItem.item_id == item_id).first()
+    if not row:
+        raise HTTPException(404, "Item not found")
+    row.section, row.label, row.value, row.date = body.section, body.label, body.value, body.date or row.date
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/cf-items/{item_id}")
+def delete_cf(item_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    row = db.query(CFItem).filter(CFItem.item_id == item_id).first()
+    if not row:
+        raise HTTPException(404, "Item not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
 
 
 @router.get("/balance-sheet")
@@ -994,14 +1142,14 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     current_assets = [
         {"label": "Cash & Bank (estimated)", "value": cash_est, "auto": True},
         {"label": "Inventory / Stock Value", "value": stock_value, "auto": True},
-    ] + [{"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-current"]
+    ] + [{"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-current"]
     fixed_assets = [
         {
             "label": f"{fa.name} (cost {fa.cost:,.0f}, less depr {depr.schedule(fa, as_of)['accumulatedDepreciation']:,.0f})",
             "value": depr.schedule(fa, as_of)["bookValue"], "auto": True,
         }
         for fa in fa_rows if not fa.disposed
-    ] + [{"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-fixed"]
+    ] + [{"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-fixed"]
     sup_pay = 0.0
     for s in db.query(Supplier).all():
         st = db.query(SupplierTxn).filter(SupplierTxn.supplier_id == s.supplier_id).all()
@@ -1009,7 +1157,7 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
         if bal > 0:
             sup_pay += bal
     liabilities = [{"label": "Supplier Payables", "value": sup_pay, "auto": True}] + [
-        {"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "liability"
+        {"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "liability"
     ]
     caps = db.query(CapitalEntry).all()
     invested = sum(c.amount for c in caps if c.type in ("investment", "loan"))
@@ -1017,7 +1165,7 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     equity = [
         {"label": "Owner Capital", "value": invested - withdrawn, "auto": True},
         {"label": "Retained Earnings", "value": net_profit, "auto": True},
-    ] + [{"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "equity"]
+    ] + [{"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "equity"]
     tca, tfa = sum(i["value"] for i in current_assets), sum(i["value"] for i in fixed_assets)
     tl, te = sum(i["value"] for i in liabilities), sum(i["value"] for i in equity)
     return {
@@ -1057,8 +1205,8 @@ def cashflow(
     ]
     op_total = sum(i["value"] for i in operating)
     cf = db.query(CFItem).all()
-    investing = [{"label": c.label, "value": c.value} for c in cf if c.section == "investing"]
-    financing = [{"label": c.label, "value": c.value} for c in cf if c.section == "financing"]
+    investing = [{"id": c.item_id, "label": c.label, "value": c.value, "date": c.date} for c in cf if c.section == "investing"]
+    financing = [{"id": c.item_id, "label": c.label, "value": c.value, "date": c.date} for c in cf if c.section == "financing"]
     inv_total = sum(i["value"] for i in investing)
     fin_total = sum(i["value"] for i in financing)
     net = op_total + inv_total + fin_total

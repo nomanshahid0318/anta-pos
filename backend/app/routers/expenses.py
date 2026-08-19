@@ -3,17 +3,25 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, require_role
 from ..database import get_db
-from ..models import Expense
+from ..models import Expense, JournalEntry, JournalLine
 from ..schemas import ExpenseIn
 from ..services.accounting import post_expense_journal
 from ..utils import today_str
 
 router = APIRouter(prefix="/api", tags=["expenses"])
+
+
+def _delete_journal_for(db: Session, source_type: str, source_id: str) -> None:
+    je = db.query(JournalEntry).filter(JournalEntry.source_type == source_type, JournalEntry.source_id == source_id).first()
+    if not je:
+        return
+    db.query(JournalLine).filter(JournalLine.entry_id == je.id).delete()
+    db.delete(je)
 
 
 @router.post("/expenses")
@@ -42,6 +50,50 @@ def create_expense(
     post_expense_journal(db, row)
     db.commit()
     return {"ok": True, "status": "ok", "id": exp_id}
+
+
+@router.put("/expenses/{exp_id}")
+def update_expense(
+    exp_id: str,
+    body: ExpenseIn,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    row = db.query(Expense).filter(Expense.exp_id == exp_id).first()
+    if not row:
+        raise HTTPException(404, "Expense not found")
+    row.date = body.date or row.date
+    row.store_id = body.storeId or row.store_id
+    row.store = body.store or row.store
+    row.category = body.category
+    row.sub_category = body.subCategory or ""
+    row.description = body.description or ""
+    row.amount = body.amount
+    row.pay_method = body.payMethod or "Cash"
+    row.reference = body.reference or ""
+    row.notes = body.notes or ""
+    # post_journal() is a no-op if a journal already exists for this
+    # source_id, so a straight re-post would keep the OLD amount — delete
+    # the old journal entry first so the corrected figures actually post.
+    _delete_journal_for(db, "expense", exp_id)
+    post_expense_journal(db, row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/expenses/{exp_id}")
+def delete_expense(
+    exp_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    row = db.query(Expense).filter(Expense.exp_id == exp_id).first()
+    if not row:
+        raise HTTPException(404, "Expense not found")
+    _delete_journal_for(db, "expense", exp_id)
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
 
 
 @router.get("/expenses")
