@@ -89,6 +89,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('capital')" data-role="admin,manager,accountant"><span class="ico">🏦</span>Capital & Equity</div>
     <div class="nav-item" onclick="show('fixed-assets')" data-role="admin,manager,accountant"><span class="ico">🏗️</span>Fixed Assets</div>
     <div class="nav-sec">Reports</div>
+    <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
     <div class="nav-sec">Admin</div>
@@ -543,6 +544,42 @@ body{display:flex;height:100vh;overflow:hidden}
       <div class="kpi-grid" id="exp-kpis"></div>
       <table><thead><tr><th>Date</th><th>Store</th><th>Category</th><th>Description</th><th>Amount</th><th>Payment</th><th data-role="admin,accountant">Actions</th></tr></thead>
       <tbody id="exp-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- CUSTOMERS -->
+  <div id="screen-customers" class="screen">
+    <div class="kpi-grid" id="cust-kpis"></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">🧑‍🤝‍🧑 Customers</div>
+        <div style="display:flex;gap:7px">
+          <input class="form-input" style="width:220px;padding:5px 9px" id="cust-search" placeholder="🔍 Search by name or phone…" oninput="loadCustomersHO()">
+          <button class="btn btn-ghost btn-sm" onclick="loadTopCustomers()">🏆 Top Customers</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportCustomers()">⬇️ Export</button>
+        </div>
+      </div>
+      <table><thead><tr><th>Name</th><th>Phone</th><th>Visits</th><th>Total Spent</th><th>Points</th><th>Last Visit</th><th>Actions</th></tr></thead>
+      <tbody id="cust-table"></tbody></table>
+    </div>
+    <div id="cust-detail-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeCustDetail()">
+      <div class="modal" style="width:560px">
+        <div class="modal-title" id="cust-detail-title">🧑 Customer</div>
+        <div class="kpi-grid" id="cust-detail-kpis" style="margin-bottom:12px"></div>
+        <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="cd-name"></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="cd-phone"></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="cd-email"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="cd-notes"></div>
+        <div style="display:flex;gap:7px;margin:8px 0 14px">
+          <button class="btn btn-primary btn-sm" onclick="saveCustomerEdit()">💾 Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeCustDetail()">Close</button>
+        </div>
+        <div class="card-title" style="font-size:12px">🧾 Purchase History</div>
+        <table><thead><tr><th>Invoice</th><th>Date</th><th>Store</th><th>Total</th><th>Points Earned</th></tr></thead>
+        <tbody id="cust-history"></tbody></table>
+      </div>
     </div>
   </div>
 

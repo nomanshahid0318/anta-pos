@@ -65,6 +65,7 @@ def init_db() -> None:
     """Create tables and seed defaults."""
     from . import models  # noqa: F401
     from . import models_accounting  # noqa: F401
+    from . import models_crm  # noqa: F401
     from .seed import seed_if_empty
 
     # Ensure parent dir exists for sqlite
@@ -119,6 +120,11 @@ def _auto_migrate() -> None:
         },
         "supplier_txns": {
             "po_id": "VARCHAR(64) DEFAULT ''",
+        },
+        "sales": {
+            "customer_id": "VARCHAR(64) DEFAULT ''",
+            "loyalty_discount": "FLOAT DEFAULT 0",
+            "loyalty_points_earned": "FLOAT DEFAULT 0",
         },
     }
     is_postgres = not settings.database_url.startswith("sqlite")

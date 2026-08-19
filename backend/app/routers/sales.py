@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
 from ..models import Claim, Exchange, InvoiceCounter, Return, Sale
+from ..models_crm import Customer
 from ..schemas import (
     ClaimIn,
     ExchangeIn,
@@ -17,6 +18,7 @@ from ..schemas import (
     SaleIn,
     SaleOut,
 )
+from ..services import loyalty
 from ..services.accounting import post_sale_journal
 from ..services.inventory import update_inv
 from ..services.promotions import apply_promotions
@@ -49,6 +51,9 @@ def _sale_to_out(s: Sale) -> dict:
         "store": s.store,
         "storeId": s.store_id,
         "customer": s.customer,
+        "customerId": s.customer_id or "",
+        "loyaltyDiscount": s.loyalty_discount or 0,
+        "loyaltyPointsEarned": s.loyalty_points_earned or 0,
         "items": items,
         "subtotal": s.subtotal,
         "discount": s.discount,
@@ -94,13 +99,36 @@ def create_sale(
         subtotal, discount, global_discount, total = (
             priced["subtotal"], priced["discount"], priced["globalDiscount"], priced["total"]
         )
+
+    # Loyalty: look up the customer (if one was selected/scanned at
+    # checkout), apply a points redemption as an extra discount on top of
+    # everything else, then — once the sale is saved — award new points
+    # on the net amount actually paid and update their visit stats.
+    customer = None
+    loyalty_discount = 0.0
+    redeemed_points = 0.0
+    if body.customerId:
+        customer = db.query(Customer).filter(Customer.customer_id == body.customerId, Customer.active.is_(True)).first()
+        if customer and body.redeemPoints and body.redeemPoints > 0:
+            redeemed_points = min(float(body.redeemPoints), float(customer.loyalty_points or 0))
+            loyalty_discount = round(redeemed_points * loyalty.redeem_value(db), 2)
+            if loyalty_discount > total:
+                # Capped by the sale total — recompute the points actually
+                # "spent" for that capped discount, so we don't deduct more
+                # points than the discount they actually received.
+                loyalty_discount = total
+                redeemed_points = round(loyalty_discount / max(loyalty.redeem_value(db), 0.0001), 2)
+            total = round(total - loyalty_discount, 2)
+
     sale = Sale(
         invoice_id=inv_id,
         date=date,
         time=time_,
         store=store,
         store_id=store_id,
-        customer=body.customer or "Walk-in",
+        customer=body.customer or (customer.name if customer else "Walk-in"),
+        customer_id=body.customerId or "",
+        loyalty_discount=loyalty_discount,
         items_json=json.dumps(items),
         subtotal=subtotal,
         discount=discount,
@@ -121,6 +149,15 @@ def create_sale(
             "sale",
             int(item.get("qty") or 1),
         )
+    if customer:
+        earned = round(total * loyalty.earn_rate(db), 2)
+        customer.loyalty_points = round(max(float(customer.loyalty_points or 0) - redeemed_points + earned, 0), 2)
+        customer.total_spent = round(float(customer.total_spent or 0) + total, 2)
+        customer.visit_count = int(customer.visit_count or 0) + 1
+        customer.last_visit = date
+        if not customer.first_visit:
+            customer.first_visit = date
+        sale.loyalty_points_earned = earned
     post_sale_journal(db, sale)
     db.commit()
     db.refresh(sale)

@@ -170,6 +170,8 @@ class SaleIn(BaseModel):
     store: Optional[str] = None
     storeId: Optional[str] = None
     customer: str = "Walk-in"
+    customerId: Optional[str] = None
+    redeemPoints: float = 0
     items: list[CartItem] = Field(default_factory=list)
     subtotal: float = 0
     discount: float = 0
@@ -187,6 +189,9 @@ class SaleOut(BaseModel):
     store: str
     storeId: str
     customer: str
+    customerId: str = ""
+    loyaltyDiscount: float = 0
+    loyaltyPointsEarned: float = 0
     items: list[Any]
     subtotal: float
     discount: float

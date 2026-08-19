@@ -147,7 +147,11 @@
       <div class="cart-area">
         <div class="cart-hdr">
           <div><div style="font-size:13px;font-weight:800;color:var(--navy)">🛒 New Sale</div><div style="font-size:10px;color:var(--gray4)" id="inv-num">INV-—</div></div>
-          <input class="form-input" style="width:140px;padding:5px 8px;font-size:11px" id="cust-name" placeholder="Customer name">
+          <div style="position:relative">
+            <input class="form-input" style="width:150px;padding:5px 24px 5px 8px;font-size:11px" id="cust-phone" placeholder="📱 Customer phone/name" autocomplete="off" oninput="searchCustomer(this.value)">
+            <button id="cust-clear" onclick="clearCustomer()" style="display:none;position:absolute;right:3px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:12px;color:var(--gray4)">✕</button>
+            <div id="cust-drop" style="display:none;position:absolute;top:100%;right:0;width:220px;background:#fff;border:1.5px solid var(--gray2);border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;z-index:200;box-shadow:0 6px 16px rgba(0,0,0,.12)"></div>
+          </div>
         </div>
         <div style="padding:9px 13px;background:var(--gray0);border-bottom:1px solid var(--gray2)">
           <div class="relative">
@@ -380,6 +384,10 @@
     <div style="background:var(--gray0);border-radius:8px;padding:13px;text-align:center;margin-bottom:14px">
       <div style="font-size:11px;color:var(--gray4)" data-i18n="amount_due">Amount Due</div>
       <div style="font-size:30px;font-weight:900;color:var(--navy)" id="pay-due">LYD 0.00</div>
+    </div>
+    <div id="loyalty-sec" style="display:none;background:var(--green-light,#e8f5e9);border-radius:8px;padding:10px;margin-bottom:12px;font-size:11px">
+      <div>🎁 <b id="loyalty-cust-name"></b> — <b id="loyalty-pts-avail">0</b> points available (worth <span id="loyalty-pts-value">LYD 0.00</span>)</div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer"><input type="checkbox" id="redeem-toggle" onchange="toggleRedeem()"> Redeem all points for a discount</label>
     </div>
     <div class="pay-methods" id="pay-grid"></div>
     <div id="cash-sec" style="display:none">

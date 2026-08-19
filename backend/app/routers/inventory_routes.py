@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
-from ..models import HOWarehouse, Inventory, Product, StoreGRN, SupplierGRN
-from ..schemas import GRNIssueIn, GRNReceiveIn, SupplierGRNIn
-from ..services.inventory import get_or_create_inv, get_stock, update_ho_warehouse, update_inv, auto_heal_store_inventory
+from ..models import Inventory, Product, StoreGRN
+from ..schemas import GRNReceiveIn
+from ..services.inventory import get_or_create_inv, get_stock, update_inv, auto_heal_store_inventory
 from ..utils import today_str
 
 router = APIRouter(prefix="/api", tags=["inventory"])
@@ -151,105 +151,6 @@ def receive_grn(
     update_inv(db, body.barcode, store_name, store_id, row.name or "", "grn", qty)
     db.commit()
     return {"ok": True, "status": "ok"}
-
-
-@router.post("/grns/issue")
-def issue_grn(
-    body: GRNIssueIn,
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
-):
-    grn_id = body.grnId or f"GRN-{int(__import__('time').time())}"
-    date = body.date or today_str()
-    count = 0
-    errors = []
-    for line in body.lines:
-        wh = db.query(HOWarehouse).filter(HOWarehouse.barcode == line.barcode).first()
-        ho_stock = int(wh.on_hand) if wh else 0
-        # Allow issue even if HO empty when no warehouse tracking yet — use product opening as soft stock
-        if wh and ho_stock < (line.qty or 0):
-            errors.append(f"{line.barcode} insufficient ({ho_stock})")
-            continue
-        db.add(
-            StoreGRN(
-                grn_id=grn_id,
-                date=date,
-                store_id=body.storeId,
-                store_name=body.storeName,
-                barcode=line.barcode,
-                name=line.name or "",
-                qty_issued=line.qty or 0,
-                qty_received=0,
-                status="pending",
-                notes=body.notes or "",
-            )
-        )
-        if line.qty:
-            update_ho_warehouse(db, line.barcode, line.name or "", line.qty, "out")
-        count += 1
-    db.commit()
-    return {"ok": True, "status": "ok", "count": count, "grnId": grn_id, "errors": errors}
-
-
-@router.post("/grns/supplier")
-def supplier_grn(
-    body: SupplierGRNIn,
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
-):
-    grn_id = body.grnId or f"SGRN-{int(__import__('time').time())}"
-    date = body.date or today_str()
-    count = 0
-    for line in body.lines:
-        total = (line.qty or 0) * (line.cost or 0)
-        db.add(
-            SupplierGRN(
-                grn_id=grn_id,
-                date=date,
-                supplier=body.supplier or "",
-                invoice_no=body.invoiceNo or "",
-                barcode=line.barcode,
-                name=line.name or "",
-                qty=line.qty or 0,
-                unit_cost=line.cost or 0,
-                total_cost=total,
-                notes=body.notes or "",
-            )
-        )
-        update_ho_warehouse(db, line.barcode, line.name or "", line.qty or 0, "in")
-        # Ensure product exists lightly
-        if not db.query(Product).filter(Product.barcode == line.barcode).first():
-            db.add(
-                Product(
-                    barcode=line.barcode,
-                    name=line.name or line.barcode,
-                    cost=line.cost or 0,
-                    retail=0,
-                    active=True,
-                )
-            )
-        count += 1
-    db.commit()
-    return {"ok": True, "status": "ok", "count": count, "grnId": grn_id}
-
-
-@router.get("/warehouse")
-def list_warehouse(
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
-):
-    rows = db.query(HOWarehouse).order_by(HOWarehouse.name).all()
-    data = [
-        {
-            "barcode": r.barcode,
-            "name": r.name,
-            "supplierIn": r.supplier_in,
-            "storeOut": r.store_out,
-            "onHand": r.on_hand,
-        }
-        for r in rows
-    ]
-    return {"ok": True, "data": data}
 
 
 @router.post("/inventory/ensure")

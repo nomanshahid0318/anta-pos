@@ -83,8 +83,9 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','purchase-orders':'Purchase Orders'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','purchase-orders':'Purchase Orders',customers:'Customers'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
+if(name==='customers'){loadCustomersHO();}
 if(name==='purchase-orders'){if($('po-date'))$('po-date').value=today();poLines=[];renderPOLines();populateSupplierSelect();loadPOs();}
 if(name==='supplier-grn'){sgrnHistCurrentPage=1;fetchAndRenderSGRNHist();if($('sgrn-date'))$('sgrn-date').value=today();if($('sgrn-id'))$('sgrn-id').value='SGRN-'+Date.now().toString().slice(-6);}
 if(name==='store-grn'){stgrnPendingCurrentPage=1;stgrnDoneCurrentPage=1;fetchAndRenderStGRNPending();fetchAndRenderStGRNDone();populateStoreSelects();if($('stgrn-date'))$('stgrn-date').value=today();if($('stgrn-id'))$('stgrn-id').value='GRN-'+Date.now().toString().slice(-6);}
@@ -1371,6 +1372,68 @@ async function cancelPOUI(poId){
   if(res&&res.ok){toast('✅ Cancelled');loadPOs();}
   else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
+
+// ---------- Customers (CRM / Loyalty) ----------
+let __custList=[],__custDetailId=null;
+async function loadCustomersHO(){
+  const q=$('cust-search')?$('cust-search').value:'';
+  const res=await api('/api/customers?'+(q?('q='+encodeURIComponent(q)):'')+'&limit=200');
+  if(!res||!res.ok){toast('Failed to load customers','error');return;}
+  __custList=res.data||[];
+  const totalSpent=__custList.reduce((a,c)=>a+(+c.totalSpent||0),0);
+  const totalPoints=__custList.reduce((a,c)=>a+(+c.loyaltyPoints||0),0);
+  if($('cust-kpis'))$('cust-kpis').innerHTML=[
+    ['Total Customers',__custList.length,''],
+    ['Total Spent (all)',fmt(totalSpent),'green'],
+    ['Outstanding Points',totalPoints.toFixed(0),'amber'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  renderCustTable(__custList);
+}
+function renderCustTable(list){
+  if($('cust-table'))$('cust-table').innerHTML=list.map(c=>`<tr>
+    <td class="fw7">${c.name}</td><td>${c.phone||'—'}</td><td>${c.visitCount||0}</td>
+    <td>${fmt(c.totalSpent||0)}</td><td>${(c.loyaltyPoints||0).toFixed(0)} <span style="color:var(--gray4);font-size:10px">(${fmt(c.loyaltyPointsValue||0)})</span></td>
+    <td>${c.lastVisit||'—'}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openCustDetail('${c.id}')">👁️ View</button></td>
+  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:16px">No customers yet</td></tr>';
+}
+async function loadTopCustomers(){
+  const res=await api('/api/customers-top/list?limit=20');
+  if(!res||!res.ok){toast('Failed','error');return;}
+  __custList=res.data||[];
+  renderCustTable(__custList);
+  toast('🏆 Showing top customers by total spent');
+}
+async function openCustDetail(id){
+  const res=await api(`/api/customers/${encodeURIComponent(id)}`);
+  if(!res||!res.ok){toast('Not found','error');return;}
+  __custDetailId=id;
+  if($('cust-detail-title'))$('cust-detail-title').textContent=`🧑 ${res.name}`;
+  if($('cust-detail-kpis'))$('cust-detail-kpis').innerHTML=[
+    ['Visits',res.visitCount||0,''],
+    ['Total Spent',fmt(res.totalSpent||0),'green'],
+    ['Points',(res.loyaltyPoints||0).toFixed(0)+' ('+fmt(res.loyaltyPointsValue||0)+')','amber'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  if($('cd-name'))$('cd-name').value=res.name||'';
+  if($('cd-phone'))$('cd-phone').value=res.phone||'';
+  if($('cd-email'))$('cd-email').value=res.email||'';
+  if($('cd-notes'))$('cd-notes').value=res.notes||'';
+  if($('cust-history'))$('cust-history').innerHTML=(res.purchaseHistory||[]).map(h=>`<tr><td class="fw7">${h.invoice}</td><td>${h.date}</td><td>${h.store||''}</td><td>${fmt(h.total)}</td><td style="color:var(--green)">${h.pointsEarned||0}</td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:12px">No purchases yet</td></tr>';
+  $('cust-detail-modal').style.display='flex';
+}
+function closeCustDetail(){$('cust-detail-modal').style.display='none';__custDetailId=null;}
+async function saveCustomerEdit(){
+  if(!__custDetailId)return;
+  const body={name:$('cd-name').value.trim(),phone:$('cd-phone').value.trim(),email:$('cd-email').value.trim(),notes:$('cd-notes').value.trim()};
+  if(!body.name){toast('Name required','error');return;}
+  const res=await api(`/api/customers/${encodeURIComponent(__custDetailId)}`,{method:'PUT',body});
+  if(res&&res.ok){toast('✅ Updated');closeCustDetail();loadCustomersHO();}
+  else toast('❌ Failed','error');
+}
+function exportCustomers(){
+  _csvDownload(__custList,[['Name','name'],['Phone','phone'],['Email','email'],['Visits','visitCount'],['Total Spent','totalSpent'],['Loyalty Points','loyaltyPoints'],['Points Value','loyaltyPointsValue'],['Last Visit','lastVisit']],'customers_'+today()+'.csv');
+}
+
 
 async function saveCapitalEntry(){const type=$('cap-type').value,date=$('cap-date').value,amt=parseFloat($('cap-amt').value)||0,desc=$('cap-desc').value.trim();if(!amt||!desc){toast('Fill fields','error');return;}const editId=$('cap-editid')?$('cap-editid').value:'';const res=editId?await api(`/api/ho/capital/${encodeURIComponent(editId)}`,{method:'PUT',body:{type,date,amount:amt,description:desc}}):await api('/api/ho/capital',{method:'POST',body:{type,date,amount:amt,description:desc}});if(res&&res.ok){toast(editId?'✅ Updated':'✅ Saved');['cap-amt','cap-desc'].forEach(id=>{if($(id))$(id).value='';});if($('cap-editid'))$('cap-editid').value='';const btn=document.querySelector('[onclick="saveCapitalEntry()"]');if(btn)btn.textContent='💾 Save';await loadAll();renderCapital();}else toast('❌ Failed','error');}
 function renderCapital(){const invested=capitalEntries.filter(c=>c.type==='investment').reduce((a,c)=>a+(+c.amount||0),0);const withdrawn=capitalEntries.filter(c=>c.type==='withdrawal').reduce((a,c)=>a+(+c.amount||0),0);const loans=capitalEntries.filter(c=>c.type==='loan').reduce((a,c)=>a+(+c.amount||0),0);const loanRepaid=capitalEntries.filter(c=>c.type==='loan-repay').reduce((a,c)=>a+(+c.amount||0),0);const netProfit=(DATA.dashboard?.netRevenue||0)-DATA.expenses.reduce((a,e)=>a+(+e.Amount||0),0);const totalEquity=invested-withdrawn+loans-loanRepaid+netProfit;if($('cap-kpis'))$('cap-kpis').innerHTML=[['Total Invested',fmt(invested),'green'],['Total Withdrawn',fmt(withdrawn),''],['Net Loans',fmt(loans-loanRepaid),'amber'],['Net Profit',fmt(netProfit),'blue'],['Total Equity',fmt(totalEquity),'purple']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');if($('cap-table'))$('cap-table').innerHTML=capitalEntries.map(c=>{const isOut=c.type==='withdrawal'||c.type==='loan-repay';return`<tr><td><span class="badge badge-blue">${c.type}</span></td><td>${c.date}</td><td>${c.desc}</td><td class="text-right fw7" style="color:${isOut?'var(--red)':'var(--green)'}">${isOut?'-':'+'} ${fmt(c.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="editCapital('${c.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteCapital('${c.id}')">🗑️</button></td></tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:16px">No entries</td></tr>';}

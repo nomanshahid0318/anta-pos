@@ -30,6 +30,7 @@ let DB = {
 let BANKS = [{ id: 'cash', name: 'Cash', device: '', ico: '💵', active: true }];
 let STORES = [];
 let currentUser = null;
+let SELECTED_CUSTOMER = null, __custSearchTimer = null, __custSearchResults = [], __redeemActive = false;
 let cart = [];
 let selPay = 'Cash';
 let pinEntry = '';
@@ -826,13 +827,78 @@ function calcCart() {
   if (el('c-total')) el('c-total').textContent = fmt(total);
   return { sub, da, total, disc };
 }
+function searchCustomer(q) {
+  clearTimeout(__custSearchTimer);
+  const drop = $('cust-drop');
+  if (!q || q.length < 2) { if (drop) drop.style.display = 'none'; return; }
+  __custSearchTimer = setTimeout(async () => {
+    const res = await api('/api/customers?q=' + encodeURIComponent(q));
+    __custSearchResults = (res && res.data) || [];
+    if (!drop) return;
+    if (!__custSearchResults.length) {
+      drop.innerHTML = `<div style="padding:9px;font-size:11px;color:var(--gray4)">No match — <a href="#" onclick="quickAddCustomer(event)" style="color:var(--accent2)">➕ Add new customer</a></div>`;
+    } else {
+      drop.innerHTML = __custSearchResults.map((c, i) =>
+        `<div style="padding:7px 9px;border-bottom:1px solid var(--gray1);cursor:pointer;font-size:11px" onclick="selectCustomerIdx(${i})"><b>${c.name}</b><br><span style="color:var(--gray4)">${c.phone || ''} · ${c.loyaltyPoints || 0} pts</span></div>`
+      ).join('') + `<div style="padding:7px 9px;cursor:pointer;font-size:11px;color:var(--accent2)" onclick="quickAddCustomer(event)">➕ Add new customer</div>`;
+    }
+    drop.style.display = 'block';
+  }, 250);
+}
+function selectCustomerIdx(i) { selectCustomer(__custSearchResults[i]); }
+function selectCustomer(c) {
+  SELECTED_CUSTOMER = c;
+  if ($('cust-phone')) $('cust-phone').value = c.name + (c.loyaltyPoints ? ' · ' + c.loyaltyPoints + 'pts' : '');
+  if ($('cust-drop')) $('cust-drop').style.display = 'none';
+  if ($('cust-clear')) $('cust-clear').style.display = 'block';
+}
+function clearCustomer() {
+  SELECTED_CUSTOMER = null;
+  __redeemActive = false;
+  if ($('cust-phone')) $('cust-phone').value = '';
+  if ($('cust-clear')) $('cust-clear').style.display = 'none';
+}
+async function quickAddCustomer(ev) {
+  if (ev) ev.preventDefault();
+  const q = ($('cust-phone') && $('cust-phone').value) || '';
+  const isPhone = /^\d/.test(q.trim());
+  const name = prompt('Customer name?', isPhone ? '' : q) || '';
+  if (!name.trim()) return;
+  const phone = isPhone ? q.trim() : (prompt('Phone number? (optional)') || '');
+  const res = await api('/api/customers', { method: 'POST', body: { name, phone } });
+  if (res && res.ok) {
+    selectCustomer({ id: res.id, name: res.name, phone: res.phone, loyaltyPoints: res.loyaltyPoints || 0 });
+    toast('✅ Customer added');
+  } else toast('❌ Failed to add customer', 'error');
+}
+function toggleRedeem() {
+  __redeemActive = $('redeem-toggle') ? $('redeem-toggle').checked : false;
+  updatePayDue();
+}
+function updatePayDue() {
+  const { total } = calcCart();
+  let due = total;
+  if (__redeemActive && SELECTED_CUSTOMER) {
+    const val = +($('loyalty-pts-value')?.dataset.val || 0);
+    due = Math.max(0, total - val);
+  }
+  if ($('pay-due')) $('pay-due').textContent = fmt(due);
+}
 function openPay() {
   if (!cart.length) {
     toast('❌ Cart empty', 'error');
     return;
   }
-  const { total } = calcCart();
-  document.getElementById('pay-due').textContent = fmt(total);
+  __redeemActive = false;
+  if ($('redeem-toggle')) $('redeem-toggle').checked = false;
+  const loyaltySec = $('loyalty-sec');
+  if (SELECTED_CUSTOMER && SELECTED_CUSTOMER.loyaltyPointsValue > 0) {
+    if ($('loyalty-cust-name')) $('loyalty-cust-name').textContent = SELECTED_CUSTOMER.name;
+    if ($('loyalty-pts-avail')) $('loyalty-pts-avail').textContent = SELECTED_CUSTOMER.loyaltyPoints;
+    if ($('loyalty-pts-value')) { $('loyalty-pts-value').textContent = fmt(SELECTED_CUSTOMER.loyaltyPointsValue); $('loyalty-pts-value').dataset.val = SELECTED_CUSTOMER.loyaltyPointsValue; }
+    if (loyaltySec) loyaltySec.style.display = 'block';
+  } else if (loyaltySec) loyaltySec.style.display = 'none';
+  updatePayDue();
   const pg = document.getElementById('pay-grid');
   pg.innerHTML = BANKS.filter((b) => b.active !== 'N')
     .map(
@@ -857,8 +923,9 @@ function setPay(m) {
 }
 function calcChange() {
   const { total } = calcCart();
+  const due = (__redeemActive && SELECTED_CUSTOMER) ? Math.max(0, total - (+($('loyalty-pts-value')?.dataset.val || 0))) : total;
   const r = +getVal('cash-rec', 0) || 0;
-  const ch = r - total;
+  const ch = r - due;
   const cb = document.getElementById('change-box');
   cb.style.display = r > 0 ? 'block' : 'none';
   document.getElementById('change-amt').textContent = fmt(Math.max(ch, 0));
@@ -967,15 +1034,20 @@ function loadCatalogCache() {
 async function completeSale() {
   try { await refreshPromoPricing(); } catch(e) {}
   const { sub, da, total, disc } = calcCart();
+  const redeemPoints = (__redeemActive && SELECTED_CUSTOMER) ? (SELECTED_CUSTOMER.loyaltyPoints || 0) : 0;
+  const loyaltyVal = (__redeemActive && SELECTED_CUSTOMER) ? (+($('loyalty-pts-value')?.dataset.val || 0)) : 0;
+  const due = Math.max(0, total - loyaltyVal);
   if (selPay === 'Cash') {
     const r = +getVal('cash-rec', 0) || 0;
-    if (r < total) {
+    if (r < due) {
       toast('❌ Insufficient cash', 'error');
       return;
     }
   }
   const payload = {
-    customer: getVal('cust-name', '') || 'Walk-in',
+    customer: SELECTED_CUSTOMER ? SELECTED_CUSTOMER.name : 'Walk-in',
+    customerId: SELECTED_CUSTOMER ? SELECTED_CUSTOMER.id : undefined,
+    redeemPoints: redeemPoints,
     items: cart.map((i) => ({
       barcode: i.barcode,
       name: i.name,
@@ -1031,10 +1103,13 @@ async function completeSale() {
   DB.transactions.unshift(txn);
   closePay();
   showInvoice(txn);
+  if (txn.loyaltyPointsEarned) {
+    toast(`🎁 ${txn.customer} earned ${txn.loyaltyPointsEarned} loyalty points`);
+  }
   cart = [];
   window.__promoQuote = null;
   setVal('g-disc', 0);
-  setVal('cust-name', '');
+  clearCustomer();
   renderCart();
   renderQuick();
   addLog('sale', (txn.synced === false ? '📴 offline ' : '✅ ') + txn.id);
@@ -1079,6 +1154,12 @@ function showInvoice(txn) {
   const globalDiscountBlock = txn.globalDiscount
     ? `<div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569"><span>Invoice Discount</span><span>-${money(txn.globalDiscount)}</span></div>`
     : '';
+  const loyaltyBlock = txn.loyaltyDiscount
+    ? `<div style="display:flex;justify-content:space-between;padding:3px 0;color:#0a7a3c"><span>🎁 Loyalty Points Redeemed</span><span>-${money(txn.loyaltyDiscount)}</span></div>`
+    : '';
+  const loyaltyEarnedBlock = txn.loyaltyPointsEarned
+    ? `<div style="font-size:10.5px;color:#0a7a3c;font-weight:600;margin-top:6px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">🎁 ${txn.customer} earned ${txn.loyaltyPointsEarned} loyalty points on this purchase</div>`
+    : '';
   const promoNotesBlock = promoNotes.length
     ? `<div style="font-size:10.5px;color:#0a7a3c;font-weight:600;margin-top:6px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">🏷️ Promotions applied: ${promoNotes.join(', ')}</div>`
     : '';
@@ -1114,7 +1195,9 @@ function showInvoice(txn) {
         <div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569"><span>Subtotal</span><span>${money(txn.subtotal)}</span></div>
         ${discountBlock}
         ${globalDiscountBlock}
+        ${loyaltyBlock}
         ${promoNotesBlock}
+        ${loyaltyEarnedBlock}
         <div style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;margin-top:10px">
           <span style="font-size:12px;font-weight:600;letter-spacing:.3px">TOTAL</span>
           <span style="font-size:19px;font-weight:900">${money(txn.total)}</span>
