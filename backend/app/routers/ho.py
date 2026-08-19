@@ -16,7 +16,8 @@ from ..database import get_db
 from ..models import (
     Expense, HOWarehouse, Inventory, Product, Return, Sale, Store, StoreGRN, SupplierGRN, Transfer,
 )
-from ..models_accounting import BSEntry, CapitalEntry, CFItem, Supplier, SupplierTxn
+from ..models_accounting import BSEntry, CapitalEntry, CFItem, FixedAsset, Supplier, SupplierTxn
+from ..services import depreciation as depr
 from ..services.inventory import update_ho_warehouse, update_inv
 from ..utils import today_str
 
@@ -100,6 +101,21 @@ class CapitalIn(BaseModel):
     type: str
     amount: float
     description: str = ""
+
+
+class FixedAssetIn(BaseModel):
+    name: str
+    category: str = "Other"
+    storeId: str = "HO"
+    purchaseDate: Optional[str] = None
+    cost: float
+    salvageValue: float = 0.0
+    usefulLifeYears: float = 5.0
+    notes: str = ""
+    # If true (default), also logs the purchase as a Cash Flow "investing"
+    # outflow, since buying a fixed asset is a real cash event even though
+    # it isn't a P&L expense.
+    recordCashOutflow: bool = True
 
 
 class BSIn(BaseModel):
@@ -728,9 +744,19 @@ def profit_loss(
     gross = net_revenue - cogs
     ebitda = gross - total_expenses
     gm = (gross / net_revenue) if net_revenue else 0
+
+    # Depreciation on Fixed Assets (shop decor, furniture, equipment, etc.)
+    # — recognized over the period, straight-line. Kept separate from
+    # ebitda (which by definition excludes D&A) but subtracted for
+    # netProfit, the true bottom line.
+    fa_rows = db.query(FixedAsset).all()
+    depreciation_expense = sum(depr.depreciation_for_period(fa, date_from, date_to) for fa in fa_rows)
+    net_profit = ebitda - depreciation_expense
+
     return {
         "ok": True, "status": "ok", "revenue": revenue, "returns": returns, "netRevenue": net_revenue,
         "cogs": cogs, "grossProfit": gross, "grossMargin": gm, "totalExpenses": total_expenses, "ebitda": ebitda,
+        "depreciationExpense": round(depreciation_expense, 2), "netProfit": round(net_profit, 2),
     }
 
 
@@ -799,9 +825,107 @@ def list_capital(db: Annotated[Session, Depends(get_db)], user: Annotated[Curren
 @router.post("/capital")
 def save_capital(body: CapitalIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
     eid = f"CAP-{int(time.time()*1000)}"
-    db.add(CapitalEntry(entry_id=eid, date=body.date or today_str(), type=body.type, amount=body.amount, description=body.description or ""))
+    edate = body.date or today_str()
+    db.add(CapitalEntry(entry_id=eid, date=edate, type=body.type, amount=body.amount, description=body.description or ""))
+    # Cash in/out either way — auto-mirror into Cash Flow (Financing) so the
+    # Balance Sheet's cash estimate and the Cash Flow Statement both pick
+    # this up automatically. No separate manual Cash Flow entry needed.
+    cash_in_types = ("investment", "loan")
+    sign = 1 if body.type in cash_in_types else -1
+    label = {
+        "investment": "Owner Investment", "withdrawal": "Owner Withdrawal",
+        "loan": "Loan Received", "loan-repay": "Loan Repayment", "retained": "Retained Profit",
+    }.get(body.type, body.type)
+    if body.type != "retained":  # retained profit isn't a new cash movement — it's already counted via sales/expenses
+        db.add(CFItem(
+            item_id=f"CF-{int(time.time()*1000)}", section="financing",
+            label=f"{label} — {body.description}" if body.description else label,
+            value=sign * abs(body.amount), date=edate,
+        ))
     db.commit()
     return {"ok": True, "status": "ok", "id": eid}
+
+
+@router.get("/fixed-assets")
+def list_fixed_assets(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    """Fixed Assets Register — durable, non-trading purchases (shop decor,
+    furniture, equipment, vehicles, POS hardware, etc.), each depreciated
+    straight-line over its useful life. Viewable by admin/manager/accountant.
+    """
+    as_of = today_str()
+    rows = db.query(FixedAsset).order_by(FixedAsset.id.desc()).all()
+    data = []
+    total_cost = total_accum = total_book = 0.0
+    for r in rows:
+        sched = depr.schedule(r, as_of)
+        total_cost += float(r.cost or 0)
+        total_accum += sched["accumulatedDepreciation"]
+        total_book += sched["bookValue"]
+        data.append({
+            "id": r.asset_id, "name": r.name, "category": r.category, "storeId": r.store_id,
+            "purchaseDate": r.purchase_date, "cost": r.cost, "salvageValue": r.salvage_value,
+            "usefulLifeYears": r.useful_life_years, "notes": r.notes,
+            "disposed": r.disposed, "disposedDate": r.disposed_date,
+            **sched,
+        })
+    return {
+        "ok": True, "data": data,
+        "totalCost": round(total_cost, 2), "totalAccumulatedDepreciation": round(total_accum, 2),
+        "totalBookValue": round(total_book, 2),
+    }
+
+
+@router.post("/fixed-assets")
+def save_fixed_asset(
+    body: FixedAssetIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    if body.cost <= 0:
+        raise HTTPException(400, "Cost must be greater than 0")
+    if body.usefulLifeYears <= 0:
+        raise HTTPException(400, "Useful life must be greater than 0 years")
+    aid = f"FA-{int(time.time()*1000)}"
+    pdate = body.purchaseDate or today_str()
+    db.add(FixedAsset(
+        asset_id=aid, name=body.name, category=body.category or "Other", store_id=body.storeId or "HO",
+        purchase_date=pdate, cost=body.cost, salvage_value=max(0.0, body.salvageValue),
+        useful_life_years=body.usefulLifeYears, notes=body.notes or "",
+    ))
+    if body.recordCashOutflow and body.cost > 0:
+        db.add(CFItem(
+            item_id=f"CF-{int(time.time()*1000)}", section="investing",
+            label=f"Fixed Asset Purchase — {body.name}", value=-abs(body.cost), date=pdate,
+        ))
+    db.commit()
+    return {"ok": True, "status": "ok", "id": aid}
+
+
+@router.post("/fixed-assets/{asset_id}/dispose")
+def dispose_fixed_asset(
+    asset_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+    date: Optional[str] = None,
+):
+    row = db.query(FixedAsset).filter(FixedAsset.asset_id == asset_id).first()
+    if not row:
+        raise HTTPException(404, "Asset not found")
+    row.disposed = True
+    row.disposed_date = date or today_str()
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/fixed-assets/{asset_id}")
+def delete_fixed_asset(
+    asset_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+):
+    row = db.query(FixedAsset).filter(FixedAsset.asset_id == asset_id).first()
+    if not row:
+        raise HTTPException(404, "Asset not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
 
 
 @router.get("/bs-entries")
@@ -839,7 +963,15 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     returns = sum(r.amount or 0 for r in rets)
     net_rev = revenue - returns
     total_exp = sum(e.amount or 0 for e in exps)
-    net_profit = net_rev - total_exp
+    net_profit_before_depr = net_rev - total_exp
+    as_of = today_str()
+    fa_rows = db.query(FixedAsset).all()
+    total_accum_depr = sum(depr.schedule(fa, as_of)["accumulatedDepreciation"] for fa in fa_rows)
+    # Retained Earnings reflects lifetime depreciation too (Dr Depreciation
+    # Expense / Cr Accumulated Depreciation) — this is what keeps
+    # Assets = Liabilities + Equity once Fixed Assets below are shown at
+    # net book value instead of full purchase cost.
+    net_profit = net_profit_before_depr - total_accum_depr
     stock_value = 0.0
     for inv in db.query(Inventory).all():
         p = db.query(Product).filter(Product.barcode == inv.barcode).first()
@@ -848,13 +980,28 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
         p = db.query(Product).filter(Product.barcode == wh.barcode).first()
         stock_value += (wh.on_hand or 0) * float(p.cost or 0 if p else 0)
     cash_sales = sum(s.total or 0 for s in sales if (s.payment or "") == "Cash")
-    cash_est = max(cash_sales - total_exp, 0)
+    sup_paid_all = sum(t.amount or 0 for t in db.query(SupplierTxn).filter(SupplierTxn.type == "payment").all())
+    # Cash & Bank estimate now reflects every real cash movement tracked by
+    # the system: cash sales in, expenses/supplier payments out, plus every
+    # Cash Flow item (Fixed Asset purchases, Owner Capital in/out — both
+    # auto-recorded here — and any other manual investing/financing entry).
+    # Previously this only looked at cash sales minus expenses, so money
+    # brought in as capital or spent on a fixed asset silently vanished
+    # from the Balance Sheet instead of showing up as cash.
+    cf_net = sum(c.value or 0 for c in db.query(CFItem).all())
+    cash_est = max(cash_sales - total_exp - sup_paid_all + cf_net, 0)
     bs_rows = db.query(BSEntry).all()
     current_assets = [
         {"label": "Cash & Bank (estimated)", "value": cash_est, "auto": True},
         {"label": "Inventory / Stock Value", "value": stock_value, "auto": True},
     ] + [{"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-current"]
-    fixed_assets = [{"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-fixed"]
+    fixed_assets = [
+        {
+            "label": f"{fa.name} (cost {fa.cost:,.0f}, less depr {depr.schedule(fa, as_of)['accumulatedDepreciation']:,.0f})",
+            "value": depr.schedule(fa, as_of)["bookValue"], "auto": True,
+        }
+        for fa in fa_rows if not fa.disposed
+    ] + [{"label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-fixed"]
     sup_pay = 0.0
     for s in db.query(Supplier).all():
         st = db.query(SupplierTxn).filter(SupplierTxn.supplier_id == s.supplier_id).all()

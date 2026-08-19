@@ -75,3 +75,33 @@ class CFItem(Base):
     value: Mapped[float] = mapped_column(Float, default=0.0)
     date: Mapped[str] = mapped_column(String(16), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class FixedAsset(Base):
+    """A durable, non-trading purchase (shop decor, furniture, equipment,
+    vehicles, POS hardware, etc.) — NOT inventory for resale. Tracked here
+    so its cost is depreciated over its useful life instead of hitting the
+    P&L as a one-time expense (which would understate that period's real
+    profit) or sitting forever at full value on the Balance Sheet.
+
+    Depreciation is straight-line: (cost - salvage_value) / (useful_life_years
+    * 12) recognized evenly every month from purchase_date, capped once fully
+    depreciated. See services/depreciation.py for the calculation.
+    """
+
+    __tablename__ = "fixed_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    asset_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    category: Mapped[str] = mapped_column(String(64), default="Other")
+    store_id: Mapped[str] = mapped_column(String(32), default="HO")
+    purchase_date: Mapped[str] = mapped_column(String(16))
+    cost: Mapped[float] = mapped_column(Float, default=0.0)
+    salvage_value: Mapped[float] = mapped_column(Float, default=0.0)
+    useful_life_years: Mapped[float] = mapped_column(Float, default=5.0)
+    method: Mapped[str] = mapped_column(String(32), default="straight-line")
+    notes: Mapped[str] = mapped_column(String(255), default="")
+    disposed: Mapped[bool] = mapped_column(Boolean, default=False)
+    disposed_date: Mapped[str] = mapped_column(String(16), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

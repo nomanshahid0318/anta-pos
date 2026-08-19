@@ -82,7 +82,7 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='supplier-grn'){sgrnHistCurrentPage=1;fetchAndRenderSGRNHist();if($('sgrn-date'))$('sgrn-date').value=today();if($('sgrn-id'))$('sgrn-id').value='SGRN-'+Date.now().toString().slice(-6);}
 if(name==='store-grn'){stgrnPendingCurrentPage=1;stgrnDoneCurrentPage=1;fetchAndRenderStGRNPending();fetchAndRenderStGRNDone();populateStoreSelects();if($('stgrn-date'))$('stgrn-date').value=today();if($('stgrn-id'))$('stgrn-id').value='GRN-'+Date.now().toString().slice(-6);}
@@ -94,6 +94,7 @@ if(name==='settings'){if($('api-url'))$('api-url').value=CFG.apiUrl;loadSettings
 if(name==='balance-sheet'){if($('bs-date'))$('bs-date').value=today();loadBalanceSheet();}
 if(name==='cashflow'){cfPreset();loadCashFlow();}if(name==='handovers'){populateStoreSelects('handover-store-filter');loadHOHandovers();}if(name==='supplier-accounts'){renderSupplierAccounts();if($('sup-txn-date'))$('sup-txn-date').value=today();}
 if(name==='capital'){if($('cap-date'))$('cap-date').value=today();renderCapital();}
+if(name==='fixed-assets'){if($('fa-date'))$('fa-date').value=today();populateStoreSelects('fa-store');loadFixedAssets();}
 }
 async function fetchInBatches(fns,batchSize){
   // Runs the given zero-arg async functions in small concurrent batches
@@ -151,7 +152,7 @@ async function removeCategory(name){
   if(res&&res.ok){DATA.categories=res.categories;renderCategoryOptions();toast('Category removed');}
   else toast('❌ '+((res&&res.msg)||'Failed'),'error');
 }
-function populateStoreSelects(id){const ids=id?[id]:['stgrn-store','tr-from','tr-to','pl-store','rpt-store','exp-store-filter','u-store','bs-store','recalc-store'];const stores=DATA.stores.length?DATA.stores.filter(s=>s.StoreID!=='HO'):[{StoreID:'s1',Name:'Store 1 — Tripoli'},{StoreID:'s2',Name:'Store 2 — Benghazi'},{StoreID:'s3',Name:'Store 3 — Misrata'}];ids.forEach(selId=>{const el=$(selId);if(!el)return;const hasAll=!['stgrn-store','tr-from','tr-to','u-store','recalc-store'].includes(selId);const storeList=selId==='u-store'?[{StoreID:'HO',Name:'Head Office'},...stores]:stores;el.innerHTML=(hasAll?'<option value="all">All Stores</option>':'')+storeList.map(s=>`<option value="${s.StoreID}">${s.Name}</option>`).join('');});}
+function populateStoreSelects(id){const ids=id?[id]:['stgrn-store','tr-from','tr-to','pl-store','rpt-store','exp-store-filter','u-store','bs-store','recalc-store','fa-store'];const stores=DATA.stores.length?DATA.stores.filter(s=>s.StoreID!=='HO'):[{StoreID:'s1',Name:'Store 1 — Tripoli'},{StoreID:'s2',Name:'Store 2 — Benghazi'},{StoreID:'s3',Name:'Store 3 — Misrata'}];ids.forEach(selId=>{const el=$(selId);if(!el)return;const hasAll=!['stgrn-store','tr-from','tr-to','u-store','recalc-store','fa-store'].includes(selId);const storeList=(selId==='u-store'||selId==='fa-store')?[{StoreID:'HO',Name:'Head Office'},...stores]:stores;el.innerHTML=(hasAll?'<option value="all">All Stores</option>':'')+storeList.map(s=>`<option value="${s.StoreID}">${s.Name}</option>`).join('');});}
 function renderDash(){const d=DATA.dashboard;const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};if(d){set('d-rev',fmt(d.totalRevenue||0));set('d-inv',d.totalInvoices||0);set('d-net',fmt(d.netRevenue||0));set('d-atv',fmt(d.atv||0));set('d-ret',fmt(d.totalReturns||0));set('d-ret-pct',d.totalRevenue?(d.totalReturns/d.totalRevenue*100).toFixed(1)+'% return rate':'0%');set('d-ho-stock',DATA.warehouse.filter(w=>(+w.OnHand||0)>0).length);
 const pm=d.paymentBreakdown||{},totR=d.totalRevenue||1;if($('d-pay'))$('d-pay').innerHTML=Object.entries(pm).map(([m,v])=>{const pct=Math.round(v/totR*100);return`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>${m}</span><span class="fw7">${fmt(v)} (${pct}%)</span></div><div style="background:var(--gray1);border-radius:4px;height:7px"><div style="background:var(--accent2);width:${pct}%;height:100%;border-radius:4px"></div></div></div>`;}).join('')||'<div style="color:var(--gray3);font-size:11px;padding:14px;text-align:center">Load data first</div>';
 if($('d-low'))$('d-low').innerHTML=(d.lowStock||[]).slice(0,8).map(i=>`<tr><td style="font-size:11px">${i.store||'—'}</td><td class="fw7" style="font-size:11px">${String(i.name||i.barcode||'').slice(0,28)}</td><td style="font-weight:800;color:${+i.onHand<=0?'var(--red)':'var(--amber)'}">${i.onHand}</td><td><button class="btn btn-green btn-sm" onclick="show('store-grn')">📦</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No alerts</td></tr>';}
@@ -892,7 +893,7 @@ async function uploadProducts(file){
   renderProducts();
 }
 function plPreset(){const p=($('pl-period')||{}).value||'month',d=today(),now=new Date();if(!$('pl-from'))return;if(p==='today'){$('pl-from').value=d;$('pl-to').value=d;}else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());$('pl-from').value=ws.toISOString().split('T')[0];$('pl-to').value=d;}else if(p==='month'){$('pl-from').value=d.slice(0,7)+'-01';$('pl-to').value=d;}else{$('pl-from').value=d.slice(0,4)+'-01-01';$('pl-to').value=d;}}
-async function loadPL(){const qs=new URLSearchParams();if($('pl-from')?.value)qs.set('from',$('pl-from').value);if($('pl-to')?.value)qs.set('to',$('pl-to').value);if($('pl-store')?.value)qs.set('store',$('pl-store').value);const pl=await api('/api/ho/pl?'+qs);if(!pl||!pl.ok){toast('P&L failed','error');return;}if($('pl-kpis'))$('pl-kpis').innerHTML=[['Revenue',fmt(pl.revenue),''],['COGS',fmt(pl.cogs),'amber'],['Gross Profit',fmt(pl.grossProfit),'green'],['GM%',((pl.grossMargin||0)*100).toFixed(1)+'%','blue'],['Expenses',fmt(pl.totalExpenses),'purple'],['EBITDA',fmt(pl.ebitda),'teal']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');const rows=[['Net Revenue','netRevenue'],['COGS','cogs'],['Gross Profit','grossProfit'],['Gross Margin %','grossMargin',true],['Total Expenses','totalExpenses'],['EBITDA','ebitda']];if($('pl-table'))$('pl-table').innerHTML=rows.map(([label,key,pct])=>`<tr style="${key==='ebitda'||key==='grossProfit'?'font-weight:800;background:var(--gray0)':''}"><td>${label}</td><td class="text-right fw7">${pct?((pl[key]||0)*100).toFixed(1)+'%':fmt(pl[key]||0)}</td><td class="text-right">${pct?'':pl.netRevenue?((pl[key]||0)/pl.netRevenue*100).toFixed(1)+'%':'—'}</td></tr>`).join('');}
+async function loadPL(){const qs=new URLSearchParams();if($('pl-from')?.value)qs.set('from',$('pl-from').value);if($('pl-to')?.value)qs.set('to',$('pl-to').value);if($('pl-store')?.value)qs.set('store',$('pl-store').value);const pl=await api('/api/ho/pl?'+qs);if(!pl||!pl.ok){toast('P&L failed','error');return;}if($('pl-kpis'))$('pl-kpis').innerHTML=[['Revenue',fmt(pl.revenue),''],['COGS',fmt(pl.cogs),'amber'],['Gross Profit',fmt(pl.grossProfit),'green'],['GM%',((pl.grossMargin||0)*100).toFixed(1)+'%','blue'],['Expenses',fmt(pl.totalExpenses),'purple'],['EBITDA',fmt(pl.ebitda),'teal'],['Depreciation',fmt(pl.depreciationExpense||0),'amber'],['Net Profit',fmt(pl.netProfit),'green']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');const rows=[['Net Revenue','netRevenue'],['COGS','cogs'],['Gross Profit','grossProfit'],['Gross Margin %','grossMargin',true],['Total Expenses','totalExpenses'],['EBITDA','ebitda'],['Depreciation Expense','depreciationExpense'],['Net Profit','netProfit']];if($('pl-table'))$('pl-table').innerHTML=rows.map(([label,key,pct])=>`<tr style="${key==='ebitda'||key==='grossProfit'||key==='netProfit'?'font-weight:800;background:var(--gray0)':''}"><td>${label}</td><td class="text-right fw7">${pct?((pl[key]||0)*100).toFixed(1)+'%':fmt(pl[key]||0)}</td><td class="text-right">${pct?'':pl.netRevenue?((pl[key]||0)/pl.netRevenue*100).toFixed(1)+'%':'—'}</td></tr>`).join('');}
 async function loadExpenses(){const el=$('exp-ho-table')||$('exp-table');if(!el)return;const qs=new URLSearchParams();const sid=$('exp-store-filter')&&$('exp-store-filter').value;if(sid&&sid!=='all')qs.set('store_id',sid);const res=await api('/api/expenses?limit=300'+(qs.toString()?'&'+qs.toString():''));const rows=(res&&res.data)||DATA.expenses||[];DATA.expenses=rows.map(e=>({...e,Date:e.date||e.Date,Amount:e.amount!=null?e.amount:e.Amount,Store:e.store||e.Store,StoreID:e.storeId||e.StoreID,Category:e.category||e.Category,Description:e.description||e.Description||'',PayMethod:e.payMethod||e.PayMethod||''}));el.innerHTML=DATA.expenses.map(e=>`<tr><td>${e.Date||''}</td><td>${e.Store||''}</td><td>${e.Category||''}</td><td>${e.Description||''}</td><td class="fw7">${fmt(e.Amount||0)}</td><td>${e.PayMethod||''}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3)">No expenses</td></tr>';}
 
 function rptPreset(){const p=($('rpt-preset')||{}).value||'today',d=today(),now=new Date();if(!$('rpt-from'))return;if(p==='today'){$('rpt-from').value=d;$('rpt-to').value=d;}else if(p==='yesterday'){const y=new Date(now);y.setDate(y.getDate()-1);const yd=y.toISOString().split('T')[0];$('rpt-from').value=yd;$('rpt-to').value=yd;}else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());$('rpt-from').value=ws.toISOString().split('T')[0];$('rpt-to').value=d;}else{$('rpt-from').value=d.slice(0,7)+'-01';$('rpt-to').value=d;}}
@@ -1131,6 +1132,51 @@ if($('sup-txns'))$('sup-txns').innerHTML=supplierTxns.slice(0,15).map(t=>`<tr><t
 function saveSuppliers(){}function saveSupplierTxns(){}function getSupplierTxns(){return supplierTxns;}function getSupplierBalances(){return suppliers;}
 async function saveCapitalEntry(){const type=$('cap-type').value,date=$('cap-date').value,amt=parseFloat($('cap-amt').value)||0,desc=$('cap-desc').value.trim();if(!amt||!desc){toast('Fill fields','error');return;}const res=await api('/api/ho/capital',{method:'POST',body:{type,date,amount:amt,description:desc}});if(res&&res.ok){toast('✅ Saved');['cap-amt','cap-desc'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderCapital();}else toast('❌ Failed','error');}
 function renderCapital(){const invested=capitalEntries.filter(c=>c.type==='investment').reduce((a,c)=>a+(+c.amount||0),0);const withdrawn=capitalEntries.filter(c=>c.type==='withdrawal').reduce((a,c)=>a+(+c.amount||0),0);const loans=capitalEntries.filter(c=>c.type==='loan').reduce((a,c)=>a+(+c.amount||0),0);const loanRepaid=capitalEntries.filter(c=>c.type==='loan-repay').reduce((a,c)=>a+(+c.amount||0),0);const netProfit=(DATA.dashboard?.netRevenue||0)-DATA.expenses.reduce((a,e)=>a+(+e.Amount||0),0);const totalEquity=invested-withdrawn+loans-loanRepaid+netProfit;if($('cap-kpis'))$('cap-kpis').innerHTML=[['Total Invested',fmt(invested),'green'],['Total Withdrawn',fmt(withdrawn),''],['Net Loans',fmt(loans-loanRepaid),'amber'],['Net Profit',fmt(netProfit),'blue'],['Total Equity',fmt(totalEquity),'purple']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');if($('cap-table'))$('cap-table').innerHTML=capitalEntries.map(c=>{const isOut=c.type==='withdrawal'||c.type==='loan-repay';return`<tr><td><span class="badge badge-blue">${c.type}</span></td><td>${c.date}</td><td>${c.desc}</td><td class="text-right fw7" style="color:${isOut?'var(--red)':'var(--green)'}">${isOut?'-':'+'} ${fmt(c.amount)}</td></tr>`;}).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:16px">No entries</td></tr>';}
+
+async function loadFixedAssets(){
+  const res=await api('/api/ho/fixed-assets');
+  if(!res||!res.ok){toast('Failed to load fixed assets','error');return;}
+  if($('fa-kpis'))$('fa-kpis').innerHTML=[
+    ['Total Cost',fmt(res.totalCost||0),''],
+    ['Accumulated Depreciation',fmt(res.totalAccumulatedDepreciation||0),'amber'],
+    ['Net Book Value',fmt(res.totalBookValue||0),'green'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  const rows=(res.data||[]);
+  if($('fa-table'))$('fa-table').innerHTML=rows.map(a=>{
+    const status=a.disposed?'<span class="badge badge-gray">Disposed</span>':(a.fullyDepreciated?'<span class="badge badge-amber">Fully Depreciated</span>':'<span class="badge badge-green">Active</span>');
+    const actions=a.disposed?'—':`<button class="btn btn-ghost btn-sm" onclick="disposeFixedAssetUI('${a.id}')">🗑️ Dispose</button>`;
+    return `<tr><td class="fw7">${a.name}</td><td>${a.category||''}</td><td>${a.storeId||'HO'}</td><td>${a.purchaseDate}</td><td>${fmt(a.cost)}</td><td>${fmt(a.monthlyDepreciation)}</td><td>${fmt(a.accumulatedDepreciation)}</td><td class="fw7">${fmt(a.bookValue)}</td><td>${status}</td><td data-role="admin,accountant">${actions}</td></tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--gray3);padding:16px">No fixed assets yet</td></tr>';
+  applyRoleUI();
+}
+
+async function saveFixedAsset(){
+  const name=$('fa-name').value.trim();
+  const cost=parseFloat($('fa-cost').value)||0;
+  const life=parseFloat($('fa-life').value)||0;
+  if(!name||cost<=0||life<=0){toast('Fill name, cost, and useful life','error');return;}
+  const body={
+    name, category:$('fa-category').value, storeId:$('fa-store').value||'HO',
+    purchaseDate:$('fa-date').value||today(), cost, salvageValue:parseFloat($('fa-salvage').value)||0,
+    usefulLifeYears:life, notes:$('fa-notes').value.trim(), recordCashOutflow:$('fa-cash').checked,
+  };
+  const res=await api('/api/ho/fixed-assets',{method:'POST',body});
+  if(res&&res.ok){
+    toast('✅ Asset saved');
+    ['fa-name','fa-notes'].forEach(id=>{if($(id))$(id).value='';});
+    if($('fa-cost'))$('fa-cost').value='';
+    if($('fa-salvage'))$('fa-salvage').value='0';
+    if($('fa-life'))$('fa-life').value='5';
+    await loadFixedAssets();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+
+async function disposeFixedAssetUI(assetId){
+  if(!confirm('Mark this asset as disposed? Depreciation will stop as of today.'))return;
+  const res=await api(`/api/ho/fixed-assets/${encodeURIComponent(assetId)}/dispose`,{method:'POST'});
+  if(res&&res.ok){toast('✅ Marked disposed');await loadFixedAssets();}
+  else toast('❌ Failed','error');
+}
 function saveCapital(){}
 async function testConn(){const url=($('api-url')&&$('api-url').value.trim())||CFG.apiUrl;CFG.apiUrl=url.replace(/\/$/,'');localStorage.setItem('anta_ho_api',CFG.apiUrl);const div=$('conn-res');if(div){div.style.display='block';div.innerHTML='⏳ Testing...';}const res=await api('/api/health');if(res&&res.ok){if(div){div.innerHTML='✅ Connected! '+res.app+' v'+res.version;div.style.color='var(--green)';}setSyncStatus('online','Connected');toast('✅ Connected');if($('server-info'))$('server-info').textContent='DB: '+(res.db||'sqlite')+' · modules: '+(res.modules||[]).join(',');}else{if(div){div.innerHTML='❌ Failed';div.style.color='var(--red)';}toast('❌ Failed','error');}}
 async function loadSettingsForm(){
@@ -1276,7 +1322,7 @@ const HO_I18N = {
     'store-grn':'Send to Stores (GRN)', transfer:'Store Transfer', products:'Product Master', pl:'P&L Statement',
     'balance-sheet':'Balance Sheet', cashflow:'Cash Flow', 'supplier-accounts':'Supplier Accounts',
     'expenses-ho':'Expenses', accounts:'Chart of Accounts', promotions:'Promotions', license:'License',
-    capital:'Capital & Equity', reports:'Sales Reports', 'inventory-ho':'Inventory — All',
+    capital:'Capital & Equity', 'fixed-assets':'Fixed Assets', reports:'Sales Reports', 'inventory-ho':'Inventory — All',
     'stores-admin':'Manage Stores', users:'Users & PINs', banks:'Banks & Payments', settings:'Settings',
     overview:'Overview', stock:'Stock Management', finance:'Finance', admin:'Admin', products_sec:'Products',
     reports_sec:'Reports', lang_btn:'العربية / EN', switch_ar:'تم التبديل إلى العربية', switch_en:'Switched to English',
@@ -1287,7 +1333,7 @@ const HO_I18N = {
     'store-grn':'إرسال للمتاجر', transfer:'تحويل بين المتاجر', products:'كتالوج المنتجات', pl:'الأرباح والخسائر',
     'balance-sheet':'الميزانية العمومية', cashflow:'التدفق النقدي', 'supplier-accounts':'حسابات الموردين',
     'expenses-ho':'المصروفات', accounts:'دليل الحسابات', promotions:'العروض', license:'الترخيص',
-    capital:'رأس المال', reports:'تقارير المبيعات', 'inventory-ho':'المخزون — الكل',
+    capital:'رأس المال', 'fixed-assets':'الأصول الثابتة', reports:'تقارير المبيعات', 'inventory-ho':'المخزون — الكل',
     'stores-admin':'إدارة المتاجر', users:'المستخدمون والرمز', banks:'البنوك والمدفوعات', settings:'الإعدادات',
     overview:'نظرة عامة', stock:'إدارة المخزون', finance:'المالية', admin:'الإدارة', products_sec:'المنتجات',
     reports_sec:'التقارير', lang_btn:'EN / العربية', switch_ar:'تم التبديل إلى العربية', switch_en:'تم التبديل إلى الإنجليزية',

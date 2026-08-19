@@ -84,6 +84,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('promotions')" data-role="admin"><span class="ico">🏷️</span>Promotions</div>
     <div class="nav-item" onclick="show('license')" data-role="admin"><span class="ico">🔑</span>License</div>
     <div class="nav-item" onclick="show('capital')"><span class="ico">🏦</span>Capital & Equity</div>
+    <div class="nav-item" onclick="show('fixed-assets')"><span class="ico">🏗️</span>Fixed Assets</div>
     <div class="nav-sec">Reports</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager"><span class="ico">🗃️</span>Inventory — All</div>
@@ -890,6 +891,41 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
         <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="cap-desc" placeholder="e.g. Initial capital investment, Bank loan from XYZ"></div>
         <button class="btn btn-primary btn-sm" onclick="saveCapitalEntry()">💾 Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIXED ASSETS -->
+  <div id="screen-fixed-assets" class="screen">
+    <div style="max-width:1000px">
+      <div class="kpi-grid" id="fa-kpis"></div>
+      <div class="card">
+        <div class="card-title">🏗️ Fixed Assets Register</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 11px">Durable, non-trading purchases only (shop decor, furniture, equipment, vehicles, POS hardware). Not for resale — stock for resale goes through Supplier GRN instead. Each asset depreciates straight-line over its useful life; the book value shown here automatically flows into the Balance Sheet, and the depreciation expense automatically flows into the P&L Statement.</p>
+        <div class="table-wrapper" style="overflow-x:auto">
+        <table><thead><tr><th>Name</th><th>Category</th><th>Store</th><th>Purchased</th><th>Cost</th><th>Monthly Depr.</th><th>Accum. Depr.</th><th>Book Value</th><th>Status</th><th data-role="admin,accountant">Actions</th></tr></thead>
+        <tbody id="fa-table"></tbody></table>
+        </div>
+      </div>
+      <div class="card" data-role="admin,accountant">
+        <div class="card-title">➕ Add Fixed Asset</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="fa-name" placeholder="e.g. Shop Decor — Store 1"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-input" id="fa-category">
+              <option>Shop Decor</option><option>Furniture</option><option>Equipment</option>
+              <option>Computer / POS Hardware</option><option>Vehicle</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="fa-store"></select></div>
+          <div class="form-group"><label class="form-label">Purchase Date</label><input class="form-input" type="date" id="fa-date"></div>
+          <div class="form-group"><label class="form-label">Cost (LYD)</label><input class="form-input" type="number" id="fa-cost" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Useful Life (years)</label><input class="form-input" type="number" id="fa-life" value="5" min="1"></div>
+          <div class="form-group"><label class="form-label">Salvage Value (LYD, optional)</label><input class="form-input" type="number" id="fa-salvage" value="0"></div>
+          <div class="form-group" style="grid-column:span 2"><label class="form-label">Notes (optional)</label><input class="form-input" id="fa-notes" placeholder="e.g. Invoice #, supplier"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray4);margin:6px 0 10px"><input type="checkbox" id="fa-cash" checked> Also record this as a cash outflow in Cash Flow (Investing)</label>
+        <button class="btn btn-primary btn-sm" onclick="saveFixedAsset()">💾 Save Asset</button>
       </div>
     </div>
   </div>
