@@ -179,6 +179,7 @@ def reports(
         txn_units = 0
         txn_cost = 0.0
         item_names = []
+        item_barcodes = []
         for i in items:
             barcode = i.get("barcode") or ""
             name = i.get("name") or barcode or "?"
@@ -190,6 +191,7 @@ def reports(
             txn_units += qty
             txn_cost += cost * qty
             item_names.append(f"{name} x{qty}")
+            item_barcodes.append(barcode or "—")
             key = barcode or name
             if key not in prod_map:
                 prod_map[key] = {"barcode": barcode, "name": name, "qty": 0, "revenue": 0, "cost": 0, "profit": 0}
@@ -213,6 +215,7 @@ def reports(
                 "items": len(items),
                 "units": txn_units,
                 "productList": "; ".join(item_names)[:180],
+                "barcodeList": "; ".join(item_barcodes)[:180],
                 "subtotal": float(s.subtotal or 0),
                 "discount": round(line_disc, 2),
                 "cost": round(txn_cost, 2),
