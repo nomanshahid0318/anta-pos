@@ -893,7 +893,7 @@ async function uploadProducts(file){
   renderProducts();
 }
 function plPreset(){const p=($('pl-period')||{}).value||'month',d=today(),now=new Date();if(!$('pl-from'))return;if(p==='today'){$('pl-from').value=d;$('pl-to').value=d;}else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());$('pl-from').value=ws.toISOString().split('T')[0];$('pl-to').value=d;}else if(p==='month'){$('pl-from').value=d.slice(0,7)+'-01';$('pl-to').value=d;}else{$('pl-from').value=d.slice(0,4)+'-01-01';$('pl-to').value=d;}}
-async function loadPL(){const qs=new URLSearchParams();if($('pl-from')?.value)qs.set('from',$('pl-from').value);if($('pl-to')?.value)qs.set('to',$('pl-to').value);if($('pl-store')?.value)qs.set('store',$('pl-store').value);const pl=await api('/api/ho/pl?'+qs);if(!pl||!pl.ok){toast('P&L failed','error');return;}if($('pl-kpis'))$('pl-kpis').innerHTML=[['Revenue',fmt(pl.revenue),''],['COGS',fmt(pl.cogs),'amber'],['Gross Profit',fmt(pl.grossProfit),'green'],['GM%',((pl.grossMargin||0)*100).toFixed(1)+'%','blue'],['Expenses',fmt(pl.totalExpenses),'purple'],['EBITDA',fmt(pl.ebitda),'teal'],['Depreciation',fmt(pl.depreciationExpense||0),'amber'],['Net Profit',fmt(pl.netProfit),'green']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');const rows=[['Net Revenue','netRevenue'],['COGS','cogs'],['Gross Profit','grossProfit'],['Gross Margin %','grossMargin',true],['Total Expenses','totalExpenses'],['EBITDA','ebitda'],['Depreciation Expense','depreciationExpense'],['Net Profit','netProfit']];if($('pl-table'))$('pl-table').innerHTML=rows.map(([label,key,pct])=>`<tr style="${key==='ebitda'||key==='grossProfit'||key==='netProfit'?'font-weight:800;background:var(--gray0)':''}"><td>${label}</td><td class="text-right fw7">${pct?((pl[key]||0)*100).toFixed(1)+'%':fmt(pl[key]||0)}</td><td class="text-right">${pct?'':pl.netRevenue?((pl[key]||0)/pl.netRevenue*100).toFixed(1)+'%':'—'}</td></tr>`).join('');}
+async function loadPL(){const qs=new URLSearchParams();if($('pl-from')?.value)qs.set('from',$('pl-from').value);if($('pl-to')?.value)qs.set('to',$('pl-to').value);if($('pl-store')?.value)qs.set('store',$('pl-store').value);const pl=await api('/api/ho/pl?'+qs);if(!pl||!pl.ok){toast('P&L failed','error');return;}window.__plData=pl;if($('pl-kpis'))$('pl-kpis').innerHTML=[['Revenue',fmt(pl.revenue),''],['COGS',fmt(pl.cogs),'amber'],['Gross Profit',fmt(pl.grossProfit),'green'],['GM%',((pl.grossMargin||0)*100).toFixed(1)+'%','blue'],['Expenses',fmt(pl.totalExpenses),'purple'],['EBITDA',fmt(pl.ebitda),'teal'],['Depreciation',fmt(pl.depreciationExpense||0),'amber'],['Net Profit',fmt(pl.netProfit),'green']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');const rows=[['Net Revenue','netRevenue'],['COGS','cogs'],['Gross Profit','grossProfit'],['Gross Margin %','grossMargin',true],['Total Expenses','totalExpenses'],['EBITDA','ebitda'],['Depreciation Expense','depreciationExpense'],['Net Profit','netProfit']];if($('pl-table'))$('pl-table').innerHTML=rows.map(([label,key,pct])=>`<tr style="${key==='ebitda'||key==='grossProfit'||key==='netProfit'?'font-weight:800;background:var(--gray0)':''}"><td>${label}</td><td class="text-right fw7">${pct?((pl[key]||0)*100).toFixed(1)+'%':fmt(pl[key]||0)}</td><td class="text-right">${pct?'':pl.netRevenue?((pl[key]||0)/pl.netRevenue*100).toFixed(1)+'%':'—'}</td></tr>`).join('');}
 async function loadExpenses(){const el=$('exp-ho-table')||$('exp-table');if(!el)return;const qs=new URLSearchParams();const sid=$('exp-store-filter')&&$('exp-store-filter').value;if(sid&&sid!=='all')qs.set('store_id',sid);const res=await api('/api/expenses?limit=300'+(qs.toString()?'&'+qs.toString():''));const rows=(res&&res.data)||DATA.expenses||[];DATA.expenses=rows.map(e=>({...e,Date:e.date||e.Date,Amount:e.amount!=null?e.amount:e.Amount,Store:e.store||e.Store,StoreID:e.storeId||e.StoreID,Category:e.category||e.Category,Description:e.description||e.Description||'',PayMethod:e.payMethod||e.PayMethod||''}));el.innerHTML=DATA.expenses.map(e=>`<tr><td>${e.Date||''}</td><td>${e.Store||''}</td><td>${e.Category||''}</td><td>${e.Description||''}</td><td class="fw7">${fmt(e.Amount||0)}</td><td>${e.PayMethod||''}</td><td data-role="admin,accountant"><button class="btn btn-ghost btn-sm" onclick="editExpense('${e.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteExpense('${e.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3)">No expenses</td></tr>';applyRoleUI();}
 
 function rptPreset(){const p=($('rpt-preset')||{}).value||'today',d=today(),now=new Date();if(!$('rpt-from'))return;if(p==='today'){$('rpt-from').value=d;$('rpt-to').value=d;}else if(p==='yesterday'){const y=new Date(now);y.setDate(y.getDate()-1);const yd=y.toISOString().split('T')[0];$('rpt-from').value=yd;$('rpt-to').value=yd;}else if(p==='week'){const ws=new Date(now);ws.setDate(now.getDate()-now.getDay());$('rpt-from').value=ws.toISOString().split('T')[0];$('rpt-to').value=d;}else{$('rpt-from').value=d.slice(0,7)+'-01';$('rpt-to').value=d;}}
@@ -1161,6 +1161,103 @@ function exportCF(){
     ...(cf.financing||[]).map(i=>({section:'Financing',...i})),
   ];
   _csvDownload(rows,[['Section','section'],['Item','label'],['Amount','value']],'cash_flow_'+today()+'.csv');
+}
+
+// ---------- Printable reports (P&L / Balance Sheet / Cash Flow) ----------
+function _reportHeader(title,subtitle){
+  const company=(DATA.settings&&DATA.settings.company)||'ANTA Shoes';
+  return `
+    <div style="text-align:center;margin-bottom:26px;border-bottom:2px solid #1a2540;padding-bottom:16px">
+      <div style="font-size:24px;font-weight:900;color:#1a2540">${company}</div>
+      <div style="font-size:16px;font-weight:700;margin-top:4px">${title}</div>
+      <div style="font-size:12px;color:#666;margin-top:3px">${subtitle}</div>
+    </div>`;
+}
+function _reportFooter(){
+  const now=new Date();
+  return `<div style="text-align:center;margin-top:36px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:10px">Generated ${now.toLocaleDateString()} ${now.toLocaleTimeString()} · ANTA Shoes System</div>`;
+}
+function _reportSectionTable(sectionTitle,rows,opts={}){
+  if(!rows||!rows.length)return '';
+  const rowsHtml=rows.map(r=>`<tr style="${r.bold?'font-weight:800;background:#f3f4f6':''}"><td style="width:70%;padding:7px 4px;border-bottom:1px solid #eee">${r.label}</td><td style="width:30%;padding:7px 4px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap">${r.value}</td></tr>`).join('');
+  return `
+    <div style="margin-bottom:18px">
+      ${sectionTitle?`<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${sectionTitle}</div>`:''}
+      <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px">${rowsHtml}</table>
+    </div>`;
+}
+function _reportSummaryRow(label,value,opts={}){
+  const big=opts.big?'font-weight:900;font-size:15px':'font-weight:700;font-size:13px';
+  const border=opts.topBorder?'border-top:2px solid #1a2540;padding-top:8px':'';
+  return `<table style="width:100%;table-layout:fixed;margin-top:${opts.topBorder?'14px':'4px'};${border}"><tr><td style="width:70%;${big}">${label}</td><td style="width:30%;text-align:right;${big};white-space:nowrap">${value}</td></tr></table>`;
+}
+function _showPrintReport(html){
+  const modal=document.getElementById('report-print-modal');
+  if(!modal){toast('Print container missing','error');return;}
+  modal.innerHTML=`<div style="max-width:750px;margin:0 auto;padding:40px 50px;font-family:Arial,sans-serif;color:#111">${html}</div>`;
+  setTimeout(()=>window.print(),50);
+}
+
+function printPL(){
+  const pl=window.__plData;
+  if(!pl){toast('Load the P&L first','error');return;}
+  const from=$('pl-from')?.value||'—', to=$('pl-to')?.value||'—';
+  const storeSel=$('pl-store');
+  const storeLabel=(storeSel&&storeSel.selectedOptions&&storeSel.selectedOptions[0]&&storeSel.selectedOptions[0].text)||'All Stores';
+  const pct=v=>pl.netRevenue?((v||0)/pl.netRevenue*100).toFixed(1)+'% of revenue':'';
+  const rows=[
+    {label:'Net Revenue',value:fmt(pl.netRevenue)},
+    {label:'Cost of Goods Sold (COGS)',value:fmt(pl.cogs)},
+    {label:'Gross Profit',value:fmt(pl.grossProfit)+`  (${((pl.grossMargin||0)*100).toFixed(1)}% margin)`,bold:true},
+    {label:'Total Operating Expenses',value:fmt(pl.totalExpenses)},
+    {label:'EBITDA',value:fmt(pl.ebitda),bold:true},
+    {label:'Depreciation Expense',value:fmt(pl.depreciationExpense||0)},
+    {label:'Net Profit',value:fmt(pl.netProfit),bold:true},
+  ];
+  const html=_reportHeader('Profit &amp; Loss Statement',`${storeLabel} · ${from} to ${to}`)
+    + _reportSectionTable('',rows)
+    + _reportFooter();
+  _showPrintReport(html);
+}
+
+function printBS(){
+  const bs=window.__bsData;
+  if(!bs){toast('Load the Balance Sheet first','error');return;}
+  const asOf=$('bs-date')?.value||today();
+  const row=i=>({label:i.label,value:fmt(i.value)});
+  const html=_reportHeader('Balance Sheet',`As of ${asOf}`)
+    + `<div style="font-size:14px;font-weight:800;color:#2e7d32;margin:0 0 8px">ASSETS</div>`
+    + _reportSectionTable('Current Assets',(bs.currentAssets||[]).map(row))
+    + _reportSectionTable('Fixed Assets',(bs.fixedAssets||[]).map(row))
+    + _reportSectionTable('',[{label:'TOTAL ASSETS',value:fmt(bs.totalAssets||0),bold:true}])
+    + `<div style="font-size:14px;font-weight:800;color:#c62828;margin:20px 0 8px">LIABILITIES</div>`
+    + _reportSectionTable('',(bs.liabilities||[]).map(row))
+    + _reportSectionTable('',[{label:'TOTAL LIABILITIES',value:fmt(bs.totalLiabilities||0),bold:true}])
+    + `<div style="font-size:14px;font-weight:800;color:#7c3aed;margin:20px 0 8px">CAPITAL &amp; EQUITY</div>`
+    + _reportSectionTable('',(bs.equity||[]).map(row))
+    + _reportSectionTable('',[{label:'TOTAL EQUITY',value:fmt(bs.totalEquity||0),bold:true}])
+    + _reportSummaryRow('TOTAL LIABILITIES + EQUITY',fmt(bs.totalLiabEquity||0),{big:true,topBorder:true})
+    + _reportFooter();
+  _showPrintReport(html);
+}
+
+function printCF(){
+  const cf=window.__cfData;
+  if(!cf){toast('Load the Cash Flow statement first','error');return;}
+  const from=$('cf-from')?.value||'—', to=$('cf-to')?.value||'—';
+  const row=i=>({label:i.label,value:fmt(i.value)});
+  const html=_reportHeader('Cash Flow Statement',`${from} to ${to}`)
+    + _reportSectionTable('Operating Activities',(cf.operating||[]).map(row))
+    + _reportSectionTable('',[{label:'Net Operating Cash Flow',value:fmt(cf.operatingTotal||0),bold:true}])
+    + _reportSectionTable('Investing Activities',(cf.investing||[]).map(row))
+    + _reportSectionTable('',[{label:'Net Investing Cash Flow',value:fmt(cf.investingTotal||0),bold:true}])
+    + _reportSectionTable('Financing Activities',(cf.financing||[]).map(row))
+    + _reportSectionTable('',[{label:'Net Financing Cash Flow',value:fmt(cf.financingTotal||0),bold:true}])
+    + _reportSummaryRow('Opening Cash Balance',fmt(cf.opening||0),{topBorder:true})
+    + _reportSummaryRow('Net Cash Flow',fmt(cf.netCashFlow||0))
+    + _reportSummaryRow('Closing Cash Balance',fmt(cf.closing||0),{big:true})
+    + _reportFooter();
+  _showPrintReport(html);
 }
 async function saveSupplier(){const name=$('sup-name').value.trim();if(!name){toast('Enter name','error');return;}const res=await api('/api/ho/suppliers',{method:'POST',body:{name,contact:$('sup-contact').value,limit:parseFloat($('sup-limit').value)||0,terms:$('sup-terms').value}});if(res&&res.ok){toast('✅ Supplier saved');['sup-name','sup-contact','sup-limit'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 async function saveSupplierTxn(){const supId=$('sup-txn-supplier').value,amt=parseFloat($('sup-txn-amt').value)||0;if(!supId||!amt){toast('Select supplier + amount','error');return;}const res=await api('/api/ho/supplier-txns',{method:'POST',body:{supplierId:supId,date:$('sup-txn-date').value,type:$('sup-txn-type').value,amount:amt,ref:$('sup-txn-ref').value}});if(res&&res.ok){toast('✅ Recorded');['sup-txn-amt','sup-txn-ref'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}

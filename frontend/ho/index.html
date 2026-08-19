@@ -21,8 +21,12 @@ body{display:flex;height:100vh;overflow:hidden}
 .btn-green{background:var(--green);color:#fff}
 .btn-sm{padding:5px 9px;font-size:11px}
 </style>
+<style id="ho-print-style">@media print{@page{size:A4;margin:15mm}.no-print{display:none!important}body *{visibility:hidden}#report-print-modal,#report-print-modal *{visibility:visible}#report-print-modal{position:absolute;left:0;top:0;width:100%;display:block!important}}</style>
 <style>html[dir=rtl]{direction:rtl}</style><style>html[dir=rtl],html[dir=rtl] body{direction:rtl}html[dir=rtl] #sidebar{border-right:none;border-left:1px solid #e5e7eb}html[dir=rtl] .nav-item,.nav-sec{text-align:right}html[dir=rtl] .topbar-title{text-align:right}</style></head>
 <body>
+
+<!-- REPORT PRINT (hidden on-screen, only shown inside @media print) -->
+<div id="report-print-modal" style="display:none"></div>
 
 <div id="login-screen" style="position:fixed;inset:0;background:linear-gradient(135deg,var(--navy),var(--blue));display:flex;align-items:center;justify-content:center;z-index:9999">
   <div style="background:#fff;border-radius:16px;padding:36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center">
@@ -444,6 +448,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <input type="date" id="pl-to"   class="form-input" style="width:138px;padding:6px 9px">
       <select class="form-input" style="width:160px;padding:6px 9px" id="pl-store"><option value="all">All Stores</option></select>
       <button class="btn btn-blue btn-sm" onclick="loadPL()">🔍 Load P&L</button>
+      <button class="btn btn-ghost btn-sm" onclick="printPL()">🖨️ Print</button>
     </div>
     <div class="kpi-grid" id="pl-kpis"></div>
     <div class="card">
@@ -664,6 +669,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <select class="form-input" style="width:160px;padding:6px 9px" id="bs-store"><option value="all">All Stores</option></select>
       <button class="btn btn-blue btn-sm" onclick="loadBalanceSheet()">🔍 Load</button>
       <button class="btn btn-ghost btn-sm" onclick="exportBS()">⬇️ Export</button>
+      <button class="btn btn-ghost btn-sm" onclick="printBS()">🖨️ Print</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
@@ -740,6 +746,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <input type="date" id="cf-to" class="form-input" style="width:138px;padding:6px 9px">
       <button class="btn btn-blue btn-sm" onclick="loadCashFlow()">🔍 Load</button>
       <button class="btn btn-ghost btn-sm" onclick="exportCF()">⬇️ Export</button>
+      <button class="btn btn-ghost btn-sm" onclick="printCF()">🖨️ Print</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
       <div class="card">
