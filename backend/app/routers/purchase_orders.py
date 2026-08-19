@@ -84,9 +84,34 @@ def create_po(body: POIn, db: Annotated[Session, Depends(get_db)], user: Annotat
     sup = db.query(Supplier).filter(Supplier.supplier_id == body.supplierId).first()
     if not sup:
         raise HTTPException(404, "Supplier not found")
+
+    # Bulk-upload support: a large PO is uploaded in chunks from the
+    # frontend, all sharing the same poId (same pattern as Supplier GRN).
+    # If that poId already exists and is still open, append/merge these
+    # lines into it instead of erroring — this is what lets a PO with
+    # thousands of line items upload safely in batches with a live
+    # progress bar, instead of one huge all-or-nothing request.
+    existing_po = db.query(PurchaseOrder).filter(PurchaseOrder.po_id == body.poId).first() if body.poId else None
+    if existing_po:
+        if existing_po.status not in ("open", "partially_received"):
+            raise HTTPException(400, f"Cannot add lines — PO is already {existing_po.status}")
+        existing_lines = {l.barcode: l for l in db.query(PurchaseOrderLine).filter(PurchaseOrderLine.po_id == existing_po.po_id).all()}
+        results = []
+        for l in lines:
+            row = existing_lines.get(l.barcode)
+            if row:
+                row.qty_ordered = (row.qty_ordered or 0) + int(l.qty or 0)
+                if l.cost:
+                    row.unit_cost = float(l.cost)
+            else:
+                row = PurchaseOrderLine(po_id=existing_po.po_id, barcode=l.barcode, name=l.name or "", qty_ordered=int(l.qty or 0), qty_received=0, unit_cost=float(l.cost or 0))
+                db.add(row)
+                existing_lines[l.barcode] = row
+            results.append({"barcode": l.barcode, "name": l.name or "", "status": "saved", "reason": ""})
+        db.commit()
+        return {"ok": True, "status": "ok", "id": existing_po.po_id, "results": results, "count": len(lines)}
+
     poid = body.poId or f"PO-{int(time.time() * 1000)}"
-    if db.query(PurchaseOrder).filter(PurchaseOrder.po_id == poid).first():
-        raise HTTPException(400, "PO id already exists")
     date = body.date or today_str()
     po = PurchaseOrder(
         po_id=poid, date=date, expected_date=body.expectedDate or "", supplier_id=body.supplierId,
@@ -94,8 +119,10 @@ def create_po(body: POIn, db: Annotated[Session, Depends(get_db)], user: Annotat
         created_by=user.user_id if hasattr(user, "user_id") else "",
     )
     db.add(po)
+    results = []
     for l in lines:
         db.add(PurchaseOrderLine(po_id=poid, barcode=l.barcode, name=l.name or "", qty_ordered=int(l.qty or 0), qty_received=0, unit_cost=float(l.cost or 0)))
+        results.append({"barcode": l.barcode, "name": l.name or "", "status": "saved", "reason": ""})
     if body.advancePaid and body.advancePaid > 0:
         db.add(SupplierTxn(
             txn_id=f"STXN-{int(time.time() * 1000)}", supplier_id=body.supplierId, supplier_name=sup.name,
@@ -104,7 +131,7 @@ def create_po(body: POIn, db: Annotated[Session, Depends(get_db)], user: Annotat
         ))
         po.advance_paid = body.advancePaid
     db.commit()
-    return {"ok": True, "status": "ok", "id": poid}
+    return {"ok": True, "status": "ok", "id": poid, "results": results, "count": len(lines)}
 
 
 @router.get("/purchase-orders")

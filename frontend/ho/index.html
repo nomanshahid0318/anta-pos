@@ -180,6 +180,29 @@ body{display:flex;height:100vh;overflow:hidden}
         <table style="margin-top:8px"><thead><tr><th>Barcode</th><th>Name</th><th>Qty</th><th>Unit Cost</th><th></th></tr></thead>
         <tbody id="po-lines"></tbody></table>
         <button class="btn btn-ghost btn-sm" onclick="addPOLine()">➕ Add Line</button>
+        <div style="margin-top:8px;padding:9px;background:var(--gray0);border-radius:7px">
+          <div style="font-size:11px;color:var(--gray4);margin-bottom:7px">📤 Or bulk add lines from Excel/CSV — same as Supplier GRN. Repeats the same barcode? Quantities merge automatically.</div>
+          <button class="btn btn-ghost btn-sm" onclick="downloadPOTemplate()">⬇️ Download Template</button>
+          <div class="upload-zone mt" onclick="document.getElementById('po-file').click()" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="dropPO(event)">
+            <div style="font-size:24px;margin-bottom:5px">📂</div>
+            <div style="font-size:12px;font-weight:700">Click or drag Excel/CSV file</div>
+            <div style="font-size:10px;color:var(--gray4)">Columns: Barcode, Name, Qty, UnitCost</div>
+          </div>
+          <input type="file" id="po-file" style="display:none" accept=".xlsx,.csv" onchange="uploadPOExcel(this.files[0])">
+        </div>
+        <div id="po-bup-panel" style="display:none;border:1px solid var(--gray1);border-radius:10px;padding:11px 13px;margin-top:11px;background:var(--gray0)">
+          <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:6px">
+            <span id="po-bup-status">Saving…</span>
+            <span id="po-bup-count">0 / 0</span>
+          </div>
+          <div style="background:var(--gray1);border-radius:6px;height:10px;overflow:hidden">
+            <div id="po-bup-bar" style="background:var(--accent2);width:0%;height:100%;border-radius:6px;transition:width .2s"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray4);margin-top:5px">
+            <span id="po-bup-elapsed">Elapsed: 0s</span>
+            <span id="po-bup-eta">Estimated remaining: —</span>
+          </div>
+        </div>
         <div style="margin-top:10px;font-size:13px" id="po-total">Total: LYD 0.00</div>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:10px 0"><input type="checkbox" id="po-advance-toggle" onchange="$('po-advance-row').style.display=this.checked?'flex':'none'"> Pay an advance now</label>
         <div id="po-advance-row" style="display:none;gap:8px;align-items:center;margin-bottom:10px">
@@ -188,7 +211,10 @@ body{display:flex;height:100vh;overflow:hidden}
         <button class="btn btn-primary btn-sm" onclick="savePO()">💾 Create Purchase Order</button>
       </div>
       <div class="card">
-        <div class="card-title">📋 Purchase Orders</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="card-title" style="margin:0">📋 Purchase Orders</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportPOs()">⬇️ Export</button>
+        </div>
         <div style="display:flex;gap:7px;margin-bottom:10px">
           <select class="form-input" style="width:160px;padding:5px 9px" id="po-status-filter" onchange="loadPOs()">
             <option value="all">All Statuses</option><option value="open">Open</option>

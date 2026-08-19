@@ -1299,6 +1299,19 @@ function calcPOTotal(){
   const total=poLines.reduce((a,l)=>a+((+l.qty||0)*(+l.cost||0)),0);
   if($('po-total'))$('po-total').textContent='Total: '+fmt(total);
 }
+function downloadPOTemplate(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['Barcode,Name,Qty,UnitCost\n8001000000001,ANTA Running Pro,20,120\n'],{type:'text/csv'}));
+  a.download='purchase_order_template.csv';a.click();
+}
+async function uploadPOExcel(file){
+  if(!file)return;
+  const rows=await readExcel(file);
+  rows.forEach(r=>poLines.push({barcode:cleanId(r.Barcode||r.barcode),name:String(r.Name||r.name||'').trim(),qty:+(r.Qty||r.qty||1),cost:+(r.UnitCost||r.Cost||r.unitcost||r.cost||0)}));
+  renderPOLines();
+  toast('✅ '+rows.length+' line(s) added — review below, then Create Purchase Order');
+}
+function dropPO(e){e.preventDefault();e.currentTarget.classList.remove('over');if(e.dataTransfer.files[0])uploadPOExcel(e.dataTransfer.files[0]);}
 async function savePO(){
   const supplierId=$('po-supplier').value;
   if(!supplierId){toast('Select a supplier','error');return;}
@@ -1306,21 +1319,47 @@ async function savePO(){
   if(!lines.length){toast('Add at least one line item','error');return;}
   const advanceOn=$('po-advance-toggle').checked;
   const advance=advanceOn?(parseFloat($('po-advance-amt').value)||0):0;
-  const body={
-    date:$('po-date').value||today(), expectedDate:$('po-expected').value||'', supplierId,
-    lines:lines.map(l=>({barcode:l.barcode,name:l.name,qty:+l.qty,cost:+l.cost})),
-    advancePaid:advance,
-  };
-  const res=await api('/api/ho/purchase-orders',{method:'POST',body});
-  if(res&&res.ok){
-    toast('✅ Purchase Order created');
+  const meta={date:$('po-date').value||today(),expectedDate:$('po-expected').value||'',supplierId};
+  const poid='PO-'+Date.now();
+  const startTime=Date.now();
+  const logRows=[];
+  const CHUNK=300;
+  let saved=0,failed=0;
+  bupShow('po-bup');
+  bupUpdate({prefix:'po-bup',status:'⏳ Saving Purchase Order… keep this tab open',done:0,total:lines.length,startTime});
+  for(let i=0;i<lines.length;i+=CHUNK){
+    const chunk=lines.slice(i,i+CHUNK);
+    const body={...meta,poId:poid,lines:chunk.map(l=>({barcode:l.barcode,name:l.name,qty:+l.qty,cost:+l.cost})),advancePaid:i===0?advance:0};
+    const res=await api('/api/ho/purchase-orders',{method:'POST',body});
+    if(res&&res.ok&&Array.isArray(res.results)){
+      res.results.forEach(r=>logRows.push(r));
+      saved+=res.results.filter(r=>r.status==='saved').length;
+      failed+=res.results.filter(r=>r.status==='failed').length;
+    } else {
+      chunk.forEach(l=>logRows.push({barcode:l.barcode||'?',name:l.name||'',status:'failed',reason:(res&&(res.detail||res.msg))||'request failed — no response from server'}));
+      failed+=chunk.length;
+    }
+    bupUpdate({prefix:'po-bup',status:'⏳ Saving Purchase Order… keep this tab open',done:Math.min(i+CHUNK,lines.length),total:lines.length,startTime,failed});
+  }
+  bupUpdate({prefix:'po-bup',status:'✅ Done',done:lines.length,total:lines.length,startTime,failed});
+  setTimeout(()=>bupHide('po-bup'),2500);
+  if(saved){
+    toast(`✅ Purchase Order ${poid} — ${saved} item(s) saved`+(failed?`, ${failed} failed — see downloaded log`:''),failed?'warn':'ok');
     poLines=[];renderPOLines();
     if($('po-advance-toggle'))$('po-advance-toggle').checked=false;
     if($('po-advance-row'))$('po-advance-row').style.display='none';
     if($('po-advance-amt'))$('po-advance-amt').value='';
     await loadAll();
     loadPOs();
-  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+  } else {
+    toast('❌ Purchase Order save failed — 0 items saved. Check the downloaded log for the reason.','error');
+  }
+  if(logRows.length)downloadEventLog(logRows);
+}
+function exportPOs(){
+  const rows=[];
+  __poList.forEach(po=>po.lines.forEach(l=>rows.push({poId:po.id,supplier:po.supplierName,status:po.status,date:po.date,barcode:l.barcode,name:l.name,qtyOrdered:l.qtyOrdered,qtyReceived:l.qtyReceived,unitCost:l.unitCost,lineTotal:l.lineTotal})));
+  _csvDownload(rows,[['PO ID','poId'],['Supplier','supplier'],['Status','status'],['Date','date'],['Barcode','barcode'],['Name','name'],['Qty Ordered','qtyOrdered'],['Qty Received','qtyReceived'],['Unit Cost','unitCost'],['Line Total','lineTotal']],'purchase_orders_'+today()+'.csv');
 }
 async function loadPOs(){
   const status=$('po-status-filter')?$('po-status-filter').value:'all';
