@@ -32,7 +32,7 @@ body{display:flex;height:100vh;overflow:hidden}
   <div style="background:#fff;border-radius:16px;padding:36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center">
     <div id="login-logo-box" style="width:72px;height:72px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:28px;margin:0 auto 16px">A</div>
     <div id="login-title-text" style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px">Head Office</div>
-    <div style="font-size:12px;color:var(--gray4);margin-bottom:20px">Admin / Manager / Accountant PIN login</div>
+    <div style="font-size:12px;color:var(--gray4);margin-bottom:20px">Admin / Manager / Merchandiser / Warehouse / Accountant PIN login</div>
     <select id="login-store" class="form-input" style="margin-bottom:12px;width:100%"><option value="HO">Head Office</option></select>
     <div id="pin-display" style="font-size:28px;font-weight:800;letter-spacing:8px;color:var(--navy);background:var(--gray0);border-radius:10px;padding:12px;margin-bottom:12px">----</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
@@ -71,28 +71,28 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item active" onclick="show('dashboard')"><span class="ico">🏢</span>HO Dashboard</div>
     <div class="nav-item" onclick="show('stores-view')" data-role="admin,manager"><span class="ico">🗺️</span>All Stores</div>
     <div class="nav-sec">Stock Management</div>
-    <div class="nav-item" onclick="show('warehouse')" data-role="admin,manager"><span class="ico">🏭</span>HO Warehouse</div>
-    <div class="nav-item" onclick="show('supplier-grn')" data-role="admin,manager"><span class="ico">📦</span>Supplier GRN</div>
-    <div class="nav-item" onclick="show('store-grn')" data-role="admin,manager"><span class="ico">🚚</span>Send to Stores (GRN)</div>
-    <div class="nav-item" onclick="show('transfer')" data-role="admin,manager"><span class="ico">🔄</span>Store Transfer</div>
+    <div class="nav-item" onclick="show('warehouse')" data-role="admin,manager,warehouse"><span class="ico">🏭</span>HO Warehouse</div>
+    <div class="nav-item" onclick="show('supplier-grn')" data-role="admin,manager,warehouse"><span class="ico">📦</span>Supplier GRN</div>
+    <div class="nav-item" onclick="show('store-grn')" data-role="admin,manager,warehouse"><span class="ico">🚚</span>Send to Stores (GRN)</div>
+    <div class="nav-item" onclick="show('transfer')" data-role="admin,manager,warehouse"><span class="ico">🔄</span>Store Transfer</div>
     <div class="nav-sec">Products</div>
-    <div class="nav-item" onclick="show('products')" data-role="admin,manager"><span class="ico">👟</span>Product Master</div>
+    <div class="nav-item" onclick="show('products')" data-role="admin,manager,merchandiser"><span class="ico">👟</span>Product Master</div>
     <div class="nav-sec">Finance</div>
-    <div class="nav-item" onclick="show('pl')"><span class="ico">📊</span>P&L Statement</div>
-    <div class="nav-item" onclick="show('balance-sheet')"><span class="ico">⚖️</span>Balance Sheet</div>
-    <div class="nav-item" onclick="show('cashflow')"><span class="ico">💰</span>Cash Flow</div>
-    <div class="nav-item" onclick="show('supplier-accounts')"><span class="ico">🤝</span>Supplier Accounts</div>
-    <div class="nav-item" onclick="show('handovers')"><span class="ico">💵</span>Cash Handovers</div>
+    <div class="nav-item" onclick="show('pl')" data-role="admin,manager,accountant"><span class="ico">📊</span>P&L Statement</div>
+    <div class="nav-item" onclick="show('balance-sheet')" data-role="admin,manager,accountant"><span class="ico">⚖️</span>Balance Sheet</div>
+    <div class="nav-item" onclick="show('cashflow')" data-role="admin,manager,accountant"><span class="ico">💰</span>Cash Flow</div>
+    <div class="nav-item" onclick="show('supplier-accounts')" data-role="admin,manager,accountant"><span class="ico">🤝</span>Supplier Accounts</div>
+    <div class="nav-item" onclick="show('handovers')" data-role="admin,manager,accountant"><span class="ico">💵</span>Cash Handovers</div>
     <div class="nav-item" onclick="show('expenses-ho')" data-role="admin,accountant"><span class="ico">💸</span>Expenses</div>
     <div class="nav-item" onclick="show('accounts')" data-role="admin,accountant"><span class="ico">📒</span>Chart of Accounts</div>
-    <div class="nav-item" onclick="show('promotions')" data-role="admin"><span class="ico">🏷️</span>Promotions</div>
-    <div class="nav-item" onclick="show('license')" data-role="admin"><span class="ico">🔑</span>License</div>
-    <div class="nav-item" onclick="show('capital')"><span class="ico">🏦</span>Capital & Equity</div>
-    <div class="nav-item" onclick="show('fixed-assets')"><span class="ico">🏗️</span>Fixed Assets</div>
+    <div class="nav-item" onclick="show('capital')" data-role="admin,manager,accountant"><span class="ico">🏦</span>Capital & Equity</div>
+    <div class="nav-item" onclick="show('fixed-assets')" data-role="admin,manager,accountant"><span class="ico">🏗️</span>Fixed Assets</div>
     <div class="nav-sec">Reports</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
-    <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager"><span class="ico">🗃️</span>Inventory — All</div>
+    <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
     <div class="nav-sec">Admin</div>
+    <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
+    <div class="nav-item" onclick="show('license')" data-role="admin"><span class="ico">🔑</span>License</div>
     <div class="nav-item" onclick="show('stores-admin')" data-role="admin"><span class="ico">🏪</span>Manage Stores</div>
     <div class="nav-item" onclick="show('users')" data-role="admin"><span class="ico">👥</span>Users & PINs</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
@@ -582,7 +582,7 @@ body{display:flex;height:100vh;overflow:hidden}
           <div class="grid-2">
             <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="u-nm" placeholder="Cashier name"></div>
             <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="u-store"></select></div>
-            <div class="form-group"><label class="form-label">Role</label><select class="form-input" id="u-role"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="accountant">Accountant</option><option value="admin">Admin</option></select></div>
+            <div class="form-group"><label class="form-label">Role</label><select class="form-input" id="u-role"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="merchandiser">Merchandiser</option><option value="warehouse">Warehouse</option><option value="accountant">Accountant</option><option value="admin">Admin</option></select></div>
             <div class="form-group"><label class="form-label">PIN (4 digits)</label><input class="form-input" type="password" id="u-pin" placeholder="4-digit PIN" maxlength="4"></div>
           </div>
           <div style="display:flex;gap:7px;margin-top:8px">

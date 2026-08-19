@@ -60,8 +60,8 @@ async function pinSubmit(){
   const user=res&&res.user;
   if(token&&user){
     const role=(user.role||'').toLowerCase();
-    if(role!=='admin'&&role!=='manager'&&role!=='accountant'){
-      if(e){e.style.display='block';e.textContent='HO requires admin, manager or accountant';}
+    if(role!=='admin'&&role!=='manager'&&role!=='accountant'&&role!=='merchandiser'&&role!=='warehouse'){
+      if(e){e.style.display='block';e.textContent='HO requires admin, manager, merchandiser, warehouse or accountant';}
       pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
       return;
     }
@@ -1479,7 +1479,7 @@ document.addEventListener('keydown',e=>{
   if(CFG.token){
     const me=await api('/api/auth/me');
     const role=me&&me.user&&(me.user.role||'');
-    if(me&&me.ok&&me.user&&(role==='admin'||role==='manager'||role==='accountant')){
+    if(me&&me.ok&&me.user&&(role==='admin'||role==='manager'||role==='accountant'||role==='merchandiser'||role==='warehouse')){
       currentUser=me.user; try{applyRoleUI();}catch(_e){}
       if($('login-screen'))$('login-screen').style.display='none';
       const app=$('app'); if(app){app.style.display='flex';app.classList.add('open');}
@@ -1510,7 +1510,7 @@ function applyRoleUI(){
     const need=(el.getAttribute('data-role')||'').split(',').map(s=>s.trim()).filter(Boolean);
     el.style.display = (!need.length || role==='admin' || need.includes(role)) ? '' : 'none';
   });
-  const roleLabels={admin:'HO ADMIN',manager:'MANAGER',accountant:'ACCOUNTANT'};
+  const roleLabels={admin:'HO ADMIN',manager:'MANAGER',accountant:'ACCOUNTANT',merchandiser:'MERCHANDISER',warehouse:'WAREHOUSE'};
   const tag=$('ho-role-tag');
   if(tag)tag.textContent=roleLabels[role]||role.toUpperCase()||'HO';
   const nameEl=$('ho-user-name');

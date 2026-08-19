@@ -60,7 +60,7 @@ def list_categories(
 def add_category(
     body: dict,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "merchandiser"))],
 ):
     name = str((body or {}).get("name", "")).strip()
     if not name:
@@ -77,7 +77,7 @@ def add_category(
 def delete_category(
     name: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "merchandiser"))],
 ):
     cats = _load_categories(db)
     cats = [c for c in cats if c.lower() != name.lower()]
@@ -209,7 +209,7 @@ def lookup_product(
 def save_product(
     body: ProductIn,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "merchandiser"))],
 ):
     lookup_barcode = body.old_barcode or body.barcode
     row = db.query(Product).filter(Product.barcode == lookup_barcode).first()
@@ -359,7 +359,7 @@ def _bulk_upsert_ho_qty(db: Session, qty_updates: dict[str, tuple[int, str]]) ->
 def bulk_save_products(
     body: list[dict],
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "merchandiser"))],
 ):
     """Upsert many products fast, while still isolating bad rows.
  
@@ -467,7 +467,7 @@ def bulk_save_products(
 def delete_product(
     barcode: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "merchandiser"))],
 ):
     row = db.query(Product).filter(Product.barcode == barcode).first()
     if not row:
@@ -481,7 +481,7 @@ def delete_product(
 def bulk_delete_products(
     barcodes: list[str],
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "merchandiser"))],
 ):
     n = db.query(Product).filter(Product.barcode.in_(barcodes)).delete(synchronize_session=False)
     db.commit()

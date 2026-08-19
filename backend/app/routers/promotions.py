@@ -66,7 +66,7 @@ def list_promos(
 def save_promo(
     body: PromoIn,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "merchandiser"))],
 ):
     pid = body.promoId or f"PR-{int(__import__('time').time() * 1000)}"
     row = db.query(Promotion).filter(Promotion.promo_id == pid).first()
@@ -104,7 +104,7 @@ def save_promo(
 def toggle_promo(
     promo_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "merchandiser"))],
 ):
     row = db.query(Promotion).filter(Promotion.promo_id == promo_id).first()
     if not row:

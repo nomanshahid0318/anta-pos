@@ -28,7 +28,7 @@ def _admin(user: CurrentUser = Depends(require_role("admin", "manager", "account
     return user
 
 
-def _stock_admin(user: CurrentUser = Depends(require_role("admin", "manager"))) -> CurrentUser:
+def _stock_admin(user: CurrentUser = Depends(require_role("admin", "manager", "accountant", "warehouse"))) -> CurrentUser:
     return user
 
 
@@ -133,7 +133,7 @@ class CFIn(BaseModel):
 
 
 @router.get("/warehouse")
-def warehouse(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def warehouse(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """HO Warehouse stock listing. Brand is looked up with ONE query for
     all barcodes instead of one query per row — the old version issued a
     Product query per HOWarehouse row (thousands of queries on a big
@@ -154,7 +154,7 @@ def warehouse(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUs
 
 
 @router.delete("/warehouse/all")
-def delete_all_warehouse(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def delete_all_warehouse(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Wipe ALL HO Warehouse stock rows (does not touch Product Master —
     products stay, only their warehouse stock counters are cleared). Use
     this to clean up after a bad bulk upload before re-importing fresh.
@@ -166,7 +166,7 @@ def delete_all_warehouse(db: Annotated[Session, Depends(get_db)], user: Annotate
 
 
 @router.post("/warehouse/bulk-delete")
-def bulk_delete_warehouse(barcodes: list[str], db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def bulk_delete_warehouse(barcodes: list[str], db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Delete selected HO Warehouse stock rows by barcode (Products stay,
     only the warehouse stock counters for these barcodes are removed)."""
     if not barcodes:
@@ -179,7 +179,7 @@ def bulk_delete_warehouse(barcodes: list[str], db: Annotated[Session, Depends(ge
 @router.get("/supplier-grns")
 def list_supplier_grns(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(_admin)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
     q: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
@@ -209,7 +209,7 @@ def list_supplier_grns(
 @router.get("/supplier-grns/count")
 def count_supplier_grns(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(_admin)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
     q: Optional[str] = None,
 ):
     query = db.query(SupplierGRN)
@@ -224,7 +224,7 @@ def count_supplier_grns(
 @router.get("/store-grns")
 def list_all_store_grns(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(_admin)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
     status: Optional[str] = None,
     q: Optional[str] = None,
     limit: int = 300,
@@ -255,7 +255,7 @@ def list_all_store_grns(
 @router.get("/store-grns/count")
 def count_store_grns(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(_admin)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
     status: Optional[str] = None,
     q: Optional[str] = None,
 ):
@@ -271,7 +271,7 @@ def count_store_grns(
 
 
 @router.get("/transfers")
-def list_transfers(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)], limit: int = 200):
+def list_transfers(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)], limit: int = 200):
     rows = db.query(Transfer).order_by(Transfer.id.desc()).limit(limit).all()
     data = [{
         "RefID": r.ref_id, "Date": r.date, "FromStoreID": r.from_store_id, "FromStore": r.from_store,
@@ -284,7 +284,7 @@ def list_transfers(db: Annotated[Session, Depends(get_db)], user: Annotated[Curr
 @router.get("/inventory-all")
 def inventory_all(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(_admin)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
     q: Optional[str] = None,
     limit: Optional[int] = None,
     offset: int = 0,
@@ -333,7 +333,7 @@ def inventory_all(
 
 
 @router.get("/inventory-all/count")
-def inventory_all_count(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)], q: Optional[str] = None):
+def inventory_all_count(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)], q: Optional[str] = None):
     query = db.query(Product).filter(Product.active.is_(True))
     if q:
         like = f"%{q}%"
@@ -378,7 +378,7 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
 
 
 @router.post("/supplier-grn")
-def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Save a Supplier GRN, processed in memory-bounded chunks, with a
     per-line pass/fail result so the caller knows exactly which barcode (if
     any) failed and why — not just an overall count.
@@ -453,7 +453,7 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
 
 
 @router.delete("/supplier-grn/{grn_id}")
-def delete_supplier_grn(grn_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def delete_supplier_grn(grn_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Undo a Supplier GRN: reverses its effect on HO Warehouse stock, then
     deletes its line rows and the auto-created supplier ledger entry.
 
@@ -495,7 +495,7 @@ def delete_supplier_grn(grn_id: str, db: Annotated[Session, Depends(get_db)], us
 
 
 @router.delete("/supplier-grn-line/{line_id}")
-def delete_supplier_grn_line(line_id: int, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def delete_supplier_grn_line(line_id: int, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Delete ONE Supplier GRN line (not the whole GRN it belongs to) and
     reverse just that line's effect on HO Warehouse stock. This is what
     fixes a single bad row (e.g. a stray 'Grand Total' row from a pivot
@@ -516,7 +516,7 @@ def delete_supplier_grn_line(line_id: int, db: Annotated[Session, Depends(get_db
 
 
 @router.post("/supplier-grn-lines/bulk-delete")
-def bulk_delete_supplier_grn_lines(line_ids: list[int], db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def bulk_delete_supplier_grn_lines(line_ids: list[int], db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Delete many Supplier GRN lines at once (e.g. from 'Select All
     Matching' in the History table), reversing each one's HO Warehouse
     effect. Processed in memory-bounded chunks like the other bulk
@@ -544,7 +544,7 @@ def bulk_delete_supplier_grn_lines(line_ids: list[int], db: Annotated[Session, D
 
 
 @router.delete("/supplier-grn-lines/all")
-def delete_all_supplier_grn_lines(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def delete_all_supplier_grn_lines(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Delete ALL Supplier GRN lines and reset supplier_in to 0 on every
     HO Warehouse row (store_out / stock already sent to stores is left
     untouched). Use this to wipe a bad bulk upload and start fresh.
@@ -597,7 +597,7 @@ def reset_all_product_stock_data(db: Annotated[Session, Depends(get_db)], user: 
 
 
 @router.post("/store-grn")
-def issue_store_grn(body: StGRNIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def issue_store_grn(body: StGRNIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Issue stock to a store, processed in memory-bounded chunks (see the
     supplier-grn endpoint above for why), with per-line pass/fail results.
     """
@@ -647,7 +647,7 @@ def issue_store_grn(body: StGRNIn, db: Annotated[Session, Depends(get_db)], user
 
 
 @router.delete("/store-grn/{grn_id}")
-def delete_store_grn(grn_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def delete_store_grn(grn_id: str, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     """Undo a Send-to-Store GRN that hasn't been received yet: reverses the
     HO Warehouse stock it reserved and deletes its lines. Only works while
     status is still 'pending' — once a store has received stock, deleting
@@ -687,7 +687,7 @@ def delete_store_grn(grn_id: str, db: Annotated[Session, Depends(get_db)], user:
 
 
 @router.post("/transfer")
-def stock_transfer(body: TransferIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+def stock_transfer(body: TransferIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
     if body.fromStoreId == body.toStoreId:
         raise HTTPException(400, "From and To cannot be the same")
     date = body.date or today_str()

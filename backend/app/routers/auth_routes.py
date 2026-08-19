@@ -143,7 +143,7 @@ def save_user(
 ):
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
-    allowed = {"admin", "manager", "cashier", "accountant"}
+    allowed = {"admin", "manager", "cashier", "accountant", "merchandiser", "warehouse"}
     if body.role not in allowed:
         raise HTTPException(status_code=400, detail=f"Role must be one of {sorted(allowed)}")
     uid = body.user_id or f"U{int(__import__('time').time())}"

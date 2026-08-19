@@ -112,6 +112,14 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "ho.view", "ho.expenses", "ho.accounts", "ho.reports", "ho.finance",
         "pos.reports", "pos.settings.read",
     },
+    "merchandiser": {
+        "ho.view", "ho.products", "ho.promotions", "ho.reports",
+        "pos.reports", "pos.settings.read",
+    },
+    "warehouse": {
+        "ho.view", "ho.stock", "ho.reports",
+        "pos.reports", "pos.settings.read",
+    },
 }
 
 
