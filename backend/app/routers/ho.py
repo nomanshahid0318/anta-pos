@@ -1169,10 +1169,27 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     cf_net = sum(c.value or 0 for c in db.query(CFItem).all())
     cash_est = max(cash_sales - total_exp - sup_paid_all + cf_net, 0)
     bs_rows = db.query(BSEntry).all()
+    sup_pay = 0.0
+    sup_advance = 0.0
+    for s in db.query(Supplier).all():
+        st = db.query(SupplierTxn).filter(SupplierTxn.supplier_id == s.supplier_id).all()
+        bal = sum(t.amount for t in st if t.type == "invoice") - sum(t.amount for t in st if t.type == "payment") - sum(t.amount for t in st if t.type == "credit")
+        if bal > 0:
+            sup_pay += bal
+        elif bal < 0:
+            # We've paid more than we've been invoiced (e.g. an advance
+            # paid on a Purchase Order before the stock arrived) — that's
+            # not a liability, it's an asset: the supplier owes us goods
+            # or a refund. Without this, an advance payment would just
+            # silently vanish from the Balance Sheet the moment it left
+            # Cash, instead of reappearing as a claim on the supplier.
+            sup_advance += -bal
     current_assets = [
         {"label": "Cash & Bank (estimated)", "value": cash_est, "auto": True},
         {"label": "Inventory / Stock Value", "value": stock_value, "auto": True},
-    ] + [{"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-current"]
+    ] + ([{"label": "Advance to Suppliers", "value": sup_advance, "auto": True}] if sup_advance > 0 else []) + [
+        {"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-current"
+    ]
     fixed_assets = [
         {
             "label": f"{fa.name} (cost {fa.cost:,.0f}, less depr {depr.schedule(fa, as_of)['accumulatedDepreciation']:,.0f})",
@@ -1180,12 +1197,6 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
         }
         for fa in fa_rows if not fa.disposed
     ] + [{"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-fixed"]
-    sup_pay = 0.0
-    for s in db.query(Supplier).all():
-        st = db.query(SupplierTxn).filter(SupplierTxn.supplier_id == s.supplier_id).all()
-        bal = sum(t.amount for t in st if t.type == "invoice") - sum(t.amount for t in st if t.type == "payment") - sum(t.amount for t in st if t.type == "credit")
-        if bal > 0:
-            sup_pay += bal
     liabilities = [{"label": "Supplier Payables", "value": sup_pay, "auto": True}] + [
         {"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "liability"
     ]

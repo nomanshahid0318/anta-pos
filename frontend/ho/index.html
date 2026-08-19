@@ -72,6 +72,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('stores-view')" data-role="admin,manager"><span class="ico">🗺️</span>All Stores</div>
     <div class="nav-sec">Stock Management</div>
     <div class="nav-item" onclick="show('warehouse')" data-role="admin,manager,warehouse"><span class="ico">🏭</span>HO Warehouse</div>
+    <div class="nav-item" onclick="show('purchase-orders')" data-role="admin,manager,warehouse"><span class="ico">📝</span>Purchase Orders</div>
     <div class="nav-item" onclick="show('supplier-grn')" data-role="admin,manager,warehouse"><span class="ico">📦</span>Supplier GRN</div>
     <div class="nav-item" onclick="show('store-grn')" data-role="admin,manager,warehouse"><span class="ico">🚚</span>Send to Stores (GRN)</div>
     <div class="nav-item" onclick="show('transfer')" data-role="admin,manager,warehouse"><span class="ico">🔄</span>Store Transfer</div>
@@ -161,6 +162,55 @@ body{display:flex;height:100vh;overflow:hidden}
       <div id="wh-selected-info" style="font-size:11px;color:var(--gray4);margin-bottom:9px"></div>
       <table><thead><tr><th><input type="checkbox" id="wh-select-all" onchange="toggleAllWarehouse(this)" title="Select/deselect all currently shown rows"></th><th>Barcode</th><th>Product</th><th>Brand</th><th>Supplier In</th><th>Store Out</th><th>ON HAND</th><th>Action</th></tr></thead>
       <tbody id="wh-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- PURCHASE ORDERS -->
+  <div id="screen-purchase-orders" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">📝 New Purchase Order</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 11px">Commit to a purchase before the stock physically arrives — useful when you pay a supplier now but receiving is weeks or months away. Any advance paid shows as "Advance to Suppliers" on the Balance Sheet until you mark it Received.</p>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Supplier</label><select class="form-input" id="po-supplier"></select></div>
+          <div class="form-group"><label class="form-label">Order Date</label><input class="form-input" type="date" id="po-date"></div>
+          <div class="form-group"><label class="form-label">Expected Date (optional)</label><input class="form-input" type="date" id="po-expected"></div>
+        </div>
+        <table style="margin-top:8px"><thead><tr><th>Barcode</th><th>Name</th><th>Qty</th><th>Unit Cost</th><th></th></tr></thead>
+        <tbody id="po-lines"></tbody></table>
+        <button class="btn btn-ghost btn-sm" onclick="addPOLine()">➕ Add Line</button>
+        <div style="margin-top:10px;font-size:13px" id="po-total">Total: LYD 0.00</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:10px 0"><input type="checkbox" id="po-advance-toggle" onchange="$('po-advance-row').style.display=this.checked?'flex':'none'"> Pay an advance now</label>
+        <div id="po-advance-row" style="display:none;gap:8px;align-items:center;margin-bottom:10px">
+          <input class="form-input" type="number" style="width:160px" id="po-advance-amt" placeholder="Advance amount">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="savePO()">💾 Create Purchase Order</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Purchase Orders</div>
+        <div style="display:flex;gap:7px;margin-bottom:10px">
+          <select class="form-input" style="width:160px;padding:5px 9px" id="po-status-filter" onchange="loadPOs()">
+            <option value="all">All Statuses</option><option value="open">Open</option>
+            <option value="partially_received">Partially Received</option><option value="received">Received</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <table><thead><tr><th>PO</th><th>Supplier</th><th>Total</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="po-table"></tbody></table>
+      </div>
+    </div>
+    <div id="po-receive-form" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePOReceive()">
+      <div class="modal" style="width:520px">
+        <div class="modal-title">📥 Receive Purchase Order</div>
+        <div id="po-receive-info" style="font-size:12px;color:var(--gray4);margin-bottom:10px"></div>
+        <table><thead><tr><th>Barcode</th><th>Name</th><th>Outstanding</th><th>Receive Now</th></tr></thead>
+        <tbody id="po-receive-lines"></tbody></table>
+        <div class="form-group" style="margin-top:10px"><label class="form-label">Receiving Date</label><input class="form-input" type="date" id="po-receive-date"></div>
+        <div style="display:flex;gap:7px;margin-top:8px">
+          <button class="btn btn-primary" onclick="confirmPOReceive()">✅ Confirm Receipt</button>
+          <button class="btn btn-ghost" onclick="closePOReceive()">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 

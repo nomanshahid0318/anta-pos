@@ -38,6 +38,7 @@ class SupplierTxn(Base):
     amount: Mapped[float] = mapped_column(Float, default=0.0)
     reference: Mapped[str] = mapped_column(String(128), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
+    po_id: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
@@ -107,3 +108,41 @@ class FixedAsset(Base):
     disposed: Mapped[bool] = mapped_column(Boolean, default=False)
     disposed_date: Mapped[str] = mapped_column(String(16), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class PurchaseOrder(Base):
+    """A commitment to buy stock from a supplier, before it's physically
+    received. Separate from Supplier GRN (which records actual receipt).
+    This is what lets a payment made today (e.g. an advance) be tracked
+    against stock that only arrives weeks or months later — the PO stays
+    'open' in between, and any advance payment made against it shows on
+    the Balance Sheet as a real asset (Advance to Suppliers) instead of
+    just vanishing from the books until the goods show up.
+    """
+
+    __tablename__ = "purchase_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    po_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    date: Mapped[str] = mapped_column(String(16), index=True)
+    expected_date: Mapped[str] = mapped_column(String(16), default="")
+    supplier_id: Mapped[str] = mapped_column(String(64), index=True)
+    supplier_name: Mapped[str] = mapped_column(String(128), default="")
+    status: Mapped[str] = mapped_column(String(24), default="open")  # open | partially_received | received | cancelled
+    notes: Mapped[str] = mapped_column(Text, default="")
+    advance_paid: Mapped[float] = mapped_column(Float, default=0.0)
+    created_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    received_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+
+class PurchaseOrderLine(Base):
+    __tablename__ = "purchase_order_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    po_id: Mapped[str] = mapped_column(String(64), index=True)
+    barcode: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128), default="")
+    qty_ordered: Mapped[int] = mapped_column(Integer, default=0)
+    qty_received: Mapped[int] = mapped_column(Integer, default=0)
+    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)

@@ -12,6 +12,7 @@ let prodPageItems=[];   // rows for the currently-shown page only
 let prodTotalCount=0;   // total matching rows, from the server
 let prodFilteredList=[]; // kept for backward-compat with any leftover references; mirrors prodPageItems
 let sgrnLines=[],stgrnLines=[],trLines=[],suppliers=[],supplierTxns=[],capitalEntries=[],bsEntries=[],cfItems={investing:[],financing:[]};
+let poLines=[],__poList=[],__poReceiveTarget=null;
 let isOnline=false,pinEntry='',currentUser=null;
 const $=id=>document.getElementById(id);
 const today=()=>new Date().toISOString().split('T')[0];
@@ -82,8 +83,9 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','purchase-orders':'Purchase Orders'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
+if(name==='purchase-orders'){if($('po-date'))$('po-date').value=today();poLines=[];renderPOLines();populateSupplierSelect();loadPOs();}
 if(name==='supplier-grn'){sgrnHistCurrentPage=1;fetchAndRenderSGRNHist();if($('sgrn-date'))$('sgrn-date').value=today();if($('sgrn-id'))$('sgrn-id').value='SGRN-'+Date.now().toString().slice(-6);}
 if(name==='store-grn'){stgrnPendingCurrentPage=1;stgrnDoneCurrentPage=1;fetchAndRenderStGRNPending();fetchAndRenderStGRNDone();populateStoreSelects();if($('stgrn-date'))$('stgrn-date').value=today();if($('stgrn-id'))$('stgrn-id').value='GRN-'+Date.now().toString().slice(-6);}
 if(name==='transfer'){renderTrHist();populateStoreSelects();}if(name==='products'){prodCurrentPage=1;fetchAndRenderProductsPage();}
@@ -1261,7 +1263,7 @@ function printCF(){
 }
 async function saveSupplier(){const name=$('sup-name').value.trim();if(!name){toast('Enter name','error');return;}const res=await api('/api/ho/suppliers',{method:'POST',body:{name,contact:$('sup-contact').value,limit:parseFloat($('sup-limit').value)||0,terms:$('sup-terms').value}});if(res&&res.ok){toast('✅ Supplier saved');['sup-name','sup-contact','sup-limit'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 async function saveSupplierTxn(){const supId=$('sup-txn-supplier').value,amt=parseFloat($('sup-txn-amt').value)||0;if(!supId||!amt){toast('Select supplier + amount','error');return;}const res=await api('/api/ho/supplier-txns',{method:'POST',body:{supplierId:supId,date:$('sup-txn-date').value,type:$('sup-txn-type').value,amount:amt,ref:$('sup-txn-ref').value}});if(res&&res.ok){toast('✅ Recorded');['sup-txn-amt','sup-txn-ref'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
-function populateSupplierSelect(){if($('sup-txn-supplier'))$('sup-txn-supplier').innerHTML=suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}
+function populateSupplierSelect(){const opts=suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');if($('sup-txn-supplier'))$('sup-txn-supplier').innerHTML=opts;if($('po-supplier'))$('po-supplier').innerHTML=opts;}
 function renderSupplierAccounts(){if($('sup-balances'))$('sup-balances').innerHTML=suppliers.map(b=>`<tr><td class="fw7">${b.name}</td><td>${b.terms||''}</td><td>${fmt(b.invoiced||0)}</td><td class="text-green">${fmt(b.paid||0)}</td><td class="fw7" style="color:${b.balance>0?'var(--red)':b.balance<0?'var(--green)':'var(--navy)'}">${fmt(Math.abs(b.balance||0))} ${b.balance>0?'DUE':b.balance<0?'CREDIT':''}</td><td><span class="badge ${b.balance<=0?'badge-green':'badge-amber'}">${b.balance<=0?'Paid':'Pending'}</span></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No suppliers</td></tr>';
 if($('sup-txns'))$('sup-txns').innerHTML=supplierTxns.slice(0,15).map(t=>`<tr><td>${t.date}</td><td>${t.supplierName}</td><td><span class="badge ${t.type==='payment'?'badge-green':'badge-amber'}">${t.type}</span></td><td class="fw7">${fmt(t.amount)}</td><td>${t.ref||'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="deleteSupplierTxn('${t.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No txns</td></tr>';populateSupplierSelect();}
 
@@ -1278,6 +1280,98 @@ function exportSupplierTxns(){
   _csvDownload(supplierTxns,[['Date','date'],['Supplier','supplierName'],['Type','type'],['Amount','amount'],['Reference','ref']],'supplier_transactions_'+today()+'.csv');
 }
 function saveSuppliers(){}function saveSupplierTxns(){}function getSupplierTxns(){return supplierTxns;}function getSupplierBalances(){return suppliers;}
+
+// ---------- Purchase Orders ----------
+function addPOLine(){poLines.push({barcode:'',name:'',qty:1,cost:0});renderPOLines();}
+function renderPOLines(){
+  if(!$('po-lines'))return;
+  $('po-lines').innerHTML=poLines.map((l,i)=>`<tr>
+    <td><input class="form-input" style="width:120px;padding:4px 7px;font-size:11px" value="${l.barcode}" oninput="poLines[${i}].barcode=this.value"></td>
+    <td><input class="form-input" style="padding:4px 7px;font-size:11px" value="${l.name}" oninput="poLines[${i}].name=this.value"></td>
+    <td><input class="form-input" type="number" style="width:65px;padding:4px 7px" value="${l.qty}" oninput="poLines[${i}].qty=+this.value;calcPOTotal()"></td>
+    <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" value="${l.cost}" oninput="poLines[${i}].cost=+this.value;calcPOTotal()"></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="poLines.splice(${i},1);renderPOLines()">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:13px">Add lines</td></tr>';
+  calcPOTotal();
+}
+function calcPOTotal(){
+  const total=poLines.reduce((a,l)=>a+((+l.qty||0)*(+l.cost||0)),0);
+  if($('po-total'))$('po-total').textContent='Total: '+fmt(total);
+}
+async function savePO(){
+  const supplierId=$('po-supplier').value;
+  if(!supplierId){toast('Select a supplier','error');return;}
+  const lines=poLines.filter(l=>l.barcode&&l.qty);
+  if(!lines.length){toast('Add at least one line item','error');return;}
+  const advanceOn=$('po-advance-toggle').checked;
+  const advance=advanceOn?(parseFloat($('po-advance-amt').value)||0):0;
+  const body={
+    date:$('po-date').value||today(), expectedDate:$('po-expected').value||'', supplierId,
+    lines:lines.map(l=>({barcode:l.barcode,name:l.name,qty:+l.qty,cost:+l.cost})),
+    advancePaid:advance,
+  };
+  const res=await api('/api/ho/purchase-orders',{method:'POST',body});
+  if(res&&res.ok){
+    toast('✅ Purchase Order created');
+    poLines=[];renderPOLines();
+    if($('po-advance-toggle'))$('po-advance-toggle').checked=false;
+    if($('po-advance-row'))$('po-advance-row').style.display='none';
+    if($('po-advance-amt'))$('po-advance-amt').value='';
+    await loadAll();
+    loadPOs();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function loadPOs(){
+  const status=$('po-status-filter')?$('po-status-filter').value:'all';
+  const res=await api('/api/ho/purchase-orders?status='+encodeURIComponent(status));
+  if(!res||!res.ok){toast('Failed to load purchase orders','error');return;}
+  __poList=res.data||[];
+  const statusBadge=s=>({open:'badge-blue',partially_received:'badge-amber',received:'badge-green',cancelled:'badge-gray'}[s]||'badge-gray');
+  const statusLabel=s=>({open:'Open',partially_received:'Partially Received',received:'Received',cancelled:'Cancelled'}[s]||s);
+  if($('po-table'))$('po-table').innerHTML=__poList.map(po=>{
+    const canReceive=po.status==='open'||po.status==='partially_received';
+    const canCancel=po.status==='open';
+    const actions=[
+      canReceive?`<button class="btn btn-ghost btn-sm" onclick="openPOReceive('${po.id}')">📥 Receive</button>`:'',
+      canCancel?`<button class="btn btn-ghost btn-sm" onclick="cancelPOUI('${po.id}')">🚫 Cancel</button>`:'',
+    ].filter(Boolean).join(' ');
+    return `<tr><td style="font-family:monospace;font-size:10px">${po.id}</td><td>${po.supplierName}</td><td>${fmt(po.total)}</td><td>${fmt(po.advancePaid)}</td><td><span class="badge ${statusBadge(po.status)}">${statusLabel(po.status)}</span></td><td>${actions||'—'}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No purchase orders</td></tr>';
+}
+function openPOReceive(poId){
+  const po=__poList.find(p=>p.id===poId);
+  if(!po){toast('Not found','error');return;}
+  __poReceiveTarget=poId;
+  if($('po-receive-info'))$('po-receive-info').textContent=`${po.id} — ${po.supplierName} — Total ${fmt(po.total)}, Paid ${fmt(po.advancePaid)}`;
+  if($('po-receive-date'))$('po-receive-date').value=today();
+  const outstandingLines=po.lines.filter(l=>l.outstanding>0);
+  if($('po-receive-lines'))$('po-receive-lines').innerHTML=outstandingLines.map((l,i)=>`<tr>
+    <td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}</td><td>${l.outstanding}</td>
+    <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="po-recv-qty-${i}" data-barcode="${l.barcode}" value="${l.outstanding}" max="${l.outstanding}" min="0"></td>
+  </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3)">Nothing outstanding</td></tr>';
+  $('po-receive-form').style.display='flex';
+}
+function closePOReceive(){$('po-receive-form').style.display='none';__poReceiveTarget=null;}
+async function confirmPOReceive(){
+  if(!__poReceiveTarget)return;
+  const inputs=document.querySelectorAll('[id^="po-recv-qty-"]');
+  const lines=[...inputs].map(inp=>({barcode:inp.dataset.barcode,qty:+inp.value||0})).filter(l=>l.qty>0);
+  if(!lines.length){toast('Enter at least one quantity to receive','error');return;}
+  const res=await api(`/api/ho/purchase-orders/${encodeURIComponent(__poReceiveTarget)}/receive`,{method:'POST',body:{date:$('po-receive-date').value||today(),lines}});
+  if(res&&res.ok){
+    toast('✅ Received — stock and cost updated');
+    closePOReceive();
+    await loadAll();
+    loadPOs();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function cancelPOUI(poId){
+  if(!confirm('Cancel this Purchase Order? This cannot be undone.'))return;
+  const res=await api(`/api/ho/purchase-orders/${encodeURIComponent(poId)}/cancel`,{method:'POST'});
+  if(res&&res.ok){toast('✅ Cancelled');loadPOs();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+
 async function saveCapitalEntry(){const type=$('cap-type').value,date=$('cap-date').value,amt=parseFloat($('cap-amt').value)||0,desc=$('cap-desc').value.trim();if(!amt||!desc){toast('Fill fields','error');return;}const editId=$('cap-editid')?$('cap-editid').value:'';const res=editId?await api(`/api/ho/capital/${encodeURIComponent(editId)}`,{method:'PUT',body:{type,date,amount:amt,description:desc}}):await api('/api/ho/capital',{method:'POST',body:{type,date,amount:amt,description:desc}});if(res&&res.ok){toast(editId?'✅ Updated':'✅ Saved');['cap-amt','cap-desc'].forEach(id=>{if($(id))$(id).value='';});if($('cap-editid'))$('cap-editid').value='';const btn=document.querySelector('[onclick="saveCapitalEntry()"]');if(btn)btn.textContent='💾 Save';await loadAll();renderCapital();}else toast('❌ Failed','error');}
 function renderCapital(){const invested=capitalEntries.filter(c=>c.type==='investment').reduce((a,c)=>a+(+c.amount||0),0);const withdrawn=capitalEntries.filter(c=>c.type==='withdrawal').reduce((a,c)=>a+(+c.amount||0),0);const loans=capitalEntries.filter(c=>c.type==='loan').reduce((a,c)=>a+(+c.amount||0),0);const loanRepaid=capitalEntries.filter(c=>c.type==='loan-repay').reduce((a,c)=>a+(+c.amount||0),0);const netProfit=(DATA.dashboard?.netRevenue||0)-DATA.expenses.reduce((a,e)=>a+(+e.Amount||0),0);const totalEquity=invested-withdrawn+loans-loanRepaid+netProfit;if($('cap-kpis'))$('cap-kpis').innerHTML=[['Total Invested',fmt(invested),'green'],['Total Withdrawn',fmt(withdrawn),''],['Net Loans',fmt(loans-loanRepaid),'amber'],['Net Profit',fmt(netProfit),'blue'],['Total Equity',fmt(totalEquity),'purple']].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');if($('cap-table'))$('cap-table').innerHTML=capitalEntries.map(c=>{const isOut=c.type==='withdrawal'||c.type==='loan-repay';return`<tr><td><span class="badge badge-blue">${c.type}</span></td><td>${c.date}</td><td>${c.desc}</td><td class="text-right fw7" style="color:${isOut?'var(--red)':'var(--green)'}">${isOut?'-':'+'} ${fmt(c.amount)}</td><td><button class="btn btn-ghost btn-sm" onclick="editCapital('${c.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteCapital('${c.id}')">🗑️</button></td></tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:16px">No entries</td></tr>';}
 

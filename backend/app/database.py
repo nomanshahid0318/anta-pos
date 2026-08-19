@@ -117,6 +117,9 @@ def _auto_migrate() -> None:
         "fixed_assets": {
             "cf_item_id": "VARCHAR(64) DEFAULT ''",
         },
+        "supplier_txns": {
+            "po_id": "VARCHAR(64) DEFAULT ''",
+        },
     }
     is_postgres = not settings.database_url.startswith("sqlite")
     inspector = inspect(engine)
