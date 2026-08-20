@@ -912,21 +912,21 @@ function flattenReportLines(res){
   const out=[];
   (res.transactions||[]).forEach(x=>{
     const lines=(x.lines&&x.lines.length)?x.lines:[{barcode:x.barcodeList||'\u2014',name:x.productList||'',qty:x.units||0,subtotal:x.subtotal||0,cost:x.cost||0,profit:x.profit||0,margin:x.margin||0}];
-    lines.forEach((l,idx)=>{
+    lines.forEach((l)=>{
       out.push({
         id:x.id,date:x.date,time:x.time,store:x.store,customer:x.customer,
         barcode:l.barcode,product:l.name,qty:l.qty,
         subtotal:l.subtotal,cost:l.cost,profit:l.profit,margin:l.margin,
-        discount:idx===0?(x.discount||0):0,
-        payment:idx===0?(x.payment||''):'',
-        payRef:idx===0?(x.payRef||''):'',
-        total:idx===0?(x.total||0):0,
+        discount:x.discount||0,
+        payment:x.payment||'',
+        payRef:x.payRef||'',
+        total:x.total||0,
       });
     });
   });
   return out;
 }
-if($('rpt-txns'))$('rpt-txns').innerHTML=flattenReportLines(res).slice(0,600).map(x=>`<tr><td class="fw7">${x.id}</td><td>${x.date||''}</td><td>${x.time||''}</td><td>${x.store||''}</td><td>${x.customer||''}</td><td style="font-size:10px;font-family:monospace">${x.barcode||''}</td><td style="font-size:11px;max-width:220px">${x.product||''}</td><td style="text-align:center">${x.qty||0}</td><td>${fmt(x.subtotal||0)}</td><td>${x.discount?fmt(x.discount):''}</td><td>${fmt(x.cost||0)}</td><td class="fw7" style="color:var(--green)">${fmt(x.profit||0)}</td><td>${x.margin||0}%</td><td>${x.payment||''}</td><td>${x.payRef||''}</td><td class="fw7">${x.total?fmt(x.total):''}</td></tr>`).join('')||'<tr><td colspan="16" style="text-align:center;color:var(--gray3);padding:14px">None</td></tr>';}
+if($('rpt-txns'))$('rpt-txns').innerHTML=flattenReportLines(res).slice(0,600).map(x=>`<tr><td class="fw7">${x.id}</td><td>${x.date||''}</td><td>${x.time||''}</td><td>${x.store||''}</td><td>${x.customer||''}</td><td style="font-size:10px;font-family:monospace">${x.barcode||''}</td><td style="font-size:11px;max-width:220px">${x.product||''}</td><td style="text-align:center">${x.qty||0}</td><td>${fmt(x.subtotal||0)}</td><td>${fmt(x.discount||0)}</td><td>${fmt(x.cost||0)}</td><td class="fw7" style="color:var(--green)">${fmt(x.profit||0)}</td><td>${x.margin||0}%</td><td>${x.payment||''}</td><td>${x.payRef||''}</td><td class="fw7">${fmt(x.total||0)}</td></tr>`).join('')||'<tr><td colspan="16" style="text-align:center;color:var(--gray3);padding:14px">None</td></tr>';}
 function exportRpt(){const rows=flattenReportLines(window.__lastReport||{});const esc=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};const header=['Invoice','Date','Time','Store','Customer','Barcode','Product','Qty','Subtotal','Discount','Cost','Profit','Margin%','Payment','Ref','Total'];const from=$('rpt-from')?.value||'',to=$('rpt-to')?.value||'';const csv=[header.join(',')].concat(rows.map(x=>[x.id,x.date,x.time,x.store,x.customer,x.barcode,x.product,x.qty,x.subtotal,x.discount,x.cost,x.profit,x.margin,x.payment,x.payRef,x.total].map(esc).join(','))).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const suffix=(from||to)?`_${from||'start'}_to_${to||'today'}`:'';a.download='anta_ho_sales_report'+suffix+'_'+today()+'.csv';a.click();}
 function exportRptExcel(){const rows=flattenReportLines(window.__lastReport||{});const header=['Invoice','Date','Time','Store','Customer','Barcode','Product','Qty','Subtotal','Discount','Cost','Profit','Margin%','Payment','Ref','Total'];const data=[header].concat(rows.map(x=>[x.id,x.date,x.time,x.store,x.customer,x.barcode,x.product,x.qty,x.subtotal,x.discount,x.cost,x.profit,x.margin,x.payment,x.payRef,x.total]));const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=[{wch:10},{wch:11},{wch:8},{wch:12},{wch:14},{wch:16},{wch:26},{wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:9},{wch:10},{wch:12},{wch:10}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Sales Report');const from=$('rpt-from')?.value||'',to=$('rpt-to')?.value||'';const suffix=(from||to)?`_${from||'start'}_to_${to||'today'}`:'';XLSX.writeFile(wb,'anta_ho_sales_report'+suffix+'_'+today()+'.xlsx');}
 async function runWithElapsedTimer(btn,label,fn){
