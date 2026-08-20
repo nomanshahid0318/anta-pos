@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/ho/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/ho/css/styles.css">
 <style>
 body{display:flex;height:100vh;overflow:hidden}
@@ -31,26 +31,26 @@ body{display:flex;height:100vh;overflow:hidden}
 <!-- REPORT PRINT (hidden on-screen, only shown inside @media print) -->
 <div id="report-print-modal" style="display:none"></div>
 
-<div id="login-screen">
-  <div class="login-box">
-    <div id="login-logo-box" class="login-logo">A</div>
-    <div id="login-title-text" class="login-title">Head Office</div>
-    <div class="login-sub">Admin / Manager / Merchandiser / Warehouse / Accountant PIN login</div>
-    <select id="login-store" class="store-select-login"><option value="HO">Head Office</option></select>
-    <div id="pin-display" class="pin-display">----</div>
-    <div class="pin-grid">
-      <button class="pin-btn" onclick="pinPress('1')">1</button>
-      <button class="pin-btn" onclick="pinPress('2')">2</button>
-      <button class="pin-btn" onclick="pinPress('3')">3</button>
-      <button class="pin-btn" onclick="pinPress('4')">4</button>
-      <button class="pin-btn" onclick="pinPress('5')">5</button>
-      <button class="pin-btn" onclick="pinPress('6')">6</button>
-      <button class="pin-btn" onclick="pinPress('7')">7</button>
-      <button class="pin-btn" onclick="pinPress('8')">8</button>
-      <button class="pin-btn" onclick="pinPress('9')">9</button>
-      <button class="pin-btn danger" onclick="pinClear()">⌫</button>
-      <button class="pin-btn" onclick="pinPress('0')">0</button>
-      <button class="pin-btn submit" onclick="pinSubmit()">✓</button>
+<div id="login-screen" style="position:fixed;inset:0;background:linear-gradient(135deg,var(--navy),var(--blue));display:flex;align-items:center;justify-content:center;z-index:9999">
+  <div style="background:#fff;border-radius:16px;padding:36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center">
+    <div id="login-logo-box" style="width:72px;height:72px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:28px;margin:0 auto 16px">A</div>
+    <div id="login-title-text" style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px">Head Office</div>
+    <div style="font-size:12px;color:var(--gray4);margin-bottom:20px">Admin / Manager / Merchandiser / Warehouse / Accountant PIN login</div>
+    <select id="login-store" class="form-input" style="margin-bottom:12px;width:100%"><option value="HO">Head Office</option></select>
+    <div id="pin-display" style="font-size:28px;font-weight:800;letter-spacing:8px;color:var(--navy);background:var(--gray0);border-radius:10px;padding:12px;margin-bottom:12px">----</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      <button class="btn btn-ghost" onclick="pinPress('1')">1</button>
+      <button class="btn btn-ghost" onclick="pinPress('2')">2</button>
+      <button class="btn btn-ghost" onclick="pinPress('3')">3</button>
+      <button class="btn btn-ghost" onclick="pinPress('4')">4</button>
+      <button class="btn btn-ghost" onclick="pinPress('5')">5</button>
+      <button class="btn btn-ghost" onclick="pinPress('6')">6</button>
+      <button class="btn btn-ghost" onclick="pinPress('7')">7</button>
+      <button class="btn btn-ghost" onclick="pinPress('8')">8</button>
+      <button class="btn btn-ghost" onclick="pinPress('9')">9</button>
+      <button class="btn btn-ghost" style="color:var(--red)" onclick="pinClear()">⌫</button>
+      <button class="btn btn-ghost" onclick="pinPress('0')">0</button>
+      <button class="btn btn-primary" onclick="pinSubmit()">✓</button>
     </div>
     <div id="login-error" style="color:var(--red);font-size:12px;display:none">Wrong PIN or not authorized for HO</div>
     <div style="margin-top:14px"><a href="/" style="font-size:12px;color:var(--accent2)">← Portal</a> · <a href="/pos/" style="font-size:12px;color:var(--accent2)">Store POS</a></div>
@@ -671,6 +671,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <select class="form-input" style="width:160px;padding:6px 9px" id="rpt-store"><option value="all">All Stores</option></select>
       <button class="btn btn-blue btn-sm" onclick="loadReports()">🔍 Search</button>
       <button class="btn btn-ghost btn-sm" onclick="exportRpt()">⬇️ Export CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportRptExcel()">📊 Export Excel</button>
     </div>
     <div class="kpi-grid" id="rpt-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -678,7 +679,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <div class="card"><div class="card-title">Top Products</div><div id="rpt-prod"></div></div>
     </div>
     <div class="card"><div class="card-title">Transactions</div>
-      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Invoice</th><th>Date</th><th>Time</th><th>Store</th><th>Customer</th><th>Items</th><th>Units</th><th>Barcode</th><th>Products</th><th>Subtotal</th><th>Discount</th><th>Cost</th><th>Profit</th><th>Margin%</th><th>Payment</th><th>Ref</th><th>Total</th></tr></thead>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Invoice</th><th>Date</th><th>Time</th><th>Store</th><th>Customer</th><th>Barcode</th><th>Product</th><th>Qty</th><th>Subtotal</th><th>Discount</th><th>Cost</th><th>Profit</th><th>Margin%</th><th>Payment</th><th>Ref</th><th>Total</th></tr></thead>
       <tbody id="rpt-txns"></tbody></table></div>
     </div>
   </div>

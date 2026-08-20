@@ -1,32 +1,40 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ANTA Shoes — POS System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;background:linear-gradient(135deg,#0a1628,#1a3a6b);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px}
-.wrap{max-width:920px;width:100%}
-.logo{width:72px;height:72px;background:#e63946;border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:32px;margin:0 auto 16px}
-h1{text-align:center;font-size:28px;margin-bottom:6px}
-.sub{text-align:center;opacity:.75;font-size:14px;margin-bottom:32px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+:root{--navy:#0a1628;--navy2:#132844;--accent:#e63946;--accent-dark:#c1121f;--accent2:#2563eb}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;background:radial-gradient(circle at 18% 15%,var(--navy2),var(--navy) 55%);color:#fff;display:flex;align-items:center;justify-content:center;padding:28px}
+.wrap{max-width:900px;width:100%}
+.logo{width:64px;height:64px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:27px;margin:0 auto 20px;box-shadow:0 10px 30px rgba(230,57,70,.35);letter-spacing:-.02em}
+h1{text-align:center;font-size:27px;font-weight:800;letter-spacing:-.02em;margin-bottom:7px}
+.sub{text-align:center;opacity:.6;font-size:13.5px;margin-bottom:38px;font-weight:500}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}
-.card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:28px;text-decoration:none;color:#fff;transition:.2s;display:block}
-.card:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}
-.card h2{font-size:20px;margin:10px 0 8px}
-.card p{font-size:13px;opacity:.8;line-height:1.5}
-.badge{display:inline-block;font-size:10px;font-weight:800;padding:4px 8px;border-radius:999px;background:#e63946}
-.badge.blue{background:#2196F3}
-.pins{margin-top:22px;background:rgba(0,0,0,.2);border-radius:12px;padding:14px 18px;font-size:12px;line-height:1.7}
-.foot{text-align:center;margin-top:28px;font-size:12px;opacity:.55}
+.card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:26px;text-decoration:none;color:#fff;transition:transform .18s cubic-bezier(.4,0,.2,1),border-color .18s,background .18s;display:block}
+.card:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.22);transform:translateY(-3px)}
+.card-icon{font-size:26px;opacity:.95}
+.card h2{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:12px 0 7px}
+.card p{font-size:12.5px;opacity:.62;line-height:1.6}
+.badge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.04em;padding:4px 10px;border-radius:999px;background:rgba(230,57,70,.2);color:#ff9098;border:1px solid rgba(230,57,70,.35)}
+.badge.blue{background:rgba(37,99,235,.2);color:#8ab4ff;border-color:rgba(37,99,235,.35)}
+.pins{margin-top:24px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:15px 19px;font-size:11.5px;line-height:1.8;color:rgba(255,255,255,.75)}
+.pins b{color:#fff;font-weight:700}
+.foot{text-align:center;margin-top:26px;font-size:11px;opacity:.4;letter-spacing:.02em}
+a.doclink{color:#8ab4ff;text-decoration:none}
+a.doclink:hover{text-decoration:underline}
 </style></head><body>
 <div class="wrap">
   <div class="logo">A</div>
   <h1>ANTA Shoes System v4</h1>
-  <p class="sub">Store POS + Head Office · Database · No Google Sheets</p>
+  <p class="sub">Store POS + Head Office · Single database · No Google Sheets</p>
   <div class="grid">
-    <a class="card" href="/pos/"><span class="badge">STORE</span><h2>🛒 Store POS</h2><p>Sales, returns, exchange, claims, receive GRN, inventory, expenses, reports.</p></a>
-    <a class="card" href="/ho/"><span class="badge blue">HEAD OFFICE</span><h2>🏢 Head Office</h2><p>Warehouse, supplier GRN, send to stores, P&L, balance sheet, cash flow, suppliers, capital, admin.</p></a>
+    <a class="card" href="/pos/"><span class="badge">STORE</span><div class="card-icon">🛒</div><h2>Store POS</h2><p>Sales, returns, exchange, claims, receive GRN, inventory, expenses, reports.</p></a>
+    <a class="card" href="/ho/"><span class="badge blue">HEAD OFFICE</span><div class="card-icon">🏢</div><h2>Head Office</h2><p>Warehouse, supplier GRN, send to stores, P&amp;L, balance sheet, cash flow, suppliers, capital, admin.</p></a>
   </div>
-  <div class="pins"><b>Default PINs</b><br>Store 1 cashier <b>1111</b> · manager <b>1199</b> · HO admin <b>0000</b><br>API: <a href="/docs" style="color:#90caf9">/docs</a></div>
+  <div class="pins"><b>Default PINs</b><br>Store 1 cashier <b>1111</b> · manager <b>1199</b> · HO admin <b>0000</b><br>API reference: <a class="doclink" href="/docs">/docs</a></div>
   <div class="foot">ANTA Shoes Libya</div>
 </div></body></html>
