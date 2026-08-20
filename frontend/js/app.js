@@ -1,6 +1,7 @@
 /* ============================================================
    ANTA Shoes POS v4 — Database-backed client (no Google Sheets)
    ============================================================ */
+const $ = (id) => document.getElementById(id);
 const DEFAULT_API = (location.origin && location.origin.startsWith('http'))
   ? location.origin
   : 'http://127.0.0.1:8765';
@@ -59,39 +60,14 @@ function fmt(n) {
 function fmtN(n) {
   return (+n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
-function showSaleSuccess(total, then) {
-  const overlay = document.getElementById('sale-success-overlay');
-  if (!overlay) { then(); return; }
-  const totalEl = document.getElementById('sale-success-total');
-  if (totalEl) totalEl.textContent = fmt(total || 0);
-  overlay.style.display = 'flex';
-  setTimeout(() => {
-    overlay.style.display = 'none';
-    then();
-  }, 850);
-}
-function toggleSidebar(){
-  const sb=document.getElementById('sidebar'),bd=document.getElementById('sidebar-backdrop');
-  if(!sb)return;
-  const opening=!sb.classList.contains('open');
-  sb.classList.toggle('open',opening);
-  if(bd)bd.classList.toggle('open',opening);
-}
 function toast(msg, type = 'ok') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-  const icons = { ok: '✅', error: '❌', warn: '⚠️', info: 'ℹ️' };
-  const el = document.createElement('div');
-  el.className = 'toast ' + type;
-  el.innerHTML = `<span class="toast-ico">${icons[type] || icons.ok}</span><span class="toast-msg"></span><span class="toast-close">✕</span>`;
-  el.querySelector('.toast-msg').textContent = msg;
-  const remove = () => {
-    el.classList.add('leaving');
-    setTimeout(() => el.remove(), 200);
-  };
-  el.querySelector('.toast-close').onclick = remove;
-  container.appendChild(el);
-  setTimeout(remove, type === 'error' ? 5000 : 3200);
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.background =
+    type === 'error' ? 'var(--red)' : type === 'warn' ? '#856404' : type === 'info' ? 'var(--accent2)' : 'var(--navy)';
+  t.style.display = 'block';
+  setTimeout(() => (t.style.display = 'none'), 3000);
 }
 function addLog(action, status) {
   activityLog.unshift({ t: new Date().toTimeString().slice(0, 8), action, status });
@@ -440,8 +416,6 @@ function show(name) {
   }
   const sb = document.getElementById('sidebar');
   if (sb) sb.classList.remove('open');
-  const bd = document.getElementById('sidebar-backdrop');
-  if (bd) bd.classList.remove('open');
 }
 
 /* ---------- CATALOG / STOCK ---------- */
@@ -799,10 +773,10 @@ function addToCart(bc) {
       discount: 0,
     });
   }
-  renderCart(p.barcode);
+  renderCart();
   toast('✅ ' + p.name.slice(0, 25));
 }
-function renderCart(flashBarcode) {
+function renderCart() {
   const ci = document.getElementById('cart-items');
   if (!cart.length) {
     ci.innerHTML =
@@ -811,7 +785,7 @@ function renderCart(flashBarcode) {
     ci.innerHTML = cart
       .map(
         (item, idx) =>
-          `<div class="cart-item${item.barcode===flashBarcode?' flash':''}"><div style="flex:1"><div style="font-size:11px;font-weight:700;color:var(--navy)">${item.name}</div><div style="font-size:10px;color:var(--gray4)">${fmt(item.price)} · <input type="number" value="${item.discount}" min="0" max="100" style="width:35px;font-size:9px;border:1px solid var(--gray2);border-radius:3px;padding:1px 3px" onchange="cart[${idx}].discount=+this.value;refreshPromoPricing().then(()=>calcCart())">% disc</div></div><div style="display:flex;align-items:center;gap:5px"><button class="qty-btn" onclick="chQty(${idx},-1)">−</button><span style="font-weight:700;min-width:18px;text-align:center">${item.qty}</span><button class="qty-btn" onclick="chQty(${idx},1)">+</button></div><div style="text-align:right"><div style="font-size:12px;font-weight:700;color:var(--navy)">${fmt(item.price * item.qty * (1 - item.discount / 100))}</div><div style="font-size:9px;cursor:pointer;color:var(--red)" onclick="cart.splice(${idx},1);renderCart()">✕</div></div></div>`
+          `<div class="cart-item"><div style="flex:1"><div style="font-size:11px;font-weight:700;color:var(--navy)">${item.name}</div><div style="font-size:10px;color:var(--gray4)">${fmt(item.price)} · <input type="number" value="${item.discount}" min="0" max="100" style="width:35px;font-size:9px;border:1px solid var(--gray2);border-radius:3px;padding:1px 3px" onchange="cart[${idx}].discount=+this.value;refreshPromoPricing().then(()=>calcCart())">% disc</div></div><div style="display:flex;align-items:center;gap:5px"><button class="qty-btn" onclick="chQty(${idx},-1)">−</button><span style="font-weight:700;min-width:18px;text-align:center">${item.qty}</span><button class="qty-btn" onclick="chQty(${idx},1)">+</button></div><div style="text-align:right"><div style="font-size:12px;font-weight:700;color:var(--navy)">${fmt(item.price * item.qty * (1 - item.discount / 100))}</div><div style="font-size:9px;cursor:pointer;color:var(--red)" onclick="cart.splice(${idx},1);renderCart()">✕</div></div></div>`
       )
       .join('');
   }
@@ -832,7 +806,7 @@ function chQty(idx, d) {
     return;
   }
   item.qty = n;
-  renderCart(item.barcode);
+  renderCart();
   refreshPromoPricing().then(()=>calcCart());
 }
 function clearCart() {
@@ -1129,7 +1103,7 @@ async function completeSale() {
   (payload.items || []).forEach((i) => adjustLocalStock(i.barcode, -i.qty));
   DB.transactions.unshift(txn);
   closePay();
-  showSaleSuccess(txn.total, () => showInvoice(txn));
+  showInvoice(txn);
   if (txn.loyaltyPointsEarned) {
     toast(`🎁 ${txn.customer} earned ${txn.loyaltyPointsEarned} loyalty points`);
   }
