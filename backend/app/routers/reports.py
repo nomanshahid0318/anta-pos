@@ -180,6 +180,7 @@ def reports(
         txn_cost = 0.0
         item_names = []
         item_barcodes = []
+        item_lines = []
         for i in items:
             barcode = i.get("barcode") or ""
             name = i.get("name") or barcode or "?"
@@ -187,11 +188,25 @@ def reports(
             price = float(i.get("price") or 0)
             cost = float(i.get("cost") or 0)
             lt = float(i.get("lineTotal") if i.get("lineTotal") is not None else price * qty)
+            line_cost = cost * qty
+            line_profit = lt - line_cost
             units += qty
             txn_units += qty
             txn_cost += cost * qty
             item_names.append(f"{name} x{qty}")
             item_barcodes.append(barcode or "—")
+            item_lines.append(
+                {
+                    "barcode": barcode or "—",
+                    "name": name,
+                    "qty": qty,
+                    "price": round(price, 2),
+                    "subtotal": round(lt, 2),
+                    "cost": round(line_cost, 2),
+                    "profit": round(line_profit, 2),
+                    "margin": round((line_profit / lt * 100) if lt else 0, 1),
+                }
+            )
             key = barcode or name
             if key not in prod_map:
                 prod_map[key] = {"barcode": barcode, "name": name, "qty": 0, "revenue": 0, "cost": 0, "profit": 0}
@@ -216,6 +231,7 @@ def reports(
                 "units": txn_units,
                 "productList": "; ".join(item_names)[:180],
                 "barcodeList": "; ".join(item_barcodes)[:180],
+                "lines": item_lines,
                 "subtotal": float(s.subtotal or 0),
                 "discount": round(line_disc, 2),
                 "cost": round(txn_cost, 2),

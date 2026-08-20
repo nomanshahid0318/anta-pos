@@ -668,6 +668,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <select class="form-input" style="width:160px;padding:6px 9px" id="rpt-store"><option value="all">All Stores</option></select>
       <button class="btn btn-blue btn-sm" onclick="loadReports()">🔍 Search</button>
       <button class="btn btn-ghost btn-sm" onclick="exportRpt()">⬇️ Export CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportRptExcel()">📊 Export Excel</button>
     </div>
     <div class="kpi-grid" id="rpt-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -675,7 +676,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <div class="card"><div class="card-title">Top Products</div><div id="rpt-prod"></div></div>
     </div>
     <div class="card"><div class="card-title">Transactions</div>
-      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Invoice</th><th>Date</th><th>Time</th><th>Store</th><th>Customer</th><th>Items</th><th>Units</th><th>Barcode</th><th>Products</th><th>Subtotal</th><th>Discount</th><th>Cost</th><th>Profit</th><th>Margin%</th><th>Payment</th><th>Ref</th><th>Total</th></tr></thead>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Invoice</th><th>Date</th><th>Time</th><th>Store</th><th>Customer</th><th>Barcode</th><th>Product</th><th>Qty</th><th>Subtotal</th><th>Discount</th><th>Cost</th><th>Profit</th><th>Margin%</th><th>Payment</th><th>Ref</th><th>Total</th></tr></thead>
       <tbody id="rpt-txns"></tbody></table></div>
     </div>
   </div>
