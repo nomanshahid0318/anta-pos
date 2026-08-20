@@ -78,6 +78,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('transfer')" data-role="admin,manager,warehouse"><span class="ico">🔄</span>Store Transfer</div>
     <div class="nav-sec">Products</div>
     <div class="nav-item" onclick="show('products')" data-role="admin,manager,merchandiser"><span class="ico">👟</span>Product Master</div>
+    <div class="nav-item" onclick="show('barcode-labels')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🏷️</span>Barcode Labels</div>
     <div class="nav-sec">Finance</div>
     <div class="nav-item" onclick="show('pl')" data-role="admin,manager,accountant"><span class="ico">📊</span>P&L Statement</div>
     <div class="nav-item" onclick="show('balance-sheet')" data-role="admin,manager,accountant"><span class="ico">⚖️</span>Balance Sheet</div>
@@ -92,11 +93,13 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
+    <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
     <div class="nav-sec">Admin</div>
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
     <div class="nav-item" onclick="show('license')" data-role="admin"><span class="ico">🔑</span>License</div>
     <div class="nav-item" onclick="show('stores-admin')" data-role="admin"><span class="ico">🏪</span>Manage Stores</div>
     <div class="nav-item" onclick="show('users')" data-role="admin"><span class="ico">👥</span>Users & PINs</div>
+    <div class="nav-item" onclick="show('audit-log')" data-role="admin"><span class="ico">🕵️</span>Audit Log</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
     <div class="nav-item" onclick="show('settings')" data-role="admin"><span class="ico">⚙️</span>Settings</div>
   </nav>
@@ -180,6 +183,7 @@ body{display:flex;height:100vh;overflow:hidden}
         <table style="margin-top:8px"><thead><tr><th>Barcode</th><th>Name</th><th>Qty</th><th>Unit Cost</th><th></th></tr></thead>
         <tbody id="po-lines"></tbody></table>
         <button class="btn btn-ghost btn-sm" onclick="addPOLine()">➕ Add Line</button>
+        <button class="btn btn-ghost btn-sm" onclick="openReorderSuggest()">🔮 Suggest Reorder</button>
         <div style="margin-top:8px;padding:9px;background:var(--gray0);border-radius:7px">
           <div style="font-size:11px;color:var(--gray4);margin-bottom:7px">📤 Or bulk add lines from Excel/CSV — same as Supplier GRN. Repeats the same barcode? Quantities merge automatically.</div>
           <button class="btn btn-ghost btn-sm" onclick="downloadPOTemplate()">⬇️ Download Template</button>
@@ -224,6 +228,18 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
         <table><thead><tr><th>PO</th><th>Supplier</th><th>Total</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="po-table"></tbody></table>
+      </div>
+    </div>
+    <div id="reorder-suggest-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeReorderSuggest()">
+      <div class="modal" style="width:600px">
+        <div class="modal-title">🔮 Suggest Reorder — Company-wide Low Stock</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">Products at or below their healthy company-wide stock level (reorder level × active stores), excluding anything already on an open Purchase Order. Untick or edit quantities as needed, then add to the PO form.</p>
+        <table><thead><tr><th><input type="checkbox" id="reorder-select-all" onchange="toggleAllReorder(this)"></th><th>Barcode</th><th>Name</th><th>Stock</th><th>Suggested Qty</th><th>Last Cost</th></tr></thead>
+        <tbody id="reorder-suggest-table"></tbody></table>
+        <div style="display:flex;gap:7px;margin-top:12px">
+          <button class="btn btn-primary" onclick="addSuggestedToPO()">➕ Add Selected to PO</button>
+          <button class="btn btn-ghost" onclick="closeReorderSuggest()">Close</button>
+        </div>
       </div>
     </div>
     <div id="po-receive-form" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePOReceive()">
@@ -281,6 +297,7 @@ body{display:flex;height:100vh;overflow:hidden}
           </div>
           <div style="display:flex;gap:7px;margin-top:11px">
             <button class="btn btn-green btn-full" onclick="saveSGRN()">✅ Save GRN to HO Warehouse</button>
+            <button id="sgrn-print-labels" class="btn btn-ghost btn-full" style="display:none;margin-top:7px" onclick="loadLabelsFromLines(window.__lastGrnLines)">🏷️ Print Labels for these items</button>
             <button class="btn btn-ghost" onclick="clearSGRN()">🗑 Clear</button>
           </div>
         </div>
@@ -514,6 +531,36 @@ body{display:flex;height:100vh;overflow:hidden}
     </div>
   </div>
 
+  <!-- BARCODE LABELS -->
+  <div id="screen-barcode-labels" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="card-title">🔍 Add Products to Print Queue</div>
+        <div style="position:relative">
+          <input class="form-input" id="lbl-search" placeholder="🔍 Search by barcode or name…" autocomplete="off" oninput="searchLabelProduct(this.value)">
+          <div id="lbl-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--gray2);border-radius:0 0 8px 8px;max-height:260px;overflow-y:auto;z-index:200;box-shadow:0 6px 16px rgba(0,0,0,.12)"></div>
+        </div>
+        <p style="font-size:11px;color:var(--gray4);margin-top:10px">Tip: after receiving a Supplier GRN or a Purchase Order, use the "🏷️ Print Labels" button there to load just-received items here automatically.</p>
+        <div class="form-group" style="margin-top:10px"><label class="form-label">Label Layout</label>
+          <select class="form-input" id="lbl-layout">
+            <option value="3">3 columns (larger labels)</option>
+            <option value="4" selected>4 columns (standard)</option>
+            <option value="5">5 columns (compact)</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="card-title" style="margin:0">🖨️ Print Queue</div>
+          <button class="btn btn-ghost btn-sm" onclick="clearLabelQueue()">🗑 Clear</button>
+        </div>
+        <table><thead><tr><th>Barcode</th><th>Name</th><th>Price</th><th>Qty</th><th></th></tr></thead>
+        <tbody id="lbl-queue"></tbody></table>
+        <div style="margin-top:10px;font-size:12px;color:var(--gray4)" id="lbl-total-count">0 labels queued</div>
+        <button class="btn btn-primary btn-full" style="margin-top:10px" onclick="printBarcodeLabels()">🖨️ Print Labels</button>
+      </div>
+    </div>
+  </div>
 
   <!-- P&L -->
   <div id="screen-pl" class="screen">
@@ -643,6 +690,68 @@ body{display:flex;height:100vh;overflow:hidden}
       <table><thead><tr><th>Barcode</th><th>Product</th><th>HO Stock</th><th id="inv-s1">Store 1</th><th id="inv-s2">Store 2</th><th id="inv-s3">Store 3</th><th>Total Stock</th></tr></thead>
       <tbody id="inv-all-table"></tbody></table>
       <div id="inv-all-pagination"></div>
+    </div>
+  </div>
+
+  <!-- STOCK AGING -->
+  <div id="screen-stock-aging" class="screen">
+    <div class="kpi-grid" id="aging-kpis"></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">🐢 Stock Aging / Slow-Moving</div>
+        <div style="display:flex;gap:7px">
+          <select class="form-input" style="width:170px;padding:5px 9px" id="aging-threshold" onchange="loadStockAging()">
+            <option value="30">Idle 30+ days</option>
+            <option value="60" selected>Idle 60+ days</option>
+            <option value="90">Idle 90+ days</option>
+            <option value="180">Idle 180+ days</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="exportStockAging()">⬇️ Export</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--gray4);margin:0 0 11px">Products with real stock on hand (Warehouse + all stores) that haven't sold within the selected window — or have never sold at all. Worst offenders (never sold) are listed first.</p>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>Category</th><th>Stock</th><th>Stock Value</th><th>Last Sold</th><th>Days Idle</th></tr></thead>
+      <tbody id="aging-table"></tbody></table>
+    </div>
+  </div>
+
+  <!-- AUDIT LOG -->
+  <div id="screen-audit-log" class="screen">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">🕵️ Audit Log</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <select class="form-input" style="width:150px;padding:5px 9px" id="audit-entity-filter" onchange="loadAuditLog()">
+            <option value="all">All Types</option>
+            <option value="expense">Expenses</option>
+            <option value="capital">Capital & Equity</option>
+            <option value="fixed_asset">Fixed Assets</option>
+            <option value="product">Products</option>
+            <option value="supplier_txn">Supplier Transactions</option>
+            <option value="bs_entry">Balance Sheet</option>
+            <option value="cf_item">Cash Flow</option>
+            <option value="purchase_order">Purchase Orders</option>
+          </select>
+          <select class="form-input" style="width:130px;padding:5px 9px" id="audit-action-filter" onchange="loadAuditLog()">
+            <option value="all">All Actions</option>
+            <option value="create">Created</option>
+            <option value="update">Updated</option>
+            <option value="delete">Deleted</option>
+          </select>
+          <input class="form-input" style="width:180px;padding:5px 9px" id="audit-search" placeholder="🔍 Search…" oninput="loadAuditLog()">
+          <button class="btn btn-ghost btn-sm" onclick="exportAuditLog()">⬇️ Export</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--gray4);margin:0 0 11px">Every edit/delete across Expenses, Capital & Equity, Fixed Assets, Product Master pricing, Supplier Transactions, Balance Sheet, Cash Flow, and Purchase Orders — who did it and when.</p>
+      <table><thead><tr><th>Time</th><th>User</th><th>Role</th><th>Action</th><th>Type</th><th>Details</th><th></th></tr></thead>
+      <tbody id="audit-table"></tbody></table>
+    </div>
+    <div id="audit-detail-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAuditDetail()">
+      <div class="modal" style="width:500px">
+        <div class="modal-title">🕵️ Change Details</div>
+        <div id="audit-detail-body" style="font-size:12px"></div>
+        <button class="btn btn-ghost" style="margin-top:12px" onclick="closeAuditDetail()">Close</button>
+      </div>
     </div>
   </div>
 
@@ -1135,6 +1244,7 @@ body{display:flex;height:100vh;overflow:hidden}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.3/JsBarcode.all.min.js"></script>
 
 </div>
 <script src="/ho/js/app.js?v=20260818a"></script>

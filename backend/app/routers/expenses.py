@@ -11,6 +11,7 @@ from ..database import get_db
 from ..models import Expense, JournalEntry, JournalLine
 from ..schemas import ExpenseIn
 from ..services.accounting import post_expense_journal
+from ..services.audit import log_audit
 from ..utils import today_str
 
 router = APIRouter(prefix="/api", tags=["expenses"])
@@ -48,6 +49,7 @@ def create_expense(
     )
     db.add(row)
     post_expense_journal(db, row)
+    log_audit(db, user, "create", "expense", exp_id, f"Created expense: {body.category} — {body.amount}", new_value=body.model_dump())
     db.commit()
     return {"ok": True, "status": "ok", "id": exp_id}
 
@@ -62,6 +64,7 @@ def update_expense(
     row = db.query(Expense).filter(Expense.exp_id == exp_id).first()
     if not row:
         raise HTTPException(404, "Expense not found")
+    old_value = {"date": row.date, "category": row.category, "description": row.description, "amount": row.amount, "payMethod": row.pay_method}
     row.date = body.date or row.date
     row.store_id = body.storeId or row.store_id
     row.store = body.store or row.store
@@ -77,6 +80,7 @@ def update_expense(
     # the old journal entry first so the corrected figures actually post.
     _delete_journal_for(db, "expense", exp_id)
     post_expense_journal(db, row)
+    log_audit(db, user, "update", "expense", exp_id, f"Updated expense: {row.category} — {row.amount}", old_value=old_value, new_value=body.model_dump())
     db.commit()
     return {"ok": True, "status": "ok"}
 
@@ -91,6 +95,7 @@ def delete_expense(
     if not row:
         raise HTTPException(404, "Expense not found")
     _delete_journal_for(db, "expense", exp_id)
+    log_audit(db, user, "delete", "expense", exp_id, f"Deleted expense: {row.category} — {row.amount}", old_value={"date": row.date, "category": row.category, "description": row.description, "amount": row.amount})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}

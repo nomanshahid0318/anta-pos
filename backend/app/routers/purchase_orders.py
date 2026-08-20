@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser
 from ..database import get_db
 from ..models_accounting import PurchaseOrder, PurchaseOrderLine, Supplier, SupplierTxn
+from ..services.audit import log_audit
 from ..utils import today_str
 from .ho import GRN_CHUNK_SIZE, SGRNIn, SGRNLine, _apply_grn_line, _stock_admin
 
@@ -272,6 +273,7 @@ def cancel_po(po_id: str, db: Annotated[Session, Depends(get_db)], user: Annotat
     if po.status in ("received", "partially_received"):
         raise HTTPException(400, "Cannot cancel a PO that already has stock received — receive or write off the remainder, or contact an admin")
     po.status = "cancelled"
+    log_audit(db, user, "update", "purchase_order", po_id, f"Cancelled PO: {po.supplier_name}", old_value={"status": "open"}, new_value={"status": "cancelled"})
     db.commit()
     return {"ok": True, "status": "ok"}
 
@@ -284,6 +286,7 @@ def delete_po(po_id: str, db: Annotated[Session, Depends(get_db)], user: Annotat
     if po.status in ("received", "partially_received"):
         raise HTTPException(400, "Cannot delete a PO that already has stock received")
     db.query(PurchaseOrderLine).filter(PurchaseOrderLine.po_id == po_id).delete()
+    log_audit(db, user, "delete", "purchase_order", po_id, f"Deleted PO: {po.supplier_name}", old_value={"supplier": po.supplier_name, "status": po.status})
     db.delete(po)
     db.commit()
     return {"ok": True, "status": "ok"}

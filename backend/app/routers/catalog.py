@@ -18,6 +18,7 @@ from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
 from ..models import Bank, HOWarehouse, Inventory, Product, Setting, Store
 from ..schemas import BankIn, BankOut, ProductIn, ProductOut, StoreIn, StoreOut
+from ..services.audit import log_audit
 from ..services.inventory import get_stock, set_ho_warehouse_qty
  
 router = APIRouter(prefix="/api", tags=["catalog"])
@@ -219,6 +220,7 @@ def save_product(
         if clash and (not row or clash.id != row.id):
             raise HTTPException(status_code=400, detail=f"Barcode {body.barcode} is already used by another product")
     if row:
+        old_cost, old_retail = row.cost, row.retail
         if renaming:
             row.barcode = body.barcode
             db.query(Inventory).filter(Inventory.barcode == lookup_barcode).update(
@@ -247,6 +249,13 @@ def save_product(
         row.reorder = body.reorder
         row.opening = body.opening
         row.active = body.active
+        if old_cost != row.cost or old_retail != row.retail:
+            log_audit(
+                db, user, "update", "product", row.barcode,
+                f"Price/cost changed: {row.name}",
+                old_value={"cost": old_cost, "retail": old_retail},
+                new_value={"cost": row.cost, "retail": row.retail},
+            )
     else:
         row = Product(
             barcode=body.barcode,
@@ -472,6 +481,7 @@ def delete_product(
     row = db.query(Product).filter(Product.barcode == barcode).first()
     if not row:
         raise HTTPException(status_code=404, detail="Product not found")
+    log_audit(db, user, "delete", "product", barcode, f"Deleted product: {row.name}", old_value={"name": row.name, "cost": row.cost, "retail": row.retail})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}

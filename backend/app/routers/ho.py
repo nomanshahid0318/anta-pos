@@ -17,8 +17,9 @@ from ..database import get_db
 from ..models import (
     Expense, HOWarehouse, Inventory, Product, Return, Sale, Store, StoreGRN, SupplierGRN, Transfer,
 )
-from ..models_accounting import BSEntry, CapitalEntry, CFItem, FixedAsset, Supplier, SupplierTxn
+from ..models_accounting import BSEntry, CapitalEntry, CFItem, FixedAsset, PurchaseOrder, PurchaseOrderLine, Supplier, SupplierTxn
 from ..services import depreciation as depr
+from ..services.audit import log_audit
 from ..services.inventory import update_ho_warehouse, update_inv
 from ..utils import today_str
 
@@ -152,6 +153,130 @@ def warehouse(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUs
         "Supplier_In": r.supplier_in, "Store_Out": r.store_out, "OnHand": r.on_hand,
     } for r in rows]
     return {"ok": True, "status": "ok", "data": out}
+
+
+@router.get("/stock-aging")
+def stock_aging(
+    db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)],
+    days_threshold: int = 60,
+):
+    """Products that are sitting on the shelf — never sold, or not sold in
+    `days_threshold` days — with real stock (Warehouse + stores) still on
+    hand. Sorted worst-first: never-sold items, then longest idle.
+
+    Scans up to the last 5,000 sales (most recent first) to find each
+    product's last-sold date, stopping early once every currently-stocked
+    barcode has an answer — cheap even on a large sales history, since a
+    product usually only needs its very first (most recent) appearance.
+    """
+    from datetime import date as _date
+
+    products = db.query(Product).filter(Product.active.is_(True)).all()
+    wh_map = {w.barcode: int(w.on_hand or 0) for w in db.query(HOWarehouse).all()}
+    store_map = dict(db.query(Inventory.barcode, func.sum(Inventory.on_hand)).group_by(Inventory.barcode).all())
+    barcodes_with_stock = {
+        p.barcode for p in products
+        if (wh_map.get(p.barcode, 0) + int(store_map.get(p.barcode, 0) or 0)) > 0
+    }
+
+    last_sold: dict = {}
+    if barcodes_with_stock:
+        remaining = set(barcodes_with_stock)
+        sales = db.query(Sale).filter(Sale.type == "sale").order_by(Sale.date.desc(), Sale.id.desc()).limit(5000).all()
+        for s in sales:
+            if not remaining:
+                break
+            try:
+                items = json.loads(s.items_json or "[]")
+            except Exception:
+                items = []
+            for it in items:
+                bc = it.get("barcode")
+                if bc in remaining:
+                    last_sold[bc] = s.date
+                    remaining.discard(bc)
+
+    today_d = _date.today()
+
+    def _days_since(d_str):
+        if not d_str:
+            return None
+        try:
+            y, m, dd = (int(x) for x in d_str.split("-"))
+            return (today_d - _date(y, m, dd)).days
+        except Exception:
+            return None
+
+    rows = []
+    for p in products:
+        stock = wh_map.get(p.barcode, 0) + int(store_map.get(p.barcode, 0) or 0)
+        if stock <= 0:
+            continue
+        last_date = last_sold.get(p.barcode)
+        days_idle = _days_since(last_date)
+        never_sold = last_date is None
+        if never_sold or (days_idle is not None and days_idle >= days_threshold):
+            rows.append({
+                "barcode": p.barcode, "name": p.name, "category": p.category or "",
+                "stock": stock, "cost": p.cost or 0, "stockValue": round(stock * float(p.cost or 0), 2),
+                "lastSoldDate": last_date or "", "daysIdle": days_idle, "neverSold": never_sold,
+            })
+    rows.sort(key=lambda r: (0 if r["neverSold"] else 1, -(r["daysIdle"] or 0)))
+    total_value = round(sum(r["stockValue"] for r in rows), 2)
+    return {"ok": True, "data": rows[:500], "totalDeadStockValue": total_value, "thresholdDays": days_threshold}
+
+
+@router.get("/reorder-suggestions")
+def reorder_suggestions(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
+    """Suggest what to reorder from suppliers, company-wide — used by the
+    "Suggest Reorder" button on the Purchase Orders screen so nobody has to
+    manually cross-reference Low Stock against what's already on order.
+
+    Heuristic (deliberately simple, not a forecasting model): each store
+    aims to keep at least `reorder` units on hand, so the company-wide
+    healthy level for a product is `reorder x number of active stores`.
+    If total stock (HO Warehouse + every store combined) has fallen to or
+    below that level, suggest topping back up to double it — enough of a
+    buffer that this doesn't need running again the next day.
+    """
+    stores = db.query(Store).filter(Store.active.is_(True), Store.store_id != "HO").all()
+    num_stores = max(len(stores), 1)
+    products = db.query(Product).filter(Product.active.is_(True)).all()
+    wh_map = {w.barcode: int(w.on_hand or 0) for w in db.query(HOWarehouse).all()}
+    store_map = dict(
+        db.query(Inventory.barcode, func.sum(Inventory.on_hand)).group_by(Inventory.barcode).all()
+    )
+    # Exclude anything already covered by an open/partially-received PO, so
+    # this doesn't repeatedly suggest reordering something already on the
+    # way.
+    open_po_qty: dict = {}
+    for line in (
+        db.query(PurchaseOrderLine)
+        .join(PurchaseOrder, PurchaseOrder.po_id == PurchaseOrderLine.po_id)
+        .filter(PurchaseOrder.status.in_(["open", "partially_received"]))
+        .all()
+    ):
+        outstanding = max(0, (line.qty_ordered or 0) - (line.qty_received or 0))
+        open_po_qty[line.barcode] = open_po_qty.get(line.barcode, 0) + outstanding
+
+    suggestions = []
+    for p in products:
+        total_stock = wh_map.get(p.barcode, 0) + int(store_map.get(p.barcode, 0) or 0)
+        threshold = (p.reorder or 5) * num_stores
+        if total_stock > threshold:
+            continue
+        already_on_order = open_po_qty.get(p.barcode, 0)
+        target = threshold * 2
+        suggested_qty = max(0, target - total_stock - already_on_order)
+        if suggested_qty <= 0:
+            continue
+        suggestions.append({
+            "barcode": p.barcode, "name": p.name, "totalStock": total_stock,
+            "threshold": threshold, "alreadyOnOrder": already_on_order,
+            "suggestedQty": suggested_qty, "lastCost": p.cost or 0,
+        })
+    suggestions.sort(key=lambda s: (s["totalStock"] / max(s["threshold"], 1)))
+    return {"ok": True, "data": suggestions[:300]}
 
 
 @router.delete("/warehouse/all")
@@ -851,6 +976,7 @@ def delete_supplier_txn(txn_id: str, db: Annotated[Session, Depends(get_db)], us
     row = db.query(SupplierTxn).filter(SupplierTxn.txn_id == txn_id).first()
     if not row:
         raise HTTPException(404, "Transaction not found")
+    log_audit(db, user, "delete", "supplier_txn", txn_id, f"Deleted {row.type} txn: {row.supplier_name} — {row.amount}", old_value={"supplier": row.supplier_name, "type": row.type, "amount": row.amount, "date": row.date})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -897,6 +1023,7 @@ def update_capital(
     row = db.query(CapitalEntry).filter(CapitalEntry.entry_id == entry_id).first()
     if not row:
         raise HTTPException(404, "Entry not found")
+    old_snapshot = {"type": row.type, "amount": row.amount, "description": row.description, "date": row.date}
     row.date = body.date or row.date
     row.type = body.type
     row.amount = body.amount
@@ -915,13 +1042,14 @@ def update_capital(
             row.cf_item_id = ""
     else:
         new_label = f"{label} — {body.description}" if body.description else label
-        new_value = sign * abs(body.amount)
+        new_cf_value = sign * abs(body.amount)
         if cf:
-            cf.label, cf.value, cf.date = new_label, new_value, row.date
+            cf.label, cf.value, cf.date = new_label, new_cf_value, row.date
         else:
             cf_id = f"CF-{int(time.time()*1000)}"
-            db.add(CFItem(item_id=cf_id, section="financing", label=new_label, value=new_value, date=row.date))
+            db.add(CFItem(item_id=cf_id, section="financing", label=new_label, value=new_cf_value, date=row.date))
             row.cf_item_id = cf_id
+    log_audit(db, user, "update", "capital", entry_id, f"Updated capital entry: {row.type} — {row.amount}", old_value=old_snapshot, new_value={"type": row.type, "amount": row.amount, "description": row.description, "date": row.date})
     db.commit()
     return {"ok": True, "status": "ok"}
 
@@ -935,6 +1063,7 @@ def delete_capital(entry_id: str, db: Annotated[Session, Depends(get_db)], user:
         cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first()
         if cf:
             db.delete(cf)
+    log_audit(db, user, "delete", "capital", entry_id, f"Deleted capital entry: {row.type} — {row.amount}", old_value={"type": row.type, "amount": row.amount, "description": row.description, "date": row.date})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -1009,6 +1138,7 @@ def update_fixed_asset(
         raise HTTPException(400, "Cost must be greater than 0")
     if body.usefulLifeYears <= 0:
         raise HTTPException(400, "Useful life must be greater than 0 years")
+    old_snapshot = {"name": row.name, "cost": row.cost, "usefulLifeYears": row.useful_life_years, "salvageValue": row.salvage_value}
     row.name = body.name
     row.category = body.category or "Other"
     row.store_id = body.storeId or "HO"
@@ -1030,6 +1160,7 @@ def update_fixed_asset(
     elif cf:
         db.delete(cf)
         row.cf_item_id = ""
+    log_audit(db, user, "update", "fixed_asset", asset_id, f"Updated fixed asset: {row.name}", old_value=old_snapshot, new_value={"name": row.name, "cost": row.cost, "usefulLifeYears": row.useful_life_years, "salvageValue": row.salvage_value})
     db.commit()
     return {"ok": True, "status": "ok"}
 
@@ -1045,6 +1176,7 @@ def dispose_fixed_asset(
         raise HTTPException(404, "Asset not found")
     row.disposed = True
     row.disposed_date = date or today_str()
+    log_audit(db, user, "update", "fixed_asset", asset_id, f"Disposed fixed asset: {row.name}", new_value={"disposedDate": row.disposed_date})
     db.commit()
     return {"ok": True, "status": "ok"}
 
@@ -1061,6 +1193,7 @@ def delete_fixed_asset(
         cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first()
         if cf:
             db.delete(cf)
+    log_audit(db, user, "delete", "fixed_asset", asset_id, f"Deleted fixed asset: {row.name} — cost {row.cost}", old_value={"name": row.name, "cost": row.cost})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -1095,6 +1228,7 @@ def delete_bs(entry_id: str, db: Annotated[Session, Depends(get_db)], user: Anno
     row = db.query(BSEntry).filter(BSEntry.entry_id == entry_id).first()
     if not row:
         raise HTTPException(404, "Entry not found")
+    log_audit(db, user, "delete", "bs_entry", entry_id, f"Deleted Balance Sheet entry: {row.type} — {row.description} — {row.amount}", old_value={"type": row.type, "description": row.description, "amount": row.amount})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -1129,6 +1263,7 @@ def delete_cf(item_id: str, db: Annotated[Session, Depends(get_db)], user: Annot
     row = db.query(CFItem).filter(CFItem.item_id == item_id).first()
     if not row:
         raise HTTPException(404, "Item not found")
+    log_audit(db, user, "delete", "cf_item", item_id, f"Deleted Cash Flow entry: {row.section} — {row.label} — {row.value}", old_value={"section": row.section, "label": row.label, "value": row.value})
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -1256,3 +1391,41 @@ def cashflow(
         "investing": investing, "investingTotal": inv_total, "financing": financing, "financingTotal": fin_total,
         "netCashFlow": net, "opening": opening, "closing": opening + net,
     }
+
+
+@router.get("/audit-log")
+def list_audit_log(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+    entity_type: Optional[str] = None,
+    action: Optional[str] = None,
+    user_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = 300,
+):
+    from ..models_audit import AuditLog
+
+    query = db.query(AuditLog)
+    if entity_type and entity_type != "all":
+        query = query.filter(AuditLog.entity_type == entity_type)
+    if action and action != "all":
+        query = query.filter(AuditLog.action == action)
+    if user_id:
+        query = query.filter(AuditLog.user_id == user_id)
+    if date_from:
+        query = query.filter(AuditLog.timestamp >= date_from)
+    if date_to:
+        query = query.filter(AuditLog.timestamp <= date_to + " 23:59:59")
+    if q:
+        like = f"%{q}%"
+        query = query.filter((AuditLog.summary.like(like)) | (AuditLog.entity_id.like(like)) | (AuditLog.user_name.like(like)))
+    rows = query.order_by(AuditLog.id.desc()).limit(limit).all()
+    data = [{
+        "id": r.log_id, "timestamp": r.timestamp.isoformat() if r.timestamp else "",
+        "userName": r.user_name, "role": r.role, "action": r.action,
+        "entityType": r.entity_type, "entityId": r.entity_id, "summary": r.summary,
+        "oldValue": r.old_value, "newValue": r.new_value,
+    } for r in rows]
+    return {"ok": True, "data": data}
