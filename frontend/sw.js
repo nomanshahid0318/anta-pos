@@ -5,11 +5,11 @@
 // lives in app.js (see the offline sales queue), since caching POST
 // requests isn't meaningful and live data should always win when it's
 // reachable.
-const CACHE_NAME = 'anta-pos-shell-v8';
+const CACHE_NAME = 'anta-pos-shell-v10';
 const APP_SHELL = [
   '/pos/',
   '/css/styles.css',
-  '/js/app.js?v=20260818a',
+  '/js/app.js?v=20260820b',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
