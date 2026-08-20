@@ -178,9 +178,7 @@ def reports(
             items = []
         txn_units = 0
         txn_cost = 0.0
-        item_names = []
-        item_barcodes = []
-        item_lines = []
+        line_rows = []  # one entry per item: (barcode, name, qty, lineTotal)
         for i in items:
             barcode = i.get("barcode") or ""
             name = i.get("name") or barcode or "?"
@@ -188,25 +186,10 @@ def reports(
             price = float(i.get("price") or 0)
             cost = float(i.get("cost") or 0)
             lt = float(i.get("lineTotal") if i.get("lineTotal") is not None else price * qty)
-            line_cost = cost * qty
-            line_profit = lt - line_cost
             units += qty
             txn_units += qty
             txn_cost += cost * qty
-            item_names.append(f"{name} x{qty}")
-            item_barcodes.append(barcode or "—")
-            item_lines.append(
-                {
-                    "barcode": barcode or "—",
-                    "name": name,
-                    "qty": qty,
-                    "price": round(price, 2),
-                    "subtotal": round(lt, 2),
-                    "cost": round(line_cost, 2),
-                    "profit": round(line_profit, 2),
-                    "margin": round((line_profit / lt * 100) if lt else 0, 1),
-                }
-            )
+            line_rows.append((barcode, name, qty, lt))
             key = barcode or name
             if key not in prod_map:
                 prod_map[key] = {"barcode": barcode, "name": name, "qty": 0, "revenue": 0, "cost": 0, "profit": 0}
@@ -217,31 +200,44 @@ def reports(
         line_disc = float(s.discount or 0) + float(s.global_discount or 0)
         gross = float(s.total or 0)
         profit = gross - txn_cost
-        txns.append(
-            {
-                "id": s.invoice_id,
-                "date": s.date,
-                "time": s.time,
-                "store": s.store,
-                "storeId": s.store_id,
-                "customer": s.customer,
-                "payment": s.payment,
-                "payRef": s.pay_ref,
-                "items": len(items),
-                "units": txn_units,
-                "productList": "; ".join(item_names)[:180],
-                "barcodeList": "; ".join(item_barcodes)[:180],
-                "lines": item_lines,
-                "subtotal": float(s.subtotal or 0),
-                "discount": round(line_disc, 2),
-                "cost": round(txn_cost, 2),
-                "profit": round(profit, 2),
-                "margin": round((profit / gross * 100) if gross else 0, 1),
-                "total": gross,
-                "type": s.type,
-                "synced": True,
-            }
-        )
+        margin = round((profit / gross * 100) if gross else 0, 1)
+        # Every field below is identical across all of this invoice's rows
+        # EXCEPT barcode/productList/subtotal, which are this specific
+        # line item's own values — so a 3-item sale becomes 3 report
+        # rows sharing one invoice number, each showing its own product
+        # and that product's own subtotal, side by side with the same
+        # invoice-level date/time/store/customer/payment/cost/profit/total.
+        base_row = {
+            "id": s.invoice_id,
+            "date": s.date,
+            "time": s.time,
+            "store": s.store,
+            "storeId": s.store_id,
+            "customer": s.customer,
+            "payment": s.payment,
+            "payRef": s.pay_ref,
+            "items": len(items),
+            "units": txn_units,
+            "discount": round(line_disc, 2),
+            "cost": round(txn_cost, 2),
+            "profit": round(profit, 2),
+            "margin": margin,
+            "total": gross,
+            "type": s.type,
+            "synced": True,
+        }
+        if line_rows:
+            for barcode, name, qty, lt in line_rows:
+                txns.append({
+                    **base_row,
+                    "barcodeList": barcode or "—",
+                    "productList": f"{name} x{qty}",
+                    "subtotal": round(lt, 2),
+                })
+        else:
+            # A sale with no parsed line items (shouldn't normally happen) —
+            # still show one row so the invoice isn't silently dropped.
+            txns.append({**base_row, "barcodeList": "", "productList": "", "subtotal": float(s.subtotal or 0)})
 
     products = sorted(prod_map.values(), key=lambda x: x["revenue"], reverse=True)[:50]
     total_cost = round(sum(p.get("cost", 0) for p in prod_map.values()), 2)
