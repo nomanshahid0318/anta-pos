@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/styles.css">
 <style>
 /* v4 enhancements */
@@ -60,6 +60,7 @@
 
 <!-- MAIN APP -->
 <div id="app" style="display:none">
+<div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 <div id="sidebar">
   <div class="brand">
     <div class="brand-logo" id="brand-logo">A</div>
@@ -95,6 +96,7 @@
 
 <div id="main">
   <div id="topbar">
+    <button class="btn btn-ghost btn-sm hamburger-btn" onclick="toggleSidebar()" style="margin-right:2px">☰</button>
     <div class="topbar-title" id="screen-title">Dashboard</div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
       <button class="btn btn-ghost btn-sm" id="lang-toggle" onclick="toggleLang()">AR / EN</button>
@@ -381,6 +383,15 @@
 </div><!-- end app -->
 
 <!-- PAYMENT MODAL -->
+<div id="sale-success-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,14,26,.55);backdrop-filter:blur(2px);z-index:1200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:36px 44px;text-align:center;box-shadow:0 30px 80px rgba(4,8,20,.4);animation:successPop .38s var(--ease)">
+    <div style="width:64px;height:64px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:successRing .5s var(--ease)">
+      <span style="font-size:32px;color:var(--green)">✓</span>
+    </div>
+    <div style="font-size:17px;font-weight:800;color:var(--navy)">Sale Complete</div>
+    <div id="sale-success-total" style="font-size:24px;font-weight:900;color:var(--green);margin-top:4px">LYD 0.00</div>
+  </div>
+</div>
 <div id="pay-modal" class="modal-overlay" style="display:none">
   <div class="modal">
     <div class="modal-title" data-i18n-modal="collect_payment">💳 Collect Payment</div>
@@ -429,12 +440,12 @@
 <!-- HANDOVER PRINT (hidden on-screen, only shown inside @media print) -->
 <div id="handover-print-modal" style="display:none"></div>
 
-<div id="toast"></div>
+<div id="toast-container"></div>
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.3/JsBarcode.all.min.js"></script>
-<script src="/js/app.js?v=20260818a"></script>
+<script src="/js/app.js?v=20260820a"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
