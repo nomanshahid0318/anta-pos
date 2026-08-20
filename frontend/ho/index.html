@@ -153,6 +153,13 @@ body{display:flex;height:100vh;overflow:hidden}
       <div style="flex:1"><div style="font-size:11px;opacity:.7">HEAD OFFICE MASTER DASHBOARD</div><div id="dash-status" style="font-size:11px;opacity:.6;margin-top:2px">Click Load Live Data after admin login</div></div>
       <button class="btn btn-primary btn-sm" onclick="loadAll()">🔄 Load Live Data</button>
     </div>
+    <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="show('products')">➕ Add Product</button>
+      <button class="btn btn-ghost btn-sm" onclick="show('purchase-orders')">📝 New Purchase Order</button>
+      <button class="btn btn-ghost btn-sm" onclick="show('customers')">🧑‍🤝‍🧑 Add Customer</button>
+      <button class="btn btn-ghost btn-sm" onclick="show('supplier-grn')">📦 Receive Stock</button>
+      <button class="btn btn-ghost btn-sm" onclick="show('reports')">📈 View Reports</button>
+    </div>
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-label">Total Revenue</div><div class="kpi-value" id="d-rev">LYD 0</div><div class="kpi-sub">all stores</div></div>
       <div class="kpi blue"><div class="kpi-label">Total Invoices</div><div class="kpi-value" id="d-inv">0</div><div class="kpi-sub">all stores</div></div>

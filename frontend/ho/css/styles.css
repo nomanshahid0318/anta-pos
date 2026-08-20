@@ -144,6 +144,13 @@ select.form-input{cursor:pointer}
 .modal{background:#fff;border-radius:var(--radius-lg);padding:24px;width:500px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:modalIn .22s var(--ease)}
 @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
 .modal-title{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:16px;letter-spacing:-.2px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;color:var(--gray3);text-align:center}
+.empty-state .ico{font-size:34px;margin-bottom:10px;opacity:.7}
+.empty-state .title{font-size:13px;font-weight:700;color:var(--gray4)}
+.empty-state .sub{font-size:11.5px;color:var(--gray3);margin-top:3px;max-width:280px}
+.btn.loading{opacity:.7;pointer-events:none;position:relative}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* MOBILE */
 .hamburger-btn{display:none}
