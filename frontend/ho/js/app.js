@@ -2159,6 +2159,8 @@ const HO_I18N = {
     'expenses-ho':'Expenses', accounts:'Chart of Accounts', promotions:'Promotions', license:'License',
     capital:'Capital & Equity', 'fixed-assets':'Fixed Assets', reports:'Sales Reports', 'inventory-ho':'Inventory — All',
     'stores-admin':'Manage Stores', users:'Users & PINs', banks:'Banks & Payments', settings:'Settings',
+    customers:'Customers', 'stock-aging':'Stock Aging', 'audit-log':'Audit Log', 'barcode-labels':'Barcode Labels',
+    'purchase-orders':'Purchase Orders', handovers:'Cash Handovers',
     overview:'Overview', stock:'Stock Management', finance:'Finance', admin:'Admin', products_sec:'Products',
     reports_sec:'Reports', lang_btn:'العربية / EN', switch_ar:'تم التبديل إلى العربية', switch_en:'Switched to English',
     logout:'Logout', refresh:'Refresh'
@@ -2170,6 +2172,8 @@ const HO_I18N = {
     'expenses-ho':'المصروفات', accounts:'دليل الحسابات', promotions:'العروض', license:'الترخيص',
     capital:'رأس المال', 'fixed-assets':'الأصول الثابتة', reports:'تقارير المبيعات', 'inventory-ho':'المخزون — الكل',
     'stores-admin':'إدارة المتاجر', users:'المستخدمون والرمز', banks:'البنوك والمدفوعات', settings:'الإعدادات',
+    customers:'العملاء', 'stock-aging':'تقادم المخزون', 'audit-log':'سجل التدقيق', 'barcode-labels':'ملصقات الباركود',
+    'purchase-orders':'أوامر الشراء', handovers:'تسليم النقدية',
     overview:'نظرة عامة', stock:'إدارة المخزون', finance:'المالية', admin:'الإدارة', products_sec:'المنتجات',
     reports_sec:'التقارير', lang_btn:'EN / العربية', switch_ar:'تم التبديل إلى العربية', switch_en:'تم التبديل إلى الإنجليزية',
     logout:'تسجيل الخروج', refresh:'تحديث'
