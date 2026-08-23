@@ -1151,14 +1151,22 @@ async function completeSale() {
   }
   toast(t('sale_complete') + ' ' + txn.id);
 }
+let __invLang = null; // null = follow app LANG; 'ar'/'en' = pinned by the in-invoice toggle
+let __lastInvoiceTxn = null;
+function toggleInvoiceLang() {
+  const current = __invLang || (typeof LANG !== 'undefined' ? LANG : 'en');
+  __invLang = current === 'ar' ? 'en' : 'ar';
+  if (__lastInvoiceTxn) showInvoice(__lastInvoiceTxn);
+}
 function showInvoice(txn) {
+  __lastInvoiceTxn = txn;
   window.__lastInvoiceId = (txn && (txn.id || txn.invoice_id)) || window.__lastInvoiceId;
   const items = txn.items || [];
   const promoNotes = txn.promoNotes || [];
   const money = (n) => fmt(n);
   const brand = window.__brandName || 'ANTA Shoes';
   const logo = window.__brandLogo || '';
-  const isAr = (typeof LANG !== 'undefined' && LANG === 'ar');
+  const isAr = (__invLang || (typeof LANG !== 'undefined' ? LANG : 'en')) === 'ar';
   const dir = isAr ? 'rtl' : 'ltr';
   const L = isAr ? {
     taxInvoice: 'فاتورة ضريبية مبسطة', invoiceNo: 'رقم الفاتورة', date: 'التاريخ', payMethod: 'طريقة الدفع',
@@ -1166,12 +1174,16 @@ function showInvoice(txn) {
     unitPrice: 'سعر الوحدة', total: 'الإجمالي', subtotal: 'المجموع', itemDiscounts: 'خصم الأصناف',
     invoiceDiscount: 'خصم الفاتورة', netTotal: 'المجموع الصافي', received: 'المقبوض', change: 'الباقي',
     thanks: 'شكراً لزيارتكم', walkIn: 'زبون عابر',
+    noReturn: 'لا يُسمح بالاستبدال أو الاسترجاع إلا خلال المدة المحددة في سياسة الإرجاع، وباصطحاب الفاتورة الأصلية.',
+    poweredBy: 'بواسطة',
   } : {
     taxInvoice: 'Tax Invoice', invoiceNo: 'Invoice No.', date: 'Date', payMethod: 'Payment Method',
     customer: 'Customer', cashier: 'Cashier', barcode: 'Barcode', item: 'Item', qty: 'Qty',
     unitPrice: 'Unit Price', total: 'Total', subtotal: 'Subtotal', itemDiscounts: 'Item Discounts',
     invoiceDiscount: 'Invoice Discount', netTotal: 'NET TOTAL', received: 'Amount Received', change: 'Change Due',
     thanks: 'Thank you for shopping with us!', walkIn: 'Walk-in',
+    noReturn: 'No return or exchange except within the return policy period stated below, and only with the original receipt.',
+    poweredBy: 'Powered by',
   };
   const logoHtml = logo
     ? `<img src="${logo}" style="width:52px;height:52px;object-fit:contain;padding:3px;border-radius:10px;margin:0 auto 8px;display:block">`
@@ -1260,8 +1272,10 @@ function showInvoice(txn) {
 
       <div style="text-align:center;margin-top:16px;padding-top:12px;border-top:1.5px dashed #cbd5e1;font-size:10px;color:#94a3b8">
         <svg id="inv-barcode" style="max-width:100%"></svg>
+        <div style="margin-top:8px;font-weight:700;color:#7a2020;font-size:9.5px;line-height:1.5">${L.noReturn}</div>
         <div style="margin-top:6px">${DB.settings.policy}</div>
         <div style="margin-top:6px;font-weight:600;color:#475569">${L.thanks}</div>
+        <div style="margin-top:8px;font-size:9px;color:#cbd5e1">${L.poweredBy} ${brand}</div>
       </div>
     </div>`;
   document.getElementById('inv-modal').style.display = 'flex';
