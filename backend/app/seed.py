@@ -125,7 +125,7 @@ def seed_if_empty(db: Session) -> None:
             )
 
     if db.query(Setting).filter(Setting.key == "policy").first() is None:
-        db.add(Setting(key="policy", value="Exchange within 7 days with receipt."))
+        db.add(Setting(key="policy", value="Exchange within 3 days with receipt."))
         db.add(Setting(key="currency", value="LYD"))
         db.add(Setting(key="company_name", value="ANTA Shoes"))
         db.add(Setting(key="pos_name", value="ANTA POS"))

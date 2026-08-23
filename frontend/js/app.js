@@ -21,7 +21,7 @@ let DB = {
   settings: {
     storeName: 'Store 1 — Tripoli',
     storeId: 's1',
-    policy: 'Exchange within 7 days with receipt.',
+    policy: 'Exchange within 3 days with receipt.',
     currency: 'LYD',
   },
   nextInv: 1,

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     database_url: str = os.getenv("ANTA_DATABASE_URL", f"sqlite:///{_DEFAULT_DB}")
     cors_origins: str = os.getenv("ANTA_CORS_ORIGINS", "*")
     currency: str = "LYD"
-    default_policy: str = "Exchange within 7 days with receipt."
+    default_policy: str = "Exchange within 3 days with receipt."
     # Desktop mode embeds server on localhost
     host: str = "127.0.0.1"
     port: int = 8765
