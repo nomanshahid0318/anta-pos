@@ -409,6 +409,7 @@ async function loadHandoverHistory() {
 }
 
 function show(name) {
+  if(document.getElementById('content'))document.getElementById('content').scrollTop=0;
   if(window.__screenTitles && window.__screenTitles[name]){ /* i18n titles */ }
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));

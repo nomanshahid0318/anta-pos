@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user
 from ..database import get_db
-from ..models import Inventory, Product, Return, Sale, Setting
-from ..schemas import DashboardOut, ReportOut, SettingsIn
+from ..models import Inventory, Product, Return, Sale
+from ..schemas import DashboardOut, ReportOut
 from ..services.inventory import get_stock, auto_heal_store_inventory
 from ..utils import iso_now, today_str
 
@@ -258,40 +258,12 @@ def reports(
     )
 
 
-@router.get("/settings")
-def get_settings_api(
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(get_current_user)],
-):
-    rows = {s.key: s.value for s in db.query(Setting).all()}
-    return {
-        "ok": True,
-        "policy": rows.get("policy", "Exchange within 7 days with receipt."),
-        "currency": rows.get("currency", "LYD"),
-        "company_name": rows.get("company_name", "ANTA Shoes"),
-        "storeId": user.store_id,
-        "storeName": user.store_name,
-    }
-
-
-@router.put("/settings")
-def put_settings(
-    body: SettingsIn,
-    db: Annotated[Session, Depends(get_db)],
-    user: Annotated[CurrentUser, Depends(get_current_user)],
-):
-    def upsert(key: str, value: str):
-        row = db.query(Setting).filter(Setting.key == key).first()
-        if row:
-            row.value = value
-        else:
-            db.add(Setting(key=key, value=value))
-
-    if body.policy is not None:
-        upsert("policy", body.policy)
-    if body.currency is not None:
-        upsert("currency", body.currency)
-    if body.storeName is not None and user.is_admin:
-        upsert("default_store_name", body.storeName)
-    db.commit()
-    return {"ok": True, "status": "ok"}
+# NOTE: GET/PUT /api/settings used to be defined here too, but they
+# silently shadowed the real ones in settings_routes.py (FastAPI uses
+# first-match routing, and this router gets registered first in main.py).
+# Neither had a company_logo field at all, and the PUT here never touched
+# company_name/company_logo — every branding save was being swallowed by
+# this dead end, reporting success while quietly discarding the name/logo.
+# Removed; settings_routes.py's GET/PUT /api/settings are now the only
+# ones, and they actually return/save company_name, company_logo,
+# pos_name, store_name, policy, and currency.
