@@ -1094,6 +1094,7 @@ body{display:flex;height:100vh;overflow:hidden}
 
   <!-- SUPPLIER ACCOUNTS -->
   <div id="screen-supplier-accounts" class="screen">
+    <div class="kpi-grid" id="sup-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div>
         <div class="card">
@@ -1131,7 +1132,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <div>
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div class="card-title" style="margin:0">📊 Supplier Balances</div>
+            <div class="card-title" style="margin:0">📊 Supplier Balances <span style="font-weight:400;color:var(--gray4);font-size:10.5px">— click a row for full statement</span></div>
             <button class="btn btn-ghost btn-sm" onclick="exportSupplierBalances()">⬇️ Export</button>
           </div>
           <table><thead><tr><th>Supplier</th><th>Terms</th><th>Total Invoiced</th><th>Total Paid</th><th>Balance Due</th><th>Status</th></tr></thead>
@@ -1145,6 +1146,21 @@ body{display:flex;height:100vh;overflow:hidden}
           <table><thead><tr><th>Date</th><th>Supplier</th><th>Type</th><th>Amount</th><th>Ref</th><th>Actions</th></tr></thead>
           <tbody id="sup-txns"></tbody></table>
         </div>
+      </div>
+    </div>
+    <div id="sup-statement-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSupStatement()">
+      <div class="modal" style="width:640px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div>
+            <div class="modal-title" id="sup-stmt-title" style="margin-bottom:2px">🧾 Statement</div>
+            <div id="sup-stmt-sub" style="font-size:11px;color:var(--gray4)"></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="printSupStatement()">🖨️ Print</button>
+        </div>
+        <div class="kpi-grid" id="sup-stmt-kpis" style="margin:14px 0"></div>
+        <table><thead><tr><th>Date</th><th>Type</th><th>Ref</th><th class="text-right">Debit</th><th class="text-right">Credit</th><th class="text-right">Balance</th></tr></thead>
+        <tbody id="sup-stmt-table"></tbody></table>
+        <button class="btn btn-ghost btn-full mt" onclick="closeSupStatement()">Close</button>
       </div>
     </div>
   </div>

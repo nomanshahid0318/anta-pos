@@ -1386,8 +1386,71 @@ function printCF(){
 async function saveSupplier(){const name=$('sup-name').value.trim();if(!name){toast('Enter name','error');return;}const res=await api('/api/ho/suppliers',{method:'POST',body:{name,contact:$('sup-contact').value,limit:parseFloat($('sup-limit').value)||0,terms:$('sup-terms').value}});if(res&&res.ok){toast('✅ Supplier saved');['sup-name','sup-contact','sup-limit'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 async function saveSupplierTxn(){const supId=$('sup-txn-supplier').value,amt=parseFloat($('sup-txn-amt').value)||0;if(!supId||!amt){toast('Select supplier + amount','error');return;}const res=await api('/api/ho/supplier-txns',{method:'POST',body:{supplierId:supId,date:$('sup-txn-date').value,type:$('sup-txn-type').value,amount:amt,ref:$('sup-txn-ref').value}});if(res&&res.ok){toast('✅ Recorded');['sup-txn-amt','sup-txn-ref'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 function populateSupplierSelect(){const opts=suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');if($('sup-txn-supplier'))$('sup-txn-supplier').innerHTML=opts;if($('po-supplier'))$('po-supplier').innerHTML=opts;}
-function renderSupplierAccounts(){if($('sup-balances'))$('sup-balances').innerHTML=suppliers.map(b=>`<tr><td class="fw7">${b.name}</td><td>${b.terms||''}</td><td>${fmt(b.invoiced||0)}</td><td class="text-green">${fmt(b.paid||0)}</td><td class="fw7" style="color:${b.balance>0?'var(--red)':b.balance<0?'var(--green)':'var(--navy)'}">${fmt(Math.abs(b.balance||0))} ${b.balance>0?'DUE':b.balance<0?'CREDIT':''}</td><td><span class="badge ${b.balance<=0?'badge-green':'badge-amber'}">${b.balance<=0?'Paid':'Pending'}</span></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No suppliers</td></tr>';
-if($('sup-txns'))$('sup-txns').innerHTML=supplierTxns.slice(0,15).map(t=>`<tr><td>${t.date}</td><td>${t.supplierName}</td><td><span class="badge ${t.type==='payment'?'badge-green':'badge-amber'}">${t.type}</span></td><td class="fw7">${fmt(t.amount)}</td><td>${t.ref||'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="deleteSupplierTxn('${t.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No txns</td></tr>';populateSupplierSelect();}
+function renderSupplierAccounts(){
+  const totalPayable=suppliers.reduce((a,s)=>a+Math.max(s.balance||0,0),0);
+  const totalCredit=suppliers.reduce((a,s)=>a+Math.max(-(s.balance||0),0),0);
+  const withBalance=suppliers.filter(s=>(s.balance||0)>0).length;
+  if($('sup-kpis'))$('sup-kpis').innerHTML=[
+    ['Total Payable',fmt(totalPayable),'red'],
+    ['Total Suppliers',suppliers.length,''],
+    ['Suppliers with Balance Due',withBalance,'amber'],
+    ['Credit Owed to Us',fmt(totalCredit),'green'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  if($('sup-balances'))$('sup-balances').innerHTML=suppliers.map(b=>`<tr style="cursor:pointer" onclick="openSupStatement('${b.id}')"><td class="fw7">${b.name}</td><td>${b.terms||''}</td><td>${fmt(b.invoiced||0)}</td><td class="text-green">${fmt(b.paid||0)}</td><td class="fw7" style="color:${b.balance>0?'var(--red)':b.balance<0?'var(--green)':'var(--navy)'}">${fmt(Math.abs(b.balance||0))} ${b.balance>0?'DUE':b.balance<0?'CREDIT':''}</td><td><span class="badge ${b.balance<=0?'badge-green':'badge-amber'}">${b.balance<=0?'Paid':'Pending'}</span></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No suppliers</td></tr>';
+  if($('sup-txns'))$('sup-txns').innerHTML=supplierTxns.slice(0,15).map(t=>`<tr><td>${t.date}</td><td>${t.supplierName}</td><td><span class="badge ${t.type==='payment'?'badge-green':'badge-amber'}">${t.type}</span></td><td class="fw7">${fmt(t.amount)}</td><td>${t.ref||'—'}</td><td><button class="btn btn-ghost btn-sm" onclick="deleteSupplierTxn('${t.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No txns</td></tr>';
+  populateSupplierSelect();
+}
+let __supStmtId=null;
+function openSupStatement(supId){
+  const sup=suppliers.find(s=>s.id===supId);
+  if(!sup)return;
+  __supStmtId=supId;
+  const txns=supplierTxns.filter(t=>t.supplierId===supId||t.supplier_id===supId).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if($('sup-stmt-title'))$('sup-stmt-title').textContent='🧾 '+sup.name+' — Statement';
+  if($('sup-stmt-sub'))$('sup-stmt-sub').textContent=`${sup.terms||''} · ${sup.contact||'No contact on file'}`;
+  let bal=0;
+  const rows=txns.map(t=>{
+    const isDebit=t.type==='payment'||t.type==='credit'; // reduces what we owe
+    if(isDebit)bal-=Math.abs(t.amount||0);else bal+=Math.abs(t.amount||0);
+    return {...t,runningBalance:bal};
+  });
+  if($('sup-stmt-kpis'))$('sup-stmt-kpis').innerHTML=[
+    ['Total Invoiced',fmt(sup.invoiced||0),''],
+    ['Total Paid',fmt(sup.paid||0),'green'],
+    ['Current Balance',fmt(Math.abs(sup.balance||0))+(sup.balance>0?' DUE':sup.balance<0?' CREDIT':''),sup.balance>0?'red':'green'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value" style="font-size:16px">${v}</div></div>`).join('');
+  const typeBadge=t=>({invoice:'badge-amber',payment:'badge-green',credit:'badge-blue'}[t]||'badge-gray');
+  if($('sup-stmt-table'))$('sup-stmt-table').innerHTML=rows.map(t=>`<tr>
+    <td>${t.date}</td><td><span class="badge ${typeBadge(t.type)}">${t.type}</span></td><td style="font-size:11px">${t.ref||'—'}</td>
+    <td class="text-right">${t.type==='invoice'?fmt(t.amount):''}</td>
+    <td class="text-right text-green">${t.type!=='invoice'?fmt(t.amount):''}</td>
+    <td class="text-right fw7">${fmt(Math.abs(t.runningBalance))}${t.runningBalance>0?' DUE':t.runningBalance<0?' CR':''}</td>
+  </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:16px">No transactions yet</td></tr>';
+  $('sup-statement-modal').style.display='flex';
+}
+function closeSupStatement(){$('sup-statement-modal').style.display='none';__supStmtId=null;}
+function printSupStatement(){
+  const sup=suppliers.find(s=>s.id===__supStmtId);
+  if(!sup)return;
+  const company=(DATA.settings&&DATA.settings.company)||'ANTA Shoes';
+  const tableHtml=$('sup-stmt-table').innerHTML;
+  const html=`<div style="max-width:700px;margin:0 auto;padding:40px 50px;font-family:Arial,sans-serif;color:#111">
+    <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #1a2540;padding-bottom:14px">
+      <div style="font-size:22px;font-weight:900;color:#1a2540">${company}</div>
+      <div style="font-size:15px;font-weight:700;margin-top:4px">Supplier Statement — ${sup.name}</div>
+      <div style="font-size:11px;color:#666;margin-top:2px">${sup.terms||''} · Generated ${new Date().toLocaleString()}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:2px solid #333;text-align:left">
+      <th style="padding:6px 4px">Date</th><th style="padding:6px 4px">Type</th><th style="padding:6px 4px">Ref</th>
+      <th style="padding:6px 4px;text-align:right">Debit</th><th style="padding:6px 4px;text-align:right">Credit</th><th style="padding:6px 4px;text-align:right">Balance</th>
+    </tr></thead><tbody>${tableHtml.replace(/<span class="badge[^>]*>/g,'<span>')}</tbody></table>
+    <div style="text-align:right;margin-top:16px;font-weight:900;font-size:15px">Balance Due: ${fmt(Math.abs(sup.balance||0))}</div>
+  </div>`;
+  const modal=document.getElementById('report-print-modal');
+  if(!modal){toast('Print container missing','error');return;}
+  modal.innerHTML=html;
+  setTimeout(()=>window.print(),80);
+}
 
 async function deleteSupplierTxn(id){
   if(!confirm('Delete this supplier transaction? This will change the supplier\'s balance. This cannot be undone.'))return;
