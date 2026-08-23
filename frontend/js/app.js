@@ -177,7 +177,7 @@ function applyBranding(b) {
   const loginTitle = document.getElementById('login-title-text');
   const initial = name ? name.trim().charAt(0).toUpperCase() : '';
   if (logoBox) {
-    logoBox.innerHTML = logo ? `<img src="${logo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : initial;
+    logoBox.innerHTML = logo ? `<img src="${logo}" style="width:100%;height:100%;object-fit:contain;padding:3px;border-radius:inherit">` : initial;
   }
   if (logoText) logoText.textContent = name;
   if (loginTitle) loginTitle.textContent = name ? name + ' POS' : 'POS';
@@ -1156,7 +1156,7 @@ function showInvoice(txn) {
   const brand = window.__brandName || 'ANTA Shoes';
   const logo = window.__brandLogo || '';
   const logoHtml = logo
-    ? `<img src="${logo}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;margin:0 auto 8px;display:block">`
+    ? `<img src="${logo}" style="width:52px;height:52px;object-fit:contain;padding:3px;border-radius:10px;margin:0 auto 8px;display:block">`
     : '';
 
   const itemRows = items

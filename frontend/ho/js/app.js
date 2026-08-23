@@ -1921,7 +1921,8 @@ function applyBranding(b){
   const initial=name?name.trim().charAt(0).toUpperCase():'';
   [logoBox,loginBox].forEach(el=>{
     if(!el)return;
-    if(logo){el.innerHTML=`<img src="${logo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`;}
+    el.style.background=logo?'#fff':'';
+    if(logo){el.innerHTML=`<img src="${logo}" style="width:100%;height:100%;object-fit:contain;padding:3px;border-radius:inherit">`;}
     else{el.innerHTML=initial;}
   });
   if(logoText)logoText.textContent=name;
@@ -1952,13 +1953,22 @@ function removeLogo(){
   if(ph)ph.style.display='block';
 }
 async function saveSettings(){
-  const body={company_name:($('co-name')&&$('co-name').value)||'',currency:($('co-currency')&&$('co-currency').value)||'LYD'};
+  const name=($('co-name')&&$('co-name').value)||'';
+  const currency=($('co-currency')&&$('co-currency').value)||'LYD';
+  const body={company_name:name,currency};
   if(_pendingLogoDataUrl!==undefined)body.company_logo=_pendingLogoDataUrl;
   const res=await api('/api/settings',{method:'PUT',body});
   if(res&&res.ok){
     toast('✅ Saved');
+    // Apply immediately from what was actually just submitted — don't
+    // wait on (or fully trust) the server round-trip for the UI update,
+    // so the sidebar/login branding changes instantly, no refresh needed.
+    applyBranding({
+      company_name:name,
+      company_logo:_pendingLogoDataUrl!==undefined?_pendingLogoDataUrl:(res.company_logo||''),
+    });
     _pendingLogoDataUrl=undefined;
-    applyBranding(res);
+    show('dashboard');
   } else {
     toast('❌ '+((res&&(res.detail||res.msg))||'Save failed'),'error');
   }
