@@ -296,6 +296,9 @@ function renderWarehouse(){
   if(info)info.textContent=selectedWarehouse.size?`✅ ${selectedWarehouse.size} row(s) selected`:`${whFilteredList.length} row(s) shown`;
 }
 function toggleWarehouseRow(bc){if(selectedWarehouse.has(bc))selectedWarehouse.delete(bc);else selectedWarehouse.add(bc);renderWarehouse();}
+function exportWarehouse(){
+  _csvDownload(whFilteredList,[['Barcode','Barcode'],['Name','Name'],['Brand','Brand'],['Supplier In','Supplier_In'],['Store Out','Store_Out'],['On Hand','OnHand']],'ho_warehouse_'+today()+'.csv');
+}
 function toggleAllWarehouse(cb){
   if(cb.checked)whFilteredList.forEach(w=>selectedWarehouse.add(w.Barcode));
   else whFilteredList.forEach(w=>selectedWarehouse.delete(w.Barcode));
@@ -1189,6 +1192,21 @@ function renderInvAllPagination(){
   container.innerHTML=html;
 }
 function renderInvAll(){fetchAndRenderInvAll();}
+async function exportInvAll(){
+  toast('⏳ Preparing export…','info');
+  const qs=new URLSearchParams({limit:String(Math.max(invAllTotalCount,1))});
+  if(invAllSearchQuery)qs.set('q',invAllSearchQuery);
+  const res=await api('/api/ho/inventory-all?'+qs.toString());
+  if(!res||!res.data){toast('❌ Export failed','error');return;}
+  const stores=res.stores||invAllStores||[];
+  const rows=res.data.map(r=>{
+    const o={barcode:r.barcode,name:r.name,ho:r.ho,total:r.total};
+    stores.forEach(s=>{o[s.store_id]=(r.stores&&r.stores[s.store_id])||0;});
+    return o;
+  });
+  const header=[['Barcode','barcode'],['Name','name'],['HO Stock','ho'],...stores.map(s=>[s.name||s.store_id,s.store_id]),['Total Stock','total']];
+  _csvDownload(rows,header,'inventory_all_stores_'+today()+'.csv');
+}
 function renderStoresAdmin(){const el=$('stores-table')||$('stores-admin-table')||$('sa-table');if(!el)return;const rows=DATA.stores||[];el.innerHTML=rows.map(s=>`<tr><td class="fw7">${s.StoreID||s.store_id||''}</td><td>${s.Name||s.name||''}</td><td>${s.City||s.city||''}</td><td>${s.Manager||s.manager||''}</td><td>${s.Phone||s.phone||''}</td><td><span class="badge badge-green">${(s.Active==='N'||s.active===false)?'Inactive':'Active'}</span></td><td><button class="btn btn-ghost btn-sm" onclick="editStore('${s.StoreID||s.store_id||''}')">Edit</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No stores yet</td></tr>';}
 function showAddStore(){const f=$('store-form')||$('add-store-form');if(f)f.style.display='flex';['st-id','st-nm','st-city','st-addr','st-mgr','st-ph'].forEach(id=>{const el=$(id);if(el){el.value='';if(id==='st-id')el.disabled=false;}});} 
 function editStore(id){const s=(DATA.stores||[]).find(x=>(x.StoreID||x.store_id)===id);const f=$('store-form')||$('add-store-form');if(!s||!f)return;f.style.display='flex';if($('st-id')){$('st-id').value=s.StoreID||s.store_id||'';$('st-id').disabled=true;}if($('st-nm'))$('st-nm').value=s.Name||s.name||'';if($('st-city'))$('st-city').value=s.City||s.city||'';if($('st-addr'))$('st-addr').value=s.Address||s.address||'';if($('st-mgr'))$('st-mgr').value=s.Manager||s.manager||'';if($('st-ph'))$('st-ph').value=s.Phone||s.phone||'';}

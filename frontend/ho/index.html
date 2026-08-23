@@ -207,6 +207,7 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="card-title" style="margin:0">🏭 HO Warehouse — Live Stock</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input class="form-input" style="width:200px;padding:5px 9px" id="wh-search" placeholder="🔍 Search..." oninput="renderWarehouse()">
+          <button class="btn btn-ghost btn-sm" onclick="exportWarehouse()">⬇️ Export</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteSelectedWarehouse()">🗑️ Delete Selected</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteAllWarehouse(this)">🗑️ Delete All</button>
         </div>
@@ -753,9 +754,12 @@ body{display:flex;height:100vh;overflow:hidden}
   <!-- INVENTORY ALL -->
   <div id="screen-inventory-ho" class="screen">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;gap:8px;flex-wrap:wrap">
         <div class="card-title" style="margin:0">🗃️ Inventory — All Stores</div>
-        <input class="form-input" style="width:200px;padding:5px 9px" id="inv-search" placeholder="🔍 Search by barcode or product…" oninput="searchInvAll(this.value)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="form-input" style="width:200px;padding:5px 9px" id="inv-search" placeholder="🔍 Search by barcode or product…" oninput="searchInvAll(this.value)">
+          <button class="btn btn-ghost btn-sm" onclick="exportInvAll()">⬇️ Export</button>
+        </div>
       </div>
       <table><thead><tr><th>Barcode</th><th>Product</th><th>HO Stock</th><th id="inv-s1">Store 1</th><th id="inv-s2">Store 2</th><th id="inv-s3">Store 3</th><th>Total Stock</th></tr></thead>
       <tbody id="inv-all-table"></tbody></table>
@@ -1333,7 +1337,7 @@ body{display:flex;height:100vh;overflow:hidden}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.3/JsBarcode.all.min.js"></script>
 
 </div>
-<script src="/ho/js/app.js?v=20260820a"></script>
+<script src="/ho/js/app.js?v=20260823a"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
