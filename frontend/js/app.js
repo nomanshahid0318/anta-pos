@@ -1097,13 +1097,15 @@ async function completeSale() {
     store: DB.settings.storeName,
     date: today(),
     time: timeNow(),
+    cashReceived: selPay === 'Cash' ? (+getVal('cash-rec', 0) || 0) : undefined,
+    changeDue: selPay === 'Cash' ? Math.max(0, (+getVal('cash-rec', 0) || 0) - due) : undefined,
   };
   setOnline('syncing', 'Saving sale...');
   const res = await api('/api/sales', { method: 'POST', body: payload });
   let txn;
   if (res && res.ok) {
     // Normal online path.
-    txn = res.sale || { ...payload, id: res.id, synced: true };
+    txn = res.sale ? { ...payload, ...res.sale } : { ...payload, id: res.id, synced: true };
   } else if (res && res._http) {
     // Server was reachable and REJECTED the sale (validation error, bad
     // data, etc.) — this is a real problem, not a connectivity one, so
@@ -1156,6 +1158,21 @@ function showInvoice(txn) {
   const money = (n) => fmt(n);
   const brand = window.__brandName || 'ANTA Shoes';
   const logo = window.__brandLogo || '';
+  const isAr = (typeof LANG !== 'undefined' && LANG === 'ar');
+  const dir = isAr ? 'rtl' : 'ltr';
+  const L = isAr ? {
+    taxInvoice: 'فاتورة ضريبية مبسطة', invoiceNo: 'رقم الفاتورة', date: 'التاريخ', payMethod: 'طريقة الدفع',
+    customer: 'العميل', cashier: 'الكاشير', barcode: 'الباركود', item: 'الصنف', qty: 'الكمية',
+    unitPrice: 'سعر الوحدة', total: 'الإجمالي', subtotal: 'المجموع', itemDiscounts: 'خصم الأصناف',
+    invoiceDiscount: 'خصم الفاتورة', netTotal: 'المجموع الصافي', received: 'المقبوض', change: 'الباقي',
+    thanks: 'شكراً لزيارتكم', walkIn: 'زبون عابر',
+  } : {
+    taxInvoice: 'Tax Invoice', invoiceNo: 'Invoice No.', date: 'Date', payMethod: 'Payment Method',
+    customer: 'Customer', cashier: 'Cashier', barcode: 'Barcode', item: 'Item', qty: 'Qty',
+    unitPrice: 'Unit Price', total: 'Total', subtotal: 'Subtotal', itemDiscounts: 'Item Discounts',
+    invoiceDiscount: 'Invoice Discount', netTotal: 'NET TOTAL', received: 'Amount Received', change: 'Change Due',
+    thanks: 'Thank you for shopping with us!', walkIn: 'Walk-in',
+  };
   const logoHtml = logo
     ? `<img src="${logo}" style="width:52px;height:52px;object-fit:contain;padding:3px;border-radius:10px;margin:0 auto 8px;display:block">`
     : '';
@@ -1169,77 +1186,82 @@ function showInvoice(txn) {
       return `<tr style="${bg}">
         <td style="padding:7px 4px;vertical-align:top">
           <div style="font-weight:600;color:#1e293b">${i.name}</div>
+          <div style="font-size:9px;color:#94a3b8;font-family:monospace">${i.barcode || ''}</div>
           ${promoTag}${lineDiscount}
         </td>
         <td style="padding:7px 4px;text-align:center;color:#475569;vertical-align:top">${i.qty}</td>
-        <td style="padding:7px 4px;text-align:right;font-weight:700;color:#1e293b;vertical-align:top">${money(lineTotal)}</td>
+        <td style="padding:7px 4px;text-align:${isAr ? 'left' : 'right'};color:#64748b;vertical-align:top">${money(i.price)}</td>
+        <td style="padding:7px 4px;text-align:${isAr ? 'left' : 'right'};font-weight:700;color:#1e293b;vertical-align:top">${money(lineTotal)}</td>
       </tr>`;
     })
     .join('');
 
-  const discountBlock = txn.discount
-    ? `<div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569"><span>Item Discounts</span><span>-${money(txn.discount)}</span></div>`
-    : '';
-  const globalDiscountBlock = txn.globalDiscount
-    ? `<div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569"><span>Invoice Discount</span><span>-${money(txn.globalDiscount)}</span></div>`
-    : '';
-  const loyaltyBlock = txn.loyaltyDiscount
-    ? `<div style="display:flex;justify-content:space-between;padding:3px 0;color:#0a7a3c"><span>🎁 Loyalty Points Redeemed</span><span>-${money(txn.loyaltyDiscount)}</span></div>`
-    : '';
+  const row = (label, value, color = '#475569') =>
+    `<div style="display:flex;justify-content:space-between;padding:3px 0;color:${color}"><span>${label}</span><span>${value}</span></div>`;
+
+  const discountBlock = txn.discount ? row(L.itemDiscounts, '-' + money(txn.discount)) : '';
+  const globalDiscountBlock = txn.globalDiscount ? row(L.invoiceDiscount, '-' + money(txn.globalDiscount)) : '';
+  const loyaltyBlock = txn.loyaltyDiscount ? row('🎁 ' + (isAr ? 'نقاط الولاء' : 'Loyalty Points Redeemed'), '-' + money(txn.loyaltyDiscount), '#0a7a3c') : '';
   const loyaltyEarnedBlock = txn.loyaltyPointsEarned
     ? `<div style="font-size:10.5px;color:#0a7a3c;font-weight:600;margin-top:6px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">🎁 ${txn.customer} earned ${txn.loyaltyPointsEarned} loyalty points on this purchase</div>`
     : '';
   const promoNotesBlock = promoNotes.length
-    ? `<div style="font-size:10.5px;color:#0a7a3c;font-weight:600;margin-top:6px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">🏷️ Promotions applied: ${promoNotes.join(', ')}</div>`
+    ? `<div style="font-size:10.5px;color:#0a7a3c;font-weight:600;margin-top:6px;padding:6px 8px;background:#f0fdf4;border-radius:6px;border:1px solid #bbf7d0">🏷️ ${isAr ? 'العروض المطبقة' : 'Promotions applied'}: ${promoNotes.join(', ')}</div>`
+    : '';
+  const receivedBlock = (txn.payment === 'Cash' && txn.cashReceived != null)
+    ? row(L.received, money(txn.cashReceived)) + row(L.change, money(txn.changeDue || 0), '#0a7a3c')
     : '';
 
   document.getElementById('inv-content').innerHTML = `
-    <div data-invoice-id="${txn.id||''}" style="font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+    <div data-invoice-id="${txn.id||''}" dir="${dir}" style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;text-align:${isAr ? 'right' : 'left'}">
       <div style="text-align:center;padding-bottom:14px;margin-bottom:14px;border-bottom:2.5px solid #0f172a">
         ${logoHtml}
         <div style="font-size:23px;font-weight:900;letter-spacing:.3px">${brand}</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:1px">${L.taxInvoice}</div>
         <div style="font-size:12px;color:#64748b;margin-top:2px">${txn.store || DB.settings.storeName}</div>
         <div style="display:inline-flex;gap:10px;margin-top:8px;font-size:10.5px;color:#64748b;background:#f1f5f9;padding:4px 12px;border-radius:20px">
-          <span>${txn.date}</span><span>·</span><span>${txn.time || ''}</span><span>·</span><span style="font-weight:700;color:#0f172a">${txn.id}</span>
+          <span>${txn.date}</span><span>·</span><span>${txn.time || ''}</span><span>·</span><span style="font-weight:700;color:#0f172a">${L.invoiceNo} ${txn.id}</span>
         </div>
       </div>
 
       <div style="display:flex;justify-content:space-between;font-size:11.5px;color:#475569;margin-bottom:10px">
-        <span>Customer: <b style="color:#0f172a">${txn.customer || 'Walk-in'}</b></span>
-        <span>Cashier: <b style="color:#0f172a">${(window.USER&&window.USER.name)||''}</b></span>
+        <span>${L.customer}: <b style="color:#0f172a">${txn.customer || L.walkIn}</b></span>
+        <span>${L.cashier}: <b style="color:#0f172a">${(window.USER&&window.USER.name)||''}</b></span>
       </div>
 
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px">
         <thead>
           <tr style="border-bottom:2px solid #0f172a">
-            <th style="text-align:left;padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">ITEM</th>
-            <th style="text-align:center;padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">QTY</th>
-            <th style="text-align:right;padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">TOTAL</th>
+            <th style="text-align:${isAr ? 'right' : 'left'};padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">${L.item}</th>
+            <th style="text-align:center;padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">${L.qty}</th>
+            <th style="text-align:${isAr ? 'left' : 'right'};padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">${L.unitPrice}</th>
+            <th style="text-align:${isAr ? 'left' : 'right'};padding:5px 4px;font-size:10.5px;letter-spacing:.4px;color:#475569">${L.total}</th>
           </tr>
         </thead>
         <tbody>${itemRows}</tbody>
       </table>
 
       <div style="border-top:1.5px dashed #cbd5e1;padding-top:10px;margin-top:6px;font-size:12.5px">
-        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569"><span>Subtotal</span><span>${money(txn.subtotal)}</span></div>
+        ${row(L.subtotal, money(txn.subtotal))}
         ${discountBlock}
         ${globalDiscountBlock}
         ${loyaltyBlock}
         ${promoNotesBlock}
         ${loyaltyEarnedBlock}
         <div style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;margin-top:10px">
-          <span style="font-size:12px;font-weight:600;letter-spacing:.3px">TOTAL</span>
+          <span style="font-size:12px;font-weight:600;letter-spacing:.3px">${L.netTotal}</span>
           <span style="font-size:19px;font-weight:900">${money(txn.total)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11.5px;color:#475569">
-          <span>Payment Method</span><span style="font-weight:700;color:#0f172a">${txn.payment}${txn.payRef ? ' · Ref ' + txn.payRef : ''}</span>
+          <span>${L.payMethod}</span><span style="font-weight:700;color:#0f172a">${txn.payment}${txn.payRef ? ' · Ref ' + txn.payRef : ''}</span>
         </div>
+        ${receivedBlock}
       </div>
 
       <div style="text-align:center;margin-top:16px;padding-top:12px;border-top:1.5px dashed #cbd5e1;font-size:10px;color:#94a3b8">
         <svg id="inv-barcode" style="max-width:100%"></svg>
         <div style="margin-top:6px">${DB.settings.policy}</div>
-        <div style="margin-top:6px;font-weight:600;color:#475569">Thank you for shopping with us! شكراً لزيارتكم</div>
+        <div style="margin-top:6px;font-weight:600;color:#475569">${L.thanks}</div>
       </div>
     </div>`;
   document.getElementById('inv-modal').style.display = 'flex';
