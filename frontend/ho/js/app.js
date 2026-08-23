@@ -1663,7 +1663,7 @@ async function loadPOs(){
     const canCancel=po.status==='open';
     const hasReceived=po.status==='received'||po.status==='partially_received';
     const actions=[
-      canReceive?`<button class="btn btn-ghost btn-sm" onclick="openPOReceive('${po.id}')">📥 Receive</button>`:'',
+      canReceive?`<button class="btn btn-green btn-sm" onclick="quickReceiveFullPO('${po.id}')">⚡ Receive All</button> <button class="btn btn-ghost btn-sm" onclick="openPOReceive('${po.id}')">📥 Review &amp; Receive</button>`:'',
       canCancel?`<button class="btn btn-ghost btn-sm" onclick="cancelPOUI('${po.id}')">🚫 Cancel</button>`:'',
       hasReceived?`<button class="btn btn-ghost btn-sm" onclick="printLabelsForPO('${po.id}')">🏷️ Labels</button>`:'',
     ].filter(Boolean).join(' ');
@@ -1676,6 +1676,15 @@ function printLabelsForPO(poId){
   const lines=po.lines.filter(l=>l.qtyReceived>0).map(l=>({barcode:l.barcode,name:l.name,qty:l.qtyReceived}));
   if(!lines.length){toast('Nothing received yet on this PO','error');return;}
   loadLabelsFromLines(lines);
+}
+async function quickReceiveFullPO(poId){
+  if(!confirm('Receive the FULL remaining quantity for every item on this PO, exactly as ordered? Use "Review & Receive" instead if you need to adjust quantities.'))return;
+  const res=await api(`/api/ho/purchase-orders/${encodeURIComponent(poId)}/receive`,{method:'POST',body:{date:today()}});
+  if(res&&res.ok){
+    toast(`✅ Received in full — stock and cost updated (GRN ${res.grnId})`);
+    await loadAll();
+    loadPOs();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 function openPOReceive(poId){
   const po=__poList.find(p=>p.id===poId);
