@@ -447,18 +447,26 @@ body{display:flex;height:100vh;overflow:hidden}
             <button class="btn btn-ghost btn-sm" onclick="clearStGRNSelection()">✕ Clear Selection</button>
           </div>
           <div id="stgrn-selected-info" style="font-size:11px;color:var(--gray4);margin-bottom:8px"></div>
-          <table><thead><tr><th><input type="checkbox" id="stgrn-select-all" onchange="toggleAllStGRN(this)" title="Select/deselect this page only"></th><th>GRN ID</th><th>Date</th><th>Store</th><th>Product</th><th>Issued</th><th>Received</th><th>Status</th><th>Actions</th></tr></thead>
+          <table><thead><tr><th><input type="checkbox" id="stgrn-select-all" onchange="toggleAllStGRN(this)" title="Select/deselect this page only"></th><th>GRN ID</th><th>Date</th><th>Store</th><th>Items</th><th>Issued</th><th>Received</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="stgrn-pending"></tbody></table>
           <div id="stgrn-pending-pagination"></div>
         </div>
         <div class="card">
           <div class="card-title">✅ Completed GRNs</div>
           <div style="margin-bottom:8px"><input class="form-input" id="stgrn-done-search" placeholder="🔍 Search by barcode, product, GRN ID, or store…" oninput="searchStGRNDone(this.value)"></div>
-          <table><thead><tr><th>GRN ID</th><th>Date</th><th>Store</th><th>Product</th><th>Qty</th><th>Status</th></tr></thead>
+          <table><thead><tr><th>GRN ID</th><th>Date</th><th>Store</th><th>Items</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="stgrn-done"></tbody></table>
           <div id="stgrn-done-pagination"></div>
         </div>
       </div>
+    </div>
+  </div>
+  <div id="stgrn-detail-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeStGRNDetail()">
+    <div class="modal" style="width:520px">
+      <div class="modal-title" id="stgrn-detail-title">📦 GRN Details</div>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>Issued</th><th>Received</th></tr></thead>
+      <tbody id="stgrn-detail-lines"></tbody></table>
+      <button class="btn btn-ghost btn-full mt" onclick="closeStGRNDetail()">Close</button>
     </div>
   </div>
 

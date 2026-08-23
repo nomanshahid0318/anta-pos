@@ -523,32 +523,36 @@ let stgrnPendingPageSize=20,stgrnPendingCurrentPage=1,stgrnPendingSearchQuery=''
 let stgrnDonePageSize=20,stgrnDoneCurrentPage=1,stgrnDoneSearchQuery='',stgrnDoneTotalCount=0,stgrnDonePageItems=[];
 let selectedStGRN=new Set();
 
+async function viewStGRNDetail(grnId){
+  const res=await api('/api/ho/store-grns?q='+encodeURIComponent(grnId)+'&limit=500');
+  const lines=((res&&res.data)||[]).filter(l=>l.GRNID===grnId);
+  if($('stgrn-detail-title'))$('stgrn-detail-title').textContent='📦 '+grnId+' — Line Items';
+  if($('stgrn-detail-lines'))$('stgrn-detail-lines').innerHTML=lines.map(l=>`<tr><td style="font-family:monospace;font-size:10px">${l.Barcode}</td><td>${l.Name}</td><td>${l.QtyIssued}</td><td>${l.QtyReceived}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No lines found</td></tr>';
+  $('stgrn-detail-modal').style.display='flex';
+}
+function closeStGRNDetail(){$('stgrn-detail-modal').style.display='none';}
 async function fetchAndRenderStGRNPending(){
   const offset=(stgrnPendingCurrentPage-1)*stgrnPendingPageSize;
   const qs=new URLSearchParams({status:'pending',limit:String(stgrnPendingPageSize),offset:String(offset)});
   if(stgrnPendingSearchQuery)qs.set('q',stgrnPendingSearchQuery);
-  const countQs=new URLSearchParams({status:'pending'});if(stgrnPendingSearchQuery)countQs.set('q',stgrnPendingSearchQuery);
   if($('stgrn-pending'))$('stgrn-pending').innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:13px">⏳ Loading…</td></tr>';
   try{
-    const [rowsRes,countRes]=await Promise.all([
-      api('/api/ho/store-grns?'+qs.toString()),
-      api('/api/ho/store-grns/count?'+countQs.toString()),
-    ]);
-    stgrnPendingPageItems=(rowsRes&&rowsRes.data)?rowsRes.data:[];
-    stgrnPendingTotalCount=(countRes&&typeof countRes.count==='number')?countRes.count:stgrnPendingPageItems.length;
+    const res=await api('/api/ho/store-grns-summary?'+qs.toString());
+    stgrnPendingPageItems=(res&&res.data)?res.data:[];
+    stgrnPendingTotalCount=(res&&typeof res.count==='number')?res.count:stgrnPendingPageItems.length;
   }catch(_e){stgrnPendingPageItems=[];stgrnPendingTotalCount=0;toast('❌ Failed to load pending GRNs','error');}
   renderStGRNPendingTable();
   renderStGRNPendingPagination();
 }
 function renderStGRNPendingTable(){
   if($('stgrn-pending'))$('stgrn-pending').innerHTML=stgrnPendingPageItems.map(g=>{
-    const checked=selectedStGRN.has(g.GRNID)?'checked':'';
-    return `<tr><td><input type="checkbox" ${checked} onchange="toggleStGRNRow('${g.GRNID}')"></td><td class="fw7">${g.GRNID}</td><td>${g.Date}</td><td>${g.StoreName}</td><td>${(g.Name||'').slice(0,25)}</td><td>${g.QtyIssued}</td><td>—</td><td><span class="badge badge-amber">Pending</span></td><td><button class="btn btn-ghost btn-sm" onclick="deleteStoreGRN('${g.GRNID}',this)" title="Delete — mistake ho jaye to yahan se undo karein">🗑</button></td></tr>`;
+    const checked=selectedStGRN.has(g.grnId)?'checked':'';
+    return `<tr><td><input type="checkbox" ${checked} onchange="toggleStGRNRow('${g.grnId}')"></td><td class="fw7">${g.grnId}</td><td>${g.date}</td><td>${g.storeName}</td><td>${g.items} item${g.items===1?'':'s'}</td><td>${g.qtyIssued}</td><td>${g.qtyReceived}</td><td><span class="badge badge-amber">Pending</span></td><td><button class="btn btn-ghost btn-sm" onclick="viewStGRNDetail('${g.grnId}')" title="View line items">👁️</button> <button class="btn btn-ghost btn-sm" onclick="deleteStoreGRN('${g.grnId}',this)" title="Delete — mistake ho jaye to yahan se undo karein">🗑</button></td></tr>`;
   }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:13px">No pending</td></tr>';
   const selAll=$('stgrn-select-all');
-  if(selAll)selAll.checked=stgrnPendingPageItems.length>0&&stgrnPendingPageItems.every(g=>selectedStGRN.has(g.GRNID));
+  if(selAll)selAll.checked=stgrnPendingPageItems.length>0&&stgrnPendingPageItems.every(g=>selectedStGRN.has(g.grnId));
   const info=$('stgrn-selected-info');
-  if(info)info.textContent=selectedStGRN.size?`✅ ${selectedStGRN.size} GRN(s) selected`:`${stgrnPendingTotalCount} pending GRN line(s) total`;
+  if(info)info.textContent=selectedStGRN.size?`✅ ${selectedStGRN.size} GRN(s) selected`:`${stgrnPendingTotalCount} pending GRN(s)`;
 }
 function renderStGRNPendingPagination(){
   const container=$('stgrn-pending-pagination');
@@ -569,19 +573,18 @@ function searchStGRNPending(query){
 }
 function toggleStGRNRow(grnId){if(selectedStGRN.has(grnId))selectedStGRN.delete(grnId);else selectedStGRN.add(grnId);renderStGRNPendingTable();}
 function toggleAllStGRN(cb){
-  const idsOnPage=[...new Set(stgrnPendingPageItems.map(g=>g.GRNID))];
+  const idsOnPage=[...new Set(stgrnPendingPageItems.map(g=>g.grnId))];
   if(cb.checked)idsOnPage.forEach(id=>selectedStGRN.add(id));
   else idsOnPage.forEach(id=>selectedStGRN.delete(id));
   renderStGRNPendingTable();
 }
 async function selectAllMatchingStGRN(){
   if(!stgrnPendingTotalCount){toast('Nothing to select','warn');return;}
-  if(stgrnPendingTotalCount>3000&&!confirm(`Select all ${stgrnPendingTotalCount} matching line(s)? This fetches the full matching list once.`))return;
   toast('⏳ Selecting all matching…','info');
-  const qs=new URLSearchParams({status:'pending',limit:String(stgrnPendingTotalCount)});
+  const qs=new URLSearchParams({status:'pending',limit:String(Math.max(stgrnPendingTotalCount,1))});
   if(stgrnPendingSearchQuery)qs.set('q',stgrnPendingSearchQuery);
-  const res=await api('/api/ho/store-grns?'+qs.toString());
-  if(res&&res.data){res.data.forEach(g=>selectedStGRN.add(g.GRNID));renderStGRNPendingTable();toast(`✅ ${selectedStGRN.size} GRN(s) selected`);}
+  const res=await api('/api/ho/store-grns-summary?'+qs.toString());
+  if(res&&res.data){res.data.forEach(g=>selectedStGRN.add(g.grnId));renderStGRNPendingTable();toast(`✅ ${selectedStGRN.size} GRN(s) selected`);}
   else toast('❌ Failed to select all — try again','error');
 }
 function clearStGRNSelection(){selectedStGRN=new Set();renderStGRNPendingTable();}
@@ -618,17 +621,13 @@ async function fetchAndRenderStGRNDone(){
   const offset=(stgrnDoneCurrentPage-1)*stgrnDonePageSize;
   const qs=new URLSearchParams({status:'received',limit:String(stgrnDonePageSize),offset:String(offset)});
   if(stgrnDoneSearchQuery)qs.set('q',stgrnDoneSearchQuery);
-  const countQs=new URLSearchParams({status:'received'});if(stgrnDoneSearchQuery)countQs.set('q',stgrnDoneSearchQuery);
   if($('stgrn-done'))$('stgrn-done').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:13px">⏳ Loading…</td></tr>';
   try{
-    const [rowsRes,countRes]=await Promise.all([
-      api('/api/ho/store-grns?'+qs.toString()),
-      api('/api/ho/store-grns/count?'+countQs.toString()),
-    ]);
-    stgrnDonePageItems=(rowsRes&&rowsRes.data)?rowsRes.data:[];
-    stgrnDoneTotalCount=(countRes&&typeof countRes.count==='number')?countRes.count:stgrnDonePageItems.length;
+    const res=await api('/api/ho/store-grns-summary?'+qs.toString());
+    stgrnDonePageItems=(res&&res.data)?res.data:[];
+    stgrnDoneTotalCount=(res&&typeof res.count==='number')?res.count:stgrnDonePageItems.length;
   }catch(_e){stgrnDonePageItems=[];stgrnDoneTotalCount=0;}
-  if($('stgrn-done'))$('stgrn-done').innerHTML=stgrnDonePageItems.map(g=>`<tr><td class="fw7">${g.GRNID}</td><td>${g.Date}</td><td>${g.StoreName}</td><td>${(g.Name||'').slice(0,25)}</td><td>${g.QtyReceived}</td><td><span class="badge badge-green">Received</span></td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:13px">None</td></tr>';
+  if($('stgrn-done'))$('stgrn-done').innerHTML=stgrnDonePageItems.map(g=>`<tr><td class="fw7">${g.grnId}</td><td>${g.date}</td><td>${g.storeName}</td><td>${g.items} item${g.items===1?'':'s'}</td><td>${g.qtyReceived}</td><td><span class="badge badge-green">Received</span></td><td><button class="btn btn-ghost btn-sm" onclick="viewStGRNDetail('${g.grnId}')" title="View line items">👁️</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:13px">None</td></tr>';
   renderStGRNDonePagination();
 }
 function renderStGRNDonePagination(){

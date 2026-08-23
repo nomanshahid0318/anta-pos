@@ -347,6 +347,64 @@ def count_supplier_grns(
     return {"ok": True, "count": query.count()}
 
 
+@router.get("/store-grns-summary")
+def list_store_grns_summary(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """One row per GRN (not per line) — a bulk-uploaded GRN can have
+    hundreds of line items, which made the "Completed GRNs" / "Pending"
+    tables unreadable (the same GRN repeated once per barcode). This
+    aggregates: item count, total qty, and an overall status (received
+    only if every line is received; pending only if every line is still
+    pending; partial otherwise). Use /store-grns (line-level) filtered by
+    grn_id for the detail drill-down.
+    """
+    base = db.query(StoreGRN)
+    if q:
+        like = f"%{q}%"
+        base = base.filter(
+            (StoreGRN.barcode.ilike(like)) | (StoreGRN.name.ilike(like)) | (StoreGRN.grn_id.ilike(like)) | (StoreGRN.store_name.ilike(like))
+        )
+    # Group at the GRN level across ALL matching lines first (so search-by-barcode
+    # still surfaces the right GRN even though the aggregate itself isn't
+    # barcode-specific), then filter/paginate the resulting GRN groups.
+    all_rows = base.order_by(StoreGRN.id.desc()).all()
+    groups: dict = {}
+    order: list = []
+    for r in all_rows:
+        key = (r.grn_id, r.store_id)
+        if key not in groups:
+            groups[key] = {
+                "grnId": r.grn_id, "date": r.date, "storeId": r.store_id, "storeName": r.store_name,
+                "items": 0, "qtyIssued": 0, "qtyReceived": 0, "allReceived": True, "allPending": True, "notes": r.notes or "",
+            }
+            order.append(key)
+        g = groups[key]
+        g["items"] += 1
+        g["qtyIssued"] += r.qty_issued or 0
+        g["qtyReceived"] += r.qty_received or 0
+        if r.status == "received":
+            g["allPending"] = False
+        else:
+            g["allReceived"] = False
+    summaries = []
+    for key in order:
+        g = groups[key]
+        g["status"] = "received" if g["allReceived"] else ("pending" if g["allPending"] else "partial")
+        del g["allReceived"], g["allPending"]
+        if status and g["status"] != status:
+            continue
+        summaries.append(g)
+    total = len(summaries)
+    page = summaries[offset:offset + limit]
+    return {"ok": True, "status": "ok", "data": page, "count": total}
+
+
 @router.get("/store-grns")
 def list_all_store_grns(
     db: Annotated[Session, Depends(get_db)],
