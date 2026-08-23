@@ -332,6 +332,45 @@ def list_supplier_grns(
     return {"ok": True, "status": "ok", "data": data}
 
 
+@router.get("/supplier-grns-summary")
+def list_supplier_grns_summary(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(_stock_admin)],
+    q: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """One row per GRN (not per line) — same reasoning and pattern as
+    /store-grns-summary. Use /supplier-grns (line-level) filtered by
+    grn_id for the detail drill-down.
+    """
+    base = db.query(SupplierGRN)
+    if q:
+        like = f"%{q}%"
+        base = base.filter(
+            (SupplierGRN.barcode.ilike(like)) | (SupplierGRN.name.ilike(like)) | (SupplierGRN.grn_id.ilike(like)) | (SupplierGRN.supplier.ilike(like))
+        )
+    all_rows = base.order_by(SupplierGRN.id.desc()).all()
+    groups: dict = {}
+    order: list = []
+    for r in all_rows:
+        key = r.grn_id
+        if key not in groups:
+            groups[key] = {
+                "grnId": r.grn_id, "date": r.date, "supplier": r.supplier, "invoiceNo": r.invoice_no,
+                "items": 0, "qty": 0, "totalCost": 0.0,
+            }
+            order.append(key)
+        g = groups[key]
+        g["items"] += 1
+        g["qty"] += r.qty or 0
+        g["totalCost"] += r.total_cost or 0
+    summaries = [groups[k] for k in order]
+    total = len(summaries)
+    page = summaries[offset:offset + limit]
+    return {"ok": True, "status": "ok", "data": page, "count": total}
+
+
 @router.get("/supplier-grns/count")
 def count_supplier_grns(
     db: Annotated[Session, Depends(get_db)],

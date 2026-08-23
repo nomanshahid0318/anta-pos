@@ -381,68 +381,85 @@ async function deleteSupplierGRN(grnId,btn){
   }
 }
 let sgrnHistPageSize=20,sgrnHistCurrentPage=1,sgrnHistSearchQuery='',sgrnHistPageItems=[],sgrnHistTotalCount=0;
-let selectedGrnLines=new Set();
+let selectedGrnLines=new Set(); // now holds grnId strings (whole GRNs), not individual line ids
 async function fetchAndRenderSGRNHist(){
   const offset=(sgrnHistCurrentPage-1)*sgrnHistPageSize;
   const qs=new URLSearchParams({limit:String(sgrnHistPageSize),offset:String(offset)});
   if(sgrnHistSearchQuery)qs.set('q',sgrnHistSearchQuery);
-  const countQs=new URLSearchParams();if(sgrnHistSearchQuery)countQs.set('q',sgrnHistSearchQuery);
   if($('sgrn-hist'))$('sgrn-hist').innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:13px">⏳ Loading…</td></tr>';
   try{
-    const [rowsRes,countRes]=await Promise.all([
-      api('/api/ho/supplier-grns?'+qs.toString()),
-      api('/api/ho/supplier-grns/count?'+countQs.toString()),
-    ]);
-    sgrnHistPageItems=(rowsRes&&rowsRes.data)?rowsRes.data:[];
-    sgrnHistTotalCount=(countRes&&typeof countRes.count==='number')?countRes.count:sgrnHistPageItems.length;
+    const res=await api('/api/ho/supplier-grns-summary?'+qs.toString());
+    sgrnHistPageItems=(res&&res.data)?res.data:[];
+    sgrnHistTotalCount=(res&&typeof res.count==='number')?res.count:sgrnHistPageItems.length;
   }catch(_e){sgrnHistPageItems=[];sgrnHistTotalCount=0;toast('❌ Failed to load GRN history','error');}
   renderSGRNHistTable();
   renderSGRNHistPagination();
 }
 function renderSGRNHistTable(){
   if($('sgrn-hist'))$('sgrn-hist').innerHTML=sgrnHistPageItems.map(g=>{
-    const checked=selectedGrnLines.has(g.id)?'checked':'';
-    return `<tr><td><input type="checkbox" ${checked} onchange="toggleGrnLine(${g.id})"></td><td class="fw7">${g.GRNID}</td><td>${g.Date}</td><td>${g.Supplier}</td><td>${g.InvoiceNo||'—'}</td><td>${(g.Name||'').slice(0,28)}</td><td>${g.Qty}</td><td>${fmt(g.UnitCost||0)}</td><td><button class="btn btn-ghost btn-sm" onclick="deleteSupplierGRNLine(${g.id})" title="Delete this line only — reverses just this line's stock">🗑</button></td></tr>`;
-  }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:13px">No GRN lines</td></tr>';
+    const checked=selectedGrnLines.has(g.grnId)?'checked':'';
+    return `<tr><td><input type="checkbox" ${checked} onchange="toggleGrnLine('${g.grnId}')"></td><td class="fw7">${g.grnId}</td><td>${g.date}</td><td>${g.supplier}</td><td>${g.invoiceNo||'—'}</td><td>${g.items} item${g.items===1?'':'s'}</td><td>${g.qty}</td><td>${fmt(g.totalCost||0)}</td><td><button class="btn btn-ghost btn-sm" onclick="viewSGRNDetail('${g.grnId}')" title="View line items">👁️</button> <button class="btn btn-ghost btn-sm" onclick="deleteWholeSupplierGRN('${g.grnId}')" title="Delete this whole GRN — reverses all its lines">🗑</button></td></tr>`;
+  }).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:13px">No GRNs</td></tr>';
   const selAll=$('sgrn-hist-select-all');
-  if(selAll)selAll.checked=sgrnHistPageItems.length>0&&sgrnHistPageItems.every(g=>selectedGrnLines.has(g.id));
+  if(selAll)selAll.checked=sgrnHistPageItems.length>0&&sgrnHistPageItems.every(g=>selectedGrnLines.has(g.grnId));
   updateSgrnHistSelectedInfo();
 }
-function toggleGrnLine(id){if(selectedGrnLines.has(id))selectedGrnLines.delete(id);else selectedGrnLines.add(id);renderSGRNHistTable();}
+function toggleGrnLine(grnId){if(selectedGrnLines.has(grnId))selectedGrnLines.delete(grnId);else selectedGrnLines.add(grnId);renderSGRNHistTable();}
 function toggleAllGrnLines(cb){
-  if(cb.checked)sgrnHistPageItems.forEach(g=>selectedGrnLines.add(g.id));
-  else sgrnHistPageItems.forEach(g=>selectedGrnLines.delete(g.id));
+  if(cb.checked)sgrnHistPageItems.forEach(g=>selectedGrnLines.add(g.grnId));
+  else sgrnHistPageItems.forEach(g=>selectedGrnLines.delete(g.grnId));
   renderSGRNHistTable();
 }
 async function selectAllMatchingGrnLines(){
   if(!sgrnHistTotalCount){toast('Nothing to select','warn');return;}
-  if(sgrnHistTotalCount>3000&&!confirm(`Select all ${sgrnHistTotalCount} matching line(s)? This fetches the full matching list once.`))return;
-  toast('⏳ Selecting all matching lines…','info');
-  const qs=new URLSearchParams({limit:String(sgrnHistTotalCount)});
+  toast('⏳ Selecting all matching GRNs…','info');
+  const qs=new URLSearchParams({limit:String(Math.max(sgrnHistTotalCount,1))});
   if(sgrnHistSearchQuery)qs.set('q',sgrnHistSearchQuery);
-  const res=await api('/api/ho/supplier-grns?'+qs.toString());
-  if(res&&res.data){res.data.forEach(g=>selectedGrnLines.add(g.id));renderSGRNHistTable();toast(`✅ ${selectedGrnLines.size} line(s) selected`);}
+  const res=await api('/api/ho/supplier-grns-summary?'+qs.toString());
+  if(res&&res.data){res.data.forEach(g=>selectedGrnLines.add(g.grnId));renderSGRNHistTable();toast(`✅ ${selectedGrnLines.size} GRN(s) selected`);}
   else toast('❌ Failed to select all — try again','error');
 }
 function clearGrnLineSelection(){selectedGrnLines=new Set();renderSGRNHistTable();}
 function updateSgrnHistSelectedInfo(){
   const el=$('sgrn-hist-selected-info');
   if(!el)return;
-  el.textContent=selectedGrnLines.size?`✅ ${selectedGrnLines.size} line(s) selected · ${sgrnHistTotalCount} total match`:`${sgrnHistTotalCount} line(s) total`;
+  el.textContent=selectedGrnLines.size?`✅ ${selectedGrnLines.size} GRN(s) selected · ${sgrnHistTotalCount} total match`:`${sgrnHistTotalCount} GRN(s) total`;
 }
 async function deleteSupplierGRNLine(id){
   if(!confirm('Delete this GRN line? This reverses its qty from HO Warehouse stock.'))return;
   const res=await api('/api/ho/supplier-grn-line/'+id,{method:'DELETE'});
-  if(res&&res.ok){toast('🗑️ Deleted');selectedGrnLines.delete(id);await loadAll();await fetchAndRenderSGRNHist();}
+  if(res&&res.ok){toast('🗑️ Deleted');await loadAll();if(__sgrnDetailGrnId)viewSGRNDetail(__sgrnDetailGrnId);await fetchAndRenderSGRNHist();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Delete failed'),'error');
+}
+async function deleteWholeSupplierGRN(grnId){
+  if(!confirm(`Delete GRN ${grnId} entirely? This reverses ALL its lines' stock from HO Warehouse. Cannot be undone.`))return;
+  const res=await api('/api/ho/supplier-grn/'+encodeURIComponent(grnId),{method:'DELETE'});
+  if(res&&res.ok){toast(`🗑️ Deleted GRN ${grnId}`);selectedGrnLines.delete(grnId);await loadAll();await fetchAndRenderSGRNHist();}
   else toast('❌ '+((res&&(res.detail||res.msg))||'Delete failed'),'error');
 }
 async function deleteSelectedGrnLines(){
-  if(!selectedGrnLines.size){toast('No lines selected','error');return;}
-  if(!confirm(`Delete ${selectedGrnLines.size} selected GRN line(s)? This reverses their qty from HO Warehouse stock. This cannot be undone.`))return;
-  const res=await api('/api/ho/supplier-grn-lines/bulk-delete',{method:'POST',body:Array.from(selectedGrnLines)});
-  if(res&&res.ok){toast(`🗑️ Deleted ${res.deleted} line(s)`);selectedGrnLines=new Set();await loadAll();await fetchAndRenderSGRNHist();}
-  else toast('❌ Delete failed','error');
+  if(!selectedGrnLines.size){toast('No GRNs selected','error');return;}
+  if(!confirm(`Delete ${selectedGrnLines.size} selected GRN(s) entirely? This reverses all their lines' stock from HO Warehouse. This cannot be undone.`))return;
+  const ids=Array.from(selectedGrnLines);
+  let ok=0,failed=0;
+  for(const grnId of ids){
+    const res=await api('/api/ho/supplier-grn/'+encodeURIComponent(grnId),{method:'DELETE'});
+    if(res&&res.ok)ok++;else failed++;
+  }
+  toast(`🗑️ Deleted ${ok} GRN(s)`+(failed?`, ${failed} failed`:''),failed?'warn':'ok');
+  selectedGrnLines=new Set();
+  await loadAll();await fetchAndRenderSGRNHist();
 }
+let __sgrnDetailGrnId=null;
+async function viewSGRNDetail(grnId){
+  __sgrnDetailGrnId=grnId;
+  const res=await api('/api/ho/supplier-grns?q='+encodeURIComponent(grnId)+'&limit=500');
+  const lines=((res&&res.data)||[]).filter(l=>l.GRNID===grnId);
+  if($('sgrn-detail-title'))$('sgrn-detail-title').textContent='📦 '+grnId+' — Line Items';
+  if($('sgrn-detail-lines'))$('sgrn-detail-lines').innerHTML=lines.map(l=>`<tr><td style="font-family:monospace;font-size:10px">${l.Barcode}</td><td>${l.Name}</td><td>${l.Qty}</td><td>${fmt(l.UnitCost||0)}</td><td><button class="btn btn-ghost btn-sm" onclick="deleteSupplierGRNLine(${l.id})" title="Delete this line only">🗑</button></td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:14px">No lines found</td></tr>';
+  $('sgrn-detail-modal').style.display='flex';
+}
+function closeSGRNDetail(){$('sgrn-detail-modal').style.display='none';__sgrnDetailGrnId=null;}
 let sgrnHistSearchDebounce=null;
 function searchSGRNHist(query){
   clearTimeout(sgrnHistSearchDebounce);
