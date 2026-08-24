@@ -114,7 +114,7 @@ if(name==='purchase-orders'){if($('po-date'))$('po-date').value=today();poLines=
 if(name==='supplier-grn'){sgrnHistCurrentPage=1;fetchAndRenderSGRNHist();if($('sgrn-date'))$('sgrn-date').value=today();if($('sgrn-id'))$('sgrn-id').value='SGRN-'+Date.now().toString().slice(-6);}
 if(name==='store-grn'){stgrnPendingCurrentPage=1;stgrnDoneCurrentPage=1;fetchAndRenderStGRNPending();fetchAndRenderStGRNDone();populateStoreSelects();if($('stgrn-date'))$('stgrn-date').value=today();if($('stgrn-id'))$('stgrn-id').value='GRN-'+Date.now().toString().slice(-6);}
 if(name==='transfer'){renderTrHist();populateStoreSelects();}if(name==='products'){prodCurrentPage=1;fetchAndRenderProductsPage();}
-if(name==='pl'){plPreset();populateStoreSelects('pl-store');loadPL();}if(name==='expenses-ho'){populateStoreSelects('exp-store-filter');populateStoreSelects('ho-exp-store');if($('ho-exp-date'))$('ho-exp-date').value=today();loadExpenses();}if(name==='promotions')loadPromosHO();if(name==='accounts'){loadCOA();loadJournals();}if(name==='license')loadLicense();
+if(name==='pl'){plPreset();populateStoreSelects('pl-store');loadPL();}if(name==='expenses-ho'){populateStoreSelects('exp-store-filter');populateStoreSelects('ho-exp-store');if($('ho-exp-date'))$('ho-exp-date').value=today();loadExpenses();}if(name==='promotions')loadPromosHO();if(name==='accounts'){loadTrialBalance();loadCOA();loadJournals();}if(name==='license')loadLicense();
 if(name==='reports'){rptPreset();populateStoreSelects('rpt-store');}if(name==='inventory-ho'){invAllCurrentPage=1;fetchAndRenderInvAll();}
 if(name==='stores-admin')renderStoresAdmin();if(name==='users'){renderUsers();populateStoreSelects('u-store');}if(name==='banks')renderBanks();
 if(name==='settings'){if($('api-url'))$('api-url').value=CFG.apiUrl;loadSettingsForm();}
@@ -2591,13 +2591,33 @@ async function togglePromo(id){
 async function loadCOA(){
   const res=await api('/api/accounts/coa');
   const el=$('coa-table'); if(!el)return;
-  el.innerHTML=((res&&res.data)||[]).map(a=>`<tr><td>${a.code}</td><td>${a.name}</td><td>${a.type}</td><td>${a.active?'✅':'-'}</td></tr>`).join('');
+  el.innerHTML=((res&&res.data)||[]).map(a=>`<tr><td class="fw7" style="font-family:monospace">${a.code}</td><td>${a.name}</td><td><span class="badge badge-blue">${a.type}</span></td><td>${a.active?'✅':'—'}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No accounts</td></tr>';
+}
+async function loadTrialBalance(){
+  const res=await api('/api/accounts/trial-balance');
+  if(!res||!res.ok)return;
+  if($('tb-status'))$('tb-status').innerHTML=res.balanced
+    ?`<span class="badge badge-green">✅ Balanced</span> <span style="color:var(--gray4)">Total Debit ${fmt(res.totalDebit)} = Total Credit ${fmt(res.totalCredit)}</span>`
+    :`<span class="badge badge-red">⚠️ Out of balance</span> <span style="color:var(--gray4)">Debit ${fmt(res.totalDebit)} vs Credit ${fmt(res.totalCredit)}</span>`;
+  if($('tb-table'))$('tb-table').innerHTML=(res.data||[]).map(r=>`<tr><td class="fw7" style="font-family:monospace">${r.code}</td><td>${r.name}</td><td><span class="badge badge-blue">${r.type}</span></td><td class="text-right">${fmt(r.debit)}</td><td class="text-right">${fmt(r.credit)}</td><td class="text-right fw7">${fmt(Math.abs(r.balance))}${r.balance<0?' CR':''}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No activity yet</td></tr>';
 }
 async function loadJournals(){
-  const res=await api('/api/accounts/journals?limit=50');
+  const src=$('je-filter')?$('je-filter').value:'';
+  const res=await api('/api/accounts/journals?limit=100'+(src?('&source_type='+encodeURIComponent(src)):''));
   const el=$('je-list'); if(!el)return;
   const rows=(res&&res.data)||[];
-  el.innerHTML=rows.map(j=>`<div style="border-bottom:1px solid #eee;padding:6px 0"><b>${j.id}</b> ${j.date} · ${j.sourceType} ${j.sourceId}<div style="opacity:.8">${j.memo||''}</div>${(j.lines||[]).map(l=>`<div>${l.accountCode} ${l.accountName}: Dr ${l.debit} / Cr ${l.credit}</div>`).join('')}</div>`).join('')||'No journals';
+  const srcBadge=t=>({sale:'badge-green',expense:'badge-amber',manual:'badge-blue'}[t]||'badge-gray');
+  el.innerHTML=rows.map(j=>{
+    const totalDr=(j.lines||[]).reduce((a,l)=>a+(+l.debit||0),0);
+    return `<div style="border:1px solid var(--gray1);border-radius:8px;padding:10px 12px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><b>${j.id}</b> <span style="color:var(--gray4);font-size:11px">${j.date}</span> <span class="badge ${srcBadge(j.sourceType)}">${j.sourceType}</span></div>
+        <div style="font-size:11px;color:var(--gray4)">${j.sourceId}</div>
+      </div>
+      <div style="font-size:11px;color:var(--gray4);margin-bottom:6px">${j.memo||''}</div>
+      <table style="font-size:11.5px"><tbody>${(j.lines||[]).map(l=>`<tr><td style="font-family:monospace;padding:2px 6px 2px 0">${l.accountCode}</td><td style="padding:2px 6px">${l.accountName}</td><td class="text-right" style="padding:2px 6px">${l.debit?fmt(l.debit):''}</td><td class="text-right" style="padding:2px 0;color:var(--gray4)">${l.credit?fmt(l.credit):''}</td></tr>`).join('')}</tbody></table>
+    </div>`;
+  }).join('')||'<div style="text-align:center;color:var(--gray3);padding:20px">No journal entries yet</div>';
 }
 async function loadLicense(){
   const res=await api('/api/license/status');

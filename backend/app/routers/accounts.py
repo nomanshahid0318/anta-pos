@@ -36,6 +36,50 @@ class JournalIn(BaseModel):
     lines: list[JELineIn] = Field(default_factory=list)
 
 
+@router.get("/trial-balance")
+def trial_balance(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant", "manager"))],
+):
+    """Trial Balance — every account's total debits and credits across
+    all posted journal entries, with its net balance. Debits should
+    equal Credits in total; if they don't, something posted an
+    unbalanced entry somewhere (post_journal() should prevent this, but
+    this report is the honest check).
+    """
+    ensure_coa(db)
+    db.commit()
+    accounts = db.query(Account).order_by(Account.code).all()
+    lines = db.query(JournalLine).all()
+    by_account: dict = {}
+    for l in lines:
+        d = by_account.setdefault(l.account_id, {"debit": 0.0, "credit": 0.0})
+        d["debit"] += l.debit or 0
+        d["credit"] += l.credit or 0
+    data = []
+    total_debit = total_credit = 0.0
+    for a in accounts:
+        totals = by_account.get(a.id, {"debit": 0.0, "credit": 0.0})
+        debit, credit = totals["debit"], totals["credit"]
+        if debit == 0 and credit == 0:
+            continue
+        # Normal balance side depends on account type — asset/expense
+        # accounts normally carry a debit balance, liability/equity/income
+        # carry credit.
+        net = debit - credit
+        total_debit += debit
+        total_credit += credit
+        data.append({
+            "code": a.code, "name": a.name, "type": a.type,
+            "debit": round(debit, 2), "credit": round(credit, 2), "balance": round(net, 2),
+        })
+    return {
+        "ok": True, "data": data,
+        "totalDebit": round(total_debit, 2), "totalCredit": round(total_credit, 2),
+        "balanced": abs(total_debit - total_credit) < 0.01,
+    }
+
+
 @router.get("/coa")
 def list_coa(
     db: Annotated[Session, Depends(get_db)],
