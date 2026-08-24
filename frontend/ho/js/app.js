@@ -102,11 +102,12 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Count','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
 if(name==='shifts'){loadShifts();}
+if(name==='stock-counts'){populateSCStoreSelect();loadStockCounts();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
 if(name==='stock-aging'){loadStockAging();}
@@ -2250,6 +2251,81 @@ async function loadShifts(){
 }
 function exportShifts(){
   _csvDownload(__shiftList,[['Cashier','cashierName'],['Store','storeName'],['Opened','openedAt'],['Closed','closedAt'],['Opening Cash','openingCash'],['Cash Sales','cashSales'],['Cash Refunds','cashRefunds'],['Additions','cashAdditions'],['Withdrawals','cashWithdrawals'],['Expected','expectedCash'],['Counted','countedCash'],['Variance','variance'],['Status','status']],'cashier_shifts_'+today()+'.csv');
+}
+
+// ---------- Stock Count / Physical Adjustments ----------
+let __scList=[],__scCurrent=null;
+function populateSCStoreSelect(){
+  const opts=(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+  if($('sc-store'))$('sc-store').innerHTML=opts;
+  if($('qa-store'))$('qa-store').innerHTML=opts;
+}
+async function loadStockCounts(){
+  const res=await api('/api/stock-counts');
+  if(!res||!res.ok){toast('Failed to load counts','error');return;}
+  __scList=res.data||[];
+  if($('sc-list'))$('sc-list').innerHTML=__scList.map(c=>`<tr><td class="fw7" style="font-size:11px">${c.id}</td><td>${c.storeName}</td><td>${c.date}</td><td>${c.countedLines}/${c.totalLines}</td><td>${c.varianceLines>0?`<span class="badge badge-amber">${c.varianceLines}</span>`:'—'}</td><td><span class="badge ${c.status==='approved'?'badge-green':'badge-amber'}">${c.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="openStockCount('${c.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No counts yet</td></tr>';
+}
+async function startStockCount(){
+  const storeId=$('sc-store')?$('sc-store').value:'';
+  const storeName=$('sc-store')?$('sc-store').options[$('sc-store').selectedIndex]?.text:'';
+  if(!storeId){toast('Select a store','error');return;}
+  const res=await api('/api/stock-counts/start',{method:'POST',body:{storeId,storeName}});
+  if(res&&res.ok){
+    toast(`✅ Count started — ${res.lineCount} item(s) snapshotted`);
+    await loadStockCounts();
+    openStockCount(res.id);
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function openStockCount(id){
+  const res=await api(`/api/stock-counts/${encodeURIComponent(id)}`);
+  if(!res||!res.ok){toast('Failed to load','error');return;}
+  __scCurrent=res;
+  if($('sc-detail-title'))$('sc-detail-title').textContent=`📋 ${res.id} — ${res.storeName} (${res.status})`;
+  const locked=res.status!=='draft';
+  if($('sc-lines-table'))$('sc-lines-table').innerHTML=(res.lines||[]).map((l,i)=>`<tr>
+    <td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}</td><td>${l.systemQty}</td>
+    <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="sc-phys-${i}" data-barcode="${l.barcode}" value="${l.physicalQty!=null?l.physicalQty:''}" ${locked?'disabled':''}></td>
+    <td class="fw7" style="color:${l.variance>0?'var(--green)':l.variance<0?'var(--red)':'var(--gray4)'}">${l.variance!=null?l.variance:'—'}</td>
+    <td><input class="form-input" style="padding:4px 7px" id="sc-reason-${i}" value="${l.reason||''}" ${locked?'disabled':''}></td>
+  </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No items</td></tr>';
+  document.querySelectorAll('#sc-detail-card [data-role]').forEach(el=>{}); // role visibility already applied globally
+  $('sc-detail-card').style.display='block';
+  $('sc-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function saveCountLines(){
+  if(!__scCurrent)return;
+  const inputs=document.querySelectorAll('[id^="sc-phys-"]');
+  const lines=[...inputs].filter(inp=>inp.value!=='').map(inp=>{
+    const i=inp.id.split('-')[2];
+    return {barcode:inp.dataset.barcode,physicalQty:+inp.value,reason:($('sc-reason-'+i)?.value)||''};
+  });
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
+  if(res&&res.ok){toast(`✅ ${res.updated} entries saved`);openStockCount(__scCurrent.id);loadStockCounts();}
+  else toast('❌ Failed','error');
+}
+async function approveStockCount(){
+  if(!__scCurrent)return;
+  if(!confirm('Approve this count? This will apply all variances to Inventory immediately and cannot be undone.'))return;
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/approve`,{method:'POST'});
+  if(res&&res.ok){
+    toast(`✅ Approved — ${res.linesAdjusted} item(s) adjusted`);
+    await loadAll();openStockCount(__scCurrent.id);loadStockCounts();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function submitQuickAdjust(){
+  const barcode=($('qa-barcode')&&$('qa-barcode').value.trim())||'';
+  const storeId=$('qa-store')?$('qa-store').value:'';
+  const storeName=$('qa-store')?$('qa-store').options[$('qa-store').selectedIndex]?.text:'';
+  const newQty=+(($('qa-qty')&&$('qa-qty').value)||'');
+  const reason=($('qa-reason')&&$('qa-reason').value.trim())||'';
+  if(!barcode||!storeId||isNaN(newQty)||!reason){toast('Barcode, store, quantity, and reason are all required','error');return;}
+  const res=await api('/api/stock-counts/quick-adjust',{method:'POST',body:{barcode,storeId,storeName,newQty,reason}});
+  if(res&&res.ok){
+    toast(res.status==='no_change'?'No change — quantity already matches':'✅ Adjustment applied — new qty '+res.newQty);
+    ['qa-barcode','qa-qty','qa-reason'].forEach(id=>{if($(id))$(id).value='';});
+    await loadAll();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 
 function saveCapital(){}

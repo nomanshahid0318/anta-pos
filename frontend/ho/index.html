@@ -101,6 +101,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
+    <div class="nav-item" onclick="show('stock-counts')" data-role="admin,manager,warehouse"><span class="ico">📋</span>Stock Count</div>
     <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
     <div class="nav-sec">Admin</div>
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
@@ -768,6 +769,46 @@ body{display:flex;height:100vh;overflow:hidden}
       <table><thead><tr><th>Barcode</th><th>Product</th><th>HO Stock</th><th id="inv-s1">Store 1</th><th id="inv-s2">Store 2</th><th id="inv-s3">Store 3</th><th>Total Stock</th></tr></thead>
       <tbody id="inv-all-table"></tbody></table>
       <div id="inv-all-pagination"></div>
+    </div>
+  </div>
+
+  <!-- STOCK COUNT -->
+  <div id="screen-stock-counts" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">📋 Start New Physical Count</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">Snapshots current system quantity for every item in the store, so counters enter what they physically see without knowing the system number in advance (blind count). Nothing changes in Inventory until a manager/admin <b>Approves</b> the completed count.</p>
+        <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="sc-store"></select></div>
+        <button class="btn btn-primary btn-sm" onclick="startStockCount()">▶️ Start Count</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📂 Recent Counts</div>
+        <table><thead><tr><th>ID</th><th>Store</th><th>Date</th><th>Counted</th><th>Variances</th><th>Status</th><th></th></tr></thead>
+        <tbody id="sc-list"></tbody></table>
+      </div>
+    </div>
+    <div class="card" id="sc-detail-card" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title" style="margin:0" id="sc-detail-title">📋 Count Detail</div>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-ghost btn-sm" onclick="saveCountLines()">💾 Save Entries</button>
+          <button class="btn btn-green btn-sm" data-role="admin,manager" onclick="approveStockCount()">✅ Approve &amp; Apply Adjustments</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Enter the physically counted quantity for each item. Leave blank to skip an item (won't be adjusted). A reason is recommended for any variance.</p>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>System Qty</th><th>Physical Qty</th><th>Variance</th><th>Reason</th></tr></thead>
+      <tbody id="sc-lines-table"></tbody></table>
+    </div>
+    <div class="card" data-role="admin,manager">
+      <div class="card-title">⚡ Quick Single-Item Adjustment</div>
+      <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">For a one-off correction outside a full count (e.g. one damaged pair found). Manager/admin only, reason required.</p>
+      <div class="grid-3">
+        <div class="form-group"><label class="form-label">Barcode</label><input class="form-input" id="qa-barcode" placeholder="Scan or type barcode"></div>
+        <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="qa-store"></select></div>
+        <div class="form-group"><label class="form-label">New Quantity</label><input class="form-input" type="number" id="qa-qty" placeholder="0"></div>
+        <div class="form-group" style="grid-column:span 3"><label class="form-label">Reason</label><input class="form-input" id="qa-reason" placeholder="e.g. Found damaged during shelving"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="submitQuickAdjust()">✅ Apply Adjustment</button>
     </div>
   </div>
 

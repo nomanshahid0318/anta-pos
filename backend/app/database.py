@@ -68,6 +68,7 @@ def init_db() -> None:
     from . import models_crm  # noqa: F401
     from . import models_audit  # noqa: F401
     from . import models_shifts  # noqa: F401
+    from . import models_stockcount  # noqa: F401
     from .seed import seed_if_empty
 
     # Ensure parent dir exists for sqlite
@@ -131,6 +132,9 @@ def _auto_migrate() -> None:
         },
         "returns": {
             "shift_id": "VARCHAR(64) DEFAULT ''",
+        },
+        "inventory": {
+            "adjustments": "INTEGER DEFAULT 0",
         },
     }
     is_postgres = not settings.database_url.startswith("sqlite")

@@ -109,6 +109,7 @@ class Inventory(Base):
     exch_out: Mapped[int] = mapped_column(Integer, default=0)
     exch_in: Mapped[int] = mapped_column(Integer, default=0)
     claims: Mapped[int] = mapped_column(Integer, default=0)
+    adjustments: Mapped[int] = mapped_column(Integer, default=0)  # net +/- from Stock Count corrections
     on_hand: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
@@ -120,6 +121,7 @@ class Inventory(Base):
             - (self.exch_out or 0)
             + (self.exch_in or 0)
             - (self.claims or 0)
+            + (self.adjustments or 0)
         )
 
 
