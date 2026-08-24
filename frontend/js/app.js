@@ -288,6 +288,72 @@ function doLogin(user, storeId, storeName) {
   try { checkLicense(); } catch (e) {}
   document.getElementById('shift-t').textContent = new Date().toTimeString().slice(0, 5);
   initApp();
+  checkShiftOnLogin();
+}
+async function checkShiftOnLogin() {
+  const res = await api('/api/shifts/current');
+  if (res && res.ok && res.data) {
+    window.CURRENT_SHIFT = res.data;
+    updateShiftIndicator();
+  } else if (USER.role === 'cashier') {
+    openShiftModal();
+  }
+}
+function openShiftModal() {
+  const m = document.getElementById('shift-open-modal');
+  if (m) m.style.display = 'flex';
+}
+async function confirmOpenShift() {
+  const amt = +getVal('shift-open-cash', 0) || 0;
+  const res = await api('/api/shifts/open', { method: 'POST', body: { openingCash: amt } });
+  if (res && res.ok) {
+    window.CURRENT_SHIFT = res;
+    updateShiftIndicator();
+    const m = document.getElementById('shift-open-modal'); if (m) m.style.display = 'none';
+    toast('✅ Shift opened — opening float ' + fmt(amt));
+  } else toast('❌ Failed to open shift', 'error');
+}
+function updateShiftIndicator() {
+  const el = document.getElementById('shift-indicator');
+  if (!el) return;
+  if (window.CURRENT_SHIFT) {
+    el.style.display = 'inline-flex';
+    el.title = 'Shift open since ' + (window.CURRENT_SHIFT.openedAt || '').slice(11, 16);
+  } else {
+    el.style.display = 'none';
+  }
+}
+function openShiftPanel() {
+  if (!window.CURRENT_SHIFT) { toast('No open shift', 'warn'); return; }
+  const m = document.getElementById('shift-panel-modal');
+  if (!m) return;
+  document.getElementById('shift-panel-body').innerHTML = `
+    <div style="font-size:12px;color:var(--gray4);margin-bottom:10px">Opened ${(window.CURRENT_SHIFT.openedAt||'').slice(0,16).replace('T',' ')} · Opening float ${fmt(window.CURRENT_SHIFT.openingCash||0)}</div>
+  `;
+  m.style.display = 'flex';
+}
+function closeShiftPanel() { const m = document.getElementById('shift-panel-modal'); if (m) m.style.display = 'none'; }
+async function recordShiftCashMovement(type) {
+  const amt = +prompt(type === 'addition' ? 'Cash addition amount?' : 'Cash withdrawal amount?', '') || 0;
+  if (!amt || amt <= 0) return;
+  const reason = prompt('Reason (required)?', '') || '';
+  if (!reason.trim()) { toast('A reason is required', 'error'); return; }
+  const res = await api(`/api/shifts/${encodeURIComponent(window.CURRENT_SHIFT.id)}/cash-movement`, { method: 'POST', body: { type, amount: amt, reason } });
+  if (res && res.ok) { toast('✅ Recorded'); closeShiftPanel(); }
+  else toast('❌ ' + ((res && (res.detail || res.msg)) || 'Failed'), 'error');
+}
+async function closeShiftFlow() {
+  const counted = prompt('Count the physical cash drawer. Enter the total cash counted:', '');
+  if (counted === null) return;
+  const amt = +counted || 0;
+  const res = await api(`/api/shifts/${encodeURIComponent(window.CURRENT_SHIFT.id)}/close`, { method: 'POST', body: { countedCash: amt } });
+  if (res && res.ok) {
+    const v = res.variance || 0;
+    alert(`Shift closed.\n\nExpected Cash: ${fmt(res.expectedCash)}\nCounted Cash: ${fmt(res.countedCash)}\nVariance: ${fmt(v)} ${v === 0 ? '(exact match ✅)' : v > 0 ? '(over)' : '(short)'}`);
+    window.CURRENT_SHIFT = null;
+    updateShiftIndicator();
+    closeShiftPanel();
+  } else toast('❌ ' + ((res && (res.detail || res.msg)) || 'Failed'), 'error');
 }
 function logout() {
   if (!confirm('Log out?')) return;

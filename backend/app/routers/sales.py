@@ -5,11 +5,13 @@ import json
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
 from ..models import Claim, Exchange, InvoiceCounter, Return, Sale
+from ..models_shifts import Shift
 from ..models_crm import Customer
 from ..schemas import (
     ClaimIn,
@@ -28,7 +30,16 @@ router = APIRouter(prefix="/api", tags=["transactions"])
 
 
 def _next_invoice(db: Session, store_id: str) -> str:
-    row = db.query(InvoiceCounter).filter(InvoiceCounter.store_id == store_id).first()
+    # SELECT ... FOR UPDATE locks this counter row until the caller's
+    # transaction commits. Without this, two checkouts arriving at nearly
+    # the same moment could both read the same next_inv value before
+    # either had committed its increment — producing two real sales that
+    # share one invoice number (confirmed happening: duplicate invoice_id
+    # rows with different items, only one carrying payment/total, showing
+    # up as "blank" rows in Sales Reports). Locking makes the second
+    # request wait until the first fully commits, then read the
+    # now-updated value — invoice numbers can never collide again.
+    row = db.query(InvoiceCounter).filter(InvoiceCounter.store_id == store_id).with_for_update().first()
     if not row:
         row = InvoiceCounter(store_id=store_id, next_inv=1)
         db.add(row)
@@ -74,15 +85,13 @@ def create_sale(
 ):
     store_id = body.storeId or user.store_id
     store = body.store or user.store_name
-    inv_id = body.id or _next_invoice(db, store_id)
 
-    existing = (
-        db.query(Sale)
-        .filter(Sale.invoice_id == inv_id, Sale.store_id == store_id)
-        .first()
-    )
-    if existing:
-        return {"ok": True, "status": "duplicate", "id": inv_id, "sale": _sale_to_out(existing)}
+    # If the caller supplied their own invoice id (offline-queue retry),
+    # duplicates are handled once, up front, and never retried below.
+    if body.id:
+        existing = db.query(Sale).filter(Sale.invoice_id == body.id, Sale.store_id == store_id).first()
+        if existing:
+            return {"ok": True, "status": "duplicate", "id": body.id, "sale": _sale_to_out(existing)}
 
     date = body.date or today_str()
     time_ = body.time or time_str()
@@ -93,77 +102,97 @@ def create_sale(
     subtotal = body.subtotal or priced["subtotal"]
     discount = max(float(body.discount or 0), float(priced["discount"] or 0))
     global_discount = max(float(body.globalDiscount or 0), float(priced["globalDiscount"] or 0))
-    total = body.total if body.total and body.total > 0 else priced["total"]
+    base_total = body.total if body.total and body.total > 0 else priced["total"]
     # If client total diverges a lot, trust server promo total when promos applied
     if priced.get("promoNotes") and abs(float(body.total or 0) - float(priced["total"])) > 0.01:
-        subtotal, discount, global_discount, total = (
+        subtotal, discount, global_discount, base_total = (
             priced["subtotal"], priced["discount"], priced["globalDiscount"], priced["total"]
         )
 
-    # Loyalty: look up the customer (if one was selected/scanned at
-    # checkout), apply a points redemption as an extra discount on top of
-    # everything else, then — once the sale is saved — award new points
-    # on the net amount actually paid and update their visit stats.
-    customer = None
-    loyalty_discount = 0.0
-    redeemed_points = 0.0
-    if body.customerId:
-        customer = db.query(Customer).filter(Customer.customer_id == body.customerId, Customer.active.is_(True)).first()
-        if customer and body.redeemPoints and body.redeemPoints > 0:
-            redeemed_points = min(float(body.redeemPoints), float(customer.loyalty_points or 0))
-            loyalty_discount = round(redeemed_points * loyalty.redeem_value(db), 2)
-            if loyalty_discount > total:
-                # Capped by the sale total — recompute the points actually
-                # "spent" for that capped discount, so we don't deduct more
-                # points than the discount they actually received.
-                loyalty_discount = total
-                redeemed_points = round(loyalty_discount / max(loyalty.redeem_value(db), 0.0001), 2)
-            total = round(total - loyalty_discount, 2)
+    # The whole save is retried (server-generated invoice ids only) if a
+    # unique-constraint conflict is hit anywhere in this block. The row
+    # lock in _next_invoice() is the primary defense on Postgres (where it
+    # actually locks); this retry loop is what keeps checkouts working
+    # correctly even on SQLite, where FOR UPDATE is a silent no-op and a
+    # genuine race can still slip through — instead of the cashier seeing
+    # a failed sale, it just transparently gets the next free number.
+    max_attempts = 5 if not body.id else 1
+    last_error: Exception | None = None
+    for _attempt in range(max_attempts):
+        inv_id = body.id or _next_invoice(db, store_id)
+        total = base_total
 
-    sale = Sale(
-        invoice_id=inv_id,
-        date=date,
-        time=time_,
-        store=store,
-        store_id=store_id,
-        customer=body.customer or (customer.name if customer else "Walk-in"),
-        customer_id=body.customerId or "",
-        loyalty_discount=loyalty_discount,
-        items_json=json.dumps(items),
-        subtotal=subtotal,
-        discount=discount,
-        global_discount=global_discount,
-        total=total,
-        payment=body.payment or "Cash",
-        pay_ref=body.payRef or "",
-        type="sale",
-    )
-    db.add(sale)
-    for item in items:
-        update_inv(
-            db,
-            item.get("barcode") or "",
-            store,
-            store_id,
-            item.get("name") or "",
-            "sale",
-            int(item.get("qty") or 1),
+        customer = None
+        loyalty_discount = 0.0
+        redeemed_points = 0.0
+        if body.customerId:
+            customer = db.query(Customer).filter(Customer.customer_id == body.customerId, Customer.active.is_(True)).first()
+            if customer and body.redeemPoints and body.redeemPoints > 0:
+                redeemed_points = min(float(body.redeemPoints), float(customer.loyalty_points or 0))
+                loyalty_discount = round(redeemed_points * loyalty.redeem_value(db), 2)
+                if loyalty_discount > total:
+                    loyalty_discount = total
+                    redeemed_points = round(loyalty_discount / max(loyalty.redeem_value(db), 0.0001), 2)
+                total = round(total - loyalty_discount, 2)
+
+        open_shift = db.query(Shift).filter(Shift.cashier_id == user.user_id, Shift.status == "open").first()
+        sale = Sale(
+            invoice_id=inv_id,
+            date=date,
+            time=time_,
+            store=store,
+            store_id=store_id,
+            customer=body.customer or (customer.name if customer else "Walk-in"),
+            customer_id=body.customerId or "",
+            loyalty_discount=loyalty_discount,
+            items_json=json.dumps(items),
+            subtotal=subtotal,
+            discount=discount,
+            global_discount=global_discount,
+            total=total,
+            payment=body.payment or "Cash",
+            pay_ref=body.payRef or "",
+            type="sale",
+            shift_id=open_shift.shift_id if open_shift else "",
         )
-    if customer:
-        earned = round(total * loyalty.earn_rate(db), 2)
-        customer.loyalty_points = round(max(float(customer.loyalty_points or 0) - redeemed_points + earned, 0), 2)
-        customer.total_spent = round(float(customer.total_spent or 0) + total, 2)
-        customer.visit_count = int(customer.visit_count or 0) + 1
-        customer.last_visit = date
-        if not customer.first_visit:
-            customer.first_visit = date
-        sale.loyalty_points_earned = earned
-    post_sale_journal(db, sale)
-    db.commit()
-    db.refresh(sale)
-    out = _sale_to_out(sale)
-    out["promoNotes"] = priced.get("promoNotes") or []
-    return {"ok": True, "status": "ok", "id": inv_id, "sale": out}
+        try:
+            db.add(sale)
+            for item in items:
+                update_inv(
+                    db,
+                    item.get("barcode") or "",
+                    store,
+                    store_id,
+                    item.get("name") or "",
+                    "sale",
+                    int(item.get("qty") or 1),
+                )
+            if customer:
+                earned = round(total * loyalty.earn_rate(db), 2)
+                customer.loyalty_points = round(max(float(customer.loyalty_points or 0) - redeemed_points + earned, 0), 2)
+                customer.total_spent = round(float(customer.total_spent or 0) + total, 2)
+                customer.visit_count = int(customer.visit_count or 0) + 1
+                customer.last_visit = date
+                if not customer.first_visit:
+                    customer.first_visit = date
+                sale.loyalty_points_earned = earned
+            post_sale_journal(db, sale)
+            db.commit()
+        except IntegrityError as e:
+            db.rollback()
+            last_error = e
+            if body.id:
+                # A client-supplied id colliding means a genuine conflict
+                # the caller needs to know about, not something to retry.
+                raise HTTPException(status_code=409, detail="This invoice number was just used by another sale — please retry.")
+            continue  # server-generated id collided under load — get a fresh one and try again
+        else:
+            db.refresh(sale)
+            out = _sale_to_out(sale)
+            out["promoNotes"] = priced.get("promoNotes") or []
+            return {"ok": True, "status": "ok", "id": inv_id, "sale": out}
+
+    raise HTTPException(status_code=409, detail="Could not save this sale after several attempts — please retry.") from last_error
 
 
 @router.get("/sales")
@@ -199,6 +228,7 @@ def create_return(
     if db.query(Return).filter(Return.ref_id == ref).first():
         return {"ok": True, "status": "duplicate", "ref": ref}
 
+    open_shift = db.query(Shift).filter(Shift.cashier_id == user.user_id, Shift.status == "open").first()
     row = Return(
         ref_id=ref,
         date=body.date or today_str(),
@@ -212,6 +242,7 @@ def create_return(
         amount=body.amount or 0,
         method=body.method or "Cash",
         reason=body.reason or "",
+        shift_id=open_shift.shift_id if open_shift else "",
     )
     db.add(row)
     update_inv(db, body.barcode, store, store_id, body.productName or "", "return", body.qty or 1)

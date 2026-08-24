@@ -152,6 +152,7 @@ class Sale(Base):
     customer_id: Mapped[str] = mapped_column(String(64), default="", index=True)
     loyalty_discount: Mapped[float] = mapped_column(Float, default=0.0)
     loyalty_points_earned: Mapped[float] = mapped_column(Float, default=0.0)
+    shift_id: Mapped[str] = mapped_column(String(64), default="", index=True)
     items_json: Mapped[str] = mapped_column(Text, default="[]")
     subtotal: Mapped[float] = mapped_column(Float, default=0.0)
     discount: Mapped[float] = mapped_column(Float, default=0.0)
@@ -179,6 +180,7 @@ class Return(Base):
     amount: Mapped[float] = mapped_column(Float, default=0.0)
     method: Mapped[str] = mapped_column(String(64), default="Cash")
     reason: Mapped[str] = mapped_column(String(255), default="")
+    shift_id: Mapped[str] = mapped_column(String(64), default="", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 

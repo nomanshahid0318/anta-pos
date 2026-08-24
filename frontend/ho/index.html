@@ -96,6 +96,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('prepaid-expenses')" data-role="admin,manager,accountant"><span class="ico">📆</span>Prepaid Expenses</div>
     <div class="nav-item" onclick="show('employee-advances')" data-role="admin,manager,accountant"><span class="ico">🤲</span>Employee Advances</div>
     <div class="nav-item" onclick="show('accrued-expenses')" data-role="admin,manager,accountant"><span class="ico">⏳</span>Accrued Expenses</div>
+    <div class="nav-item" onclick="show('shifts')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cashier Shifts</div>
     <div class="nav-sec">Reports</div>
     <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
@@ -1385,6 +1386,24 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveAccruedExpense()">💾 Save Accrued Expense</button>
       </div>
+    </div>
+  </div>
+
+  <!-- CASHIER SHIFTS -->
+  <div id="screen-shifts" class="screen">
+    <div class="kpi-grid" id="shift-kpis"></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin:0">🧾 Cashier Shifts</div>
+        <div style="display:flex;gap:8px">
+          <select class="form-input" style="width:150px;padding:5px 9px" id="shift-status-filter" onchange="loadShifts()">
+            <option value="">All</option><option value="open">Open</option><option value="closed">Closed</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="exportShifts()">⬇️ Export</button>
+        </div>
+      </div>
+      <table><thead><tr><th>Cashier</th><th>Store</th><th>Opened</th><th>Closed</th><th>Opening Cash</th><th>Cash Sales</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status</th></tr></thead>
+      <tbody id="shift-table"></tbody></table>
     </div>
   </div>
 

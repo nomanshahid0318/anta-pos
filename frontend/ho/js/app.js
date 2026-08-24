@@ -102,10 +102,11 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
+if(name==='shifts'){loadShifts();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
 if(name==='stock-aging'){loadStockAging();}
@@ -2224,6 +2225,31 @@ async function deleteAccrued(id){
 }
 function exportAccruedExpenses(){
   _csvDownload(__acrList,[['Name','name'],['Category','category'],['Store','storeId'],['Date','date'],['Amount','amount'],['Settled','settled']],'accrued_expenses_'+today()+'.csv');
+}
+
+// ---------- Cashier Shifts ----------
+let __shiftList=[];
+async function loadShifts(){
+  const status=$('shift-status-filter')?$('shift-status-filter').value:'';
+  const res=await api('/api/shifts'+(status?('?status='+status):''));
+  if(!res||!res.ok){toast('Failed to load shifts','error');return;}
+  __shiftList=res.data||[];
+  const openCount=__shiftList.filter(s=>s.status==='open').length;
+  const totalVariance=__shiftList.filter(s=>s.status==='closed').reduce((a,s)=>a+Math.abs(s.variance||0),0);
+  const shortages=__shiftList.filter(s=>s.status==='closed'&&(s.variance||0)<-0.01).length;
+  if($('shift-kpis'))$('shift-kpis').innerHTML=[
+    ['Open Shifts',openCount,'amber'],
+    ['Total Shifts',__shiftList.length,''],
+    ['Shifts with Shortage',shortages,shortages>0?'red':'green'],
+    ['Total Variance (abs)',fmt(totalVariance),''],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  if($('shift-table'))$('shift-table').innerHTML=__shiftList.map(s=>{
+    const vColor=s.variance==null?'':(Math.abs(s.variance)<0.01?'var(--green)':s.variance<0?'var(--red)':'var(--amber)');
+    return `<tr><td class="fw7">${s.cashierName}</td><td>${s.storeName}</td><td style="font-size:11px">${(s.openedAt||'').slice(0,16).replace('T',' ')}</td><td style="font-size:11px">${s.closedAt?(s.closedAt.slice(0,16).replace('T',' ')):'—'}</td><td>${fmt(s.openingCash)}</td><td>${fmt(s.cashSales)}</td><td>${s.status==='closed'?fmt(s.expectedCash):'—'}</td><td>${s.countedCash!=null?fmt(s.countedCash):'—'}</td><td class="fw7" style="color:${vColor}">${s.variance!=null?fmt(s.variance):'—'}</td><td><span class="badge ${s.status==='open'?'badge-amber':'badge-green'}">${s.status}</span></td></tr>`;
+  }).join('')||'<tr><td colspan="10" style="text-align:center;color:var(--gray3);padding:16px">No shifts yet</td></tr>';
+}
+function exportShifts(){
+  _csvDownload(__shiftList,[['Cashier','cashierName'],['Store','storeName'],['Opened','openedAt'],['Closed','closedAt'],['Opening Cash','openingCash'],['Cash Sales','cashSales'],['Cash Refunds','cashRefunds'],['Additions','cashAdditions'],['Withdrawals','cashWithdrawals'],['Expected','expectedCash'],['Counted','countedCash'],['Variance','variance'],['Status','status']],'cashier_shifts_'+today()+'.csv');
 }
 
 function saveCapital(){}

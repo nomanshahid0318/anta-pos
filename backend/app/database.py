@@ -67,6 +67,7 @@ def init_db() -> None:
     from . import models_accounting  # noqa: F401
     from . import models_crm  # noqa: F401
     from . import models_audit  # noqa: F401
+    from . import models_shifts  # noqa: F401
     from .seed import seed_if_empty
 
     # Ensure parent dir exists for sqlite
@@ -126,6 +127,10 @@ def _auto_migrate() -> None:
             "customer_id": "VARCHAR(64) DEFAULT ''",
             "loyalty_discount": "FLOAT DEFAULT 0",
             "loyalty_points_earned": "FLOAT DEFAULT 0",
+            "shift_id": "VARCHAR(64) DEFAULT ''",
+        },
+        "returns": {
+            "shift_id": "VARCHAR(64) DEFAULT ''",
         },
     }
     is_postgres = not settings.database_url.startswith("sqlite")
@@ -168,4 +173,41 @@ def _auto_migrate() -> None:
                     conn.execute(text("SET LOCAL statement_timeout = '15s'"))
                 conn.execute(text("UPDATE products SET original_price = retail WHERE original_price = 0 OR original_price IS NULL"))
         except (OperationalError, Exception):  # noqa: BLE001
+            pass
+
+    # The Sale model has always declared invoice_id+store_id as unique,
+    # but on a database whose sales table already existed before that was
+    # added, create_all() never goes back and adds it — so it was never
+    # actually enforced. Combined with a (now-fixed) race condition in
+    # invoice number generation, that let genuinely different sales slip
+    # in sharing one invoice number, showing up as confusing "half-blank"
+    # duplicate rows in Sales Reports. Create the missing index now. If
+    # older duplicate rows already exist they're merged first — the sale
+    # with the actual payment/total kept, any zero/blank duplicate
+    # sharing its invoice number removed (no items are double-counted:
+    # duplicates only ever occur when one row lacks real payment data).
+    try:
+        existing_indexes = {i["name"] for i in inspector.get_indexes("sales")} if "sales" in inspector.get_table_names() else set()
+    except Exception:  # noqa: BLE001
+        existing_indexes = set()
+    if "uq_sale_inv_store" not in existing_indexes:
+        try:
+            with engine.begin() as conn:
+                if is_postgres:
+                    conn.execute(text("SET LOCAL lock_timeout = '5s'"))
+                    conn.execute(text("SET LOCAL statement_timeout = '15s'"))
+                conn.execute(text("""
+                    DELETE FROM sales WHERE id IN (
+                        SELECT s1.id FROM sales s1
+                        JOIN sales s2 ON s1.invoice_id = s2.invoice_id AND s1.store_id = s2.store_id AND s1.id > s2.id
+                        WHERE COALESCE(s1.total, 0) = 0 OR COALESCE(s1.payment, '') = ''
+                    )
+                """))
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX uq_sale_inv_store ON sales (invoice_id, store_id)"
+                ))
+        except (OperationalError, Exception):  # noqa: BLE001 — if real (non-blank) duplicates
+            # still exist, index creation fails safely; the race-condition
+            # fix in _next_invoice() still stops any *new* ones from
+            # forming even without the DB-level index.
             pass
