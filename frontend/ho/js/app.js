@@ -102,7 +102,10 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
+if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
+if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
 if(name==='stock-aging'){loadStockAging();}
@@ -1992,6 +1995,237 @@ async function deleteFixedAssetUI(assetId){
 function exportFixedAssets(){
   _csvDownload(__faList,[['Name','name'],['Category','category'],['Store','storeId'],['Purchase Date','purchaseDate'],['Cost','cost'],['Salvage Value','salvageValue'],['Useful Life (yrs)','usefulLifeYears'],['Monthly Depreciation','monthlyDepreciation'],['Accumulated Depreciation','accumulatedDepreciation'],['Book Value','bookValue'],['Disposed','disposed']],'fixed_assets_'+today()+'.csv');
 }
+
+// ---------- Prepaid / Deferred Expenses ----------
+let __ppdList=[];
+function populatePrepaidStoreSelect(){
+  const el=$('ppd-store');
+  if(!el)return;
+  const opts='<option value="HO">Head Office</option>'+(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+  el.innerHTML=opts;
+}
+async function loadPrepaidExpenses(){
+  const res=await api('/api/ho/prepaid-expenses');
+  if(!res||!res.ok){toast('Failed to load prepaid expenses','error');return;}
+  __ppdList=res.data||[];
+  if($('ppd-kpis'))$('ppd-kpis').innerHTML=[
+    ['Total Paid',fmt(res.totalAmount||0),''],
+    ['Amortized So Far',fmt(res.totalAmortized||0),'amber'],
+    ['Remaining Balance',fmt(res.totalRemaining||0),'green'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  if($('ppd-table'))$('ppd-table').innerHTML=__ppdList.map(p=>{
+    const status=p.writtenOff?'<span class="badge badge-gray">Written Off</span>':(p.fullyAmortized?'<span class="badge badge-amber">Fully Amortized</span>':'<span class="badge badge-green">Active</span>');
+    const actions=p.writtenOff?'—':`<button class="btn btn-ghost btn-sm" onclick="editPrepaidExpense('${p.id}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="writeOffPrepaidExpense('${p.id}')">📦 Write Off</button> <button class="btn btn-ghost btn-sm" onclick="deletePrepaidExpense('${p.id}')">🗑️</button>`;
+    return `<tr><td class="fw7">${p.name}</td><td>${p.category||''}</td><td>${p.storeId||'HO'}</td><td>${p.startDate}</td><td>${fmt(p.totalAmount)}</td><td>${fmt(p.monthlyAmortization)}</td><td>${fmt(p.amortizedToDate)}</td><td class="fw7">${fmt(p.remainingBalance)}</td><td>${status}</td><td data-role="admin,accountant">${actions}</td></tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--gray3);padding:16px">No prepaid expenses yet</td></tr>';
+  applyRoleUI();
+}
+async function savePrepaidExpense(){
+  const name=$('ppd-name').value.trim();
+  const amount=parseFloat($('ppd-amount').value)||0;
+  const months=parseInt($('ppd-months').value)||0;
+  if(!name||amount<=0||months<=0){toast('Fill name, amount, and coverage months','error');return;}
+  const body={
+    name, category:$('ppd-category').value, storeId:$('ppd-store').value||'HO',
+    startDate:$('ppd-date').value||today(), totalAmount:amount, months,
+    notes:$('ppd-notes').value.trim(), recordCashOutflow:$('ppd-cash').checked,
+  };
+  const editId=$('ppd-editid')?$('ppd-editid').value:'';
+  const res=editId
+    ? await api(`/api/ho/prepaid-expenses/${encodeURIComponent(editId)}`,{method:'PUT',body})
+    : await api('/api/ho/prepaid-expenses',{method:'POST',body});
+  if(res&&res.ok){
+    toast(editId?'✅ Prepaid expense updated':'✅ Prepaid expense saved');
+    ['ppd-name','ppd-notes'].forEach(id=>{if($(id))$(id).value='';});
+    if($('ppd-amount'))$('ppd-amount').value='';
+    if($('ppd-months'))$('ppd-months').value='12';
+    if($('ppd-editid'))$('ppd-editid').value='';
+    const btn=document.querySelector('[onclick="savePrepaidExpense()"]');
+    if(btn)btn.textContent='💾 Save Prepaid Expense';
+    await loadPrepaidExpenses();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+function editPrepaidExpense(id){
+  const p=__ppdList.find(x=>x.id===id);
+  if(!p){toast('Not found','error');return;}
+  if($('ppd-name'))$('ppd-name').value=p.name;
+  if($('ppd-category'))$('ppd-category').value=p.category||'Other';
+  if($('ppd-store'))$('ppd-store').value=p.storeId||'HO';
+  if($('ppd-date'))$('ppd-date').value=p.startDate;
+  if($('ppd-amount'))$('ppd-amount').value=p.totalAmount;
+  if($('ppd-months'))$('ppd-months').value=p.months;
+  if($('ppd-notes'))$('ppd-notes').value=p.notes||'';
+  if(!$('ppd-editid')){
+    const hidden=document.createElement('input');hidden.type='hidden';hidden.id='ppd-editid';
+    document.querySelector('[onclick="savePrepaidExpense()"]').insertAdjacentElement('beforebegin',hidden);
+  }
+  $('ppd-editid').value=id;
+  const btn=document.querySelector('[onclick="savePrepaidExpense()"]');
+  if(btn){btn.textContent='💾 Update Prepaid Expense';btn.scrollIntoView({behavior:'smooth',block:'center'});}
+}
+async function writeOffPrepaidExpense(id){
+  if(!confirm('Write off this prepaid expense early? Amortization will stop as of today (e.g. contract cancelled or refunded).'))return;
+  const res=await api(`/api/ho/prepaid-expenses/${encodeURIComponent(id)}/write-off`,{method:'POST'});
+  if(res&&res.ok){toast('✅ Marked written off');await loadPrepaidExpenses();}
+  else toast('❌ Failed','error');
+}
+async function deletePrepaidExpense(id){
+  if(!confirm('Delete this prepaid expense permanently? Its linked Cash Flow entry will also be removed. This cannot be undone — if you just want to stop it early, use Write Off instead.'))return;
+  const res=await api(`/api/ho/prepaid-expenses/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('✅ Deleted');await loadPrepaidExpenses();}
+  else toast('❌ Failed','error');
+}
+function exportPrepaidExpenses(){
+  _csvDownload(__ppdList,[['Name','name'],['Category','category'],['Store','storeId'],['Start Date','startDate'],['Total Amount','totalAmount'],['Coverage Months','months'],['Monthly Amortization','monthlyAmortization'],['Amortized To Date','amortizedToDate'],['Remaining Balance','remainingBalance'],['Written Off','writtenOff']],'prepaid_expenses_'+today()+'.csv');
+}
+
+// ---------- Employee Advances / Loans ----------
+let __advList=[],__advDetailId=null;
+function populateAdvStoreSelect(){
+  const el=$('adv-store');
+  if(!el)return;
+  el.innerHTML='<option value="HO">Head Office</option>'+(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+}
+async function loadEmployeeAdvances(){
+  const res=await api('/api/ho/employee-advances');
+  if(!res||!res.ok){toast('Failed to load employee advances','error');return;}
+  __advList=res.data||[];
+  if($('adv-kpis'))$('adv-kpis').innerHTML=[
+    ['Total Advanced',fmt(res.totalAdvanced||0),''],
+    ['Total Repaid',fmt(res.totalRepaid||0),'green'],
+    ['Outstanding (Receivable)',fmt(res.totalOutstanding||0),'amber'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  const statusBadge=s=>({outstanding:'badge-amber',paid:'badge-green',written_off:'badge-red'}[s]||'badge-gray');
+  const statusLabel=s=>({outstanding:'Outstanding',paid:'Fully Repaid',written_off:'Written Off'}[s]||s);
+  if($('adv-table'))$('adv-table').innerHTML=__advList.map(a=>`<tr style="cursor:pointer" onclick="openAdvDetail('${a.id}')">
+    <td class="fw7">${a.employeeName}</td><td>${a.storeId}</td><td>${a.date}</td><td>${a.reason||'—'}</td>
+    <td>${fmt(a.amount)}</td><td class="text-green">${fmt(a.repaidAmount)}</td>
+    <td class="fw7" style="color:${a.balance>0.005&&!a.writtenOff?'var(--red)':'var(--navy)'}">${fmt(a.balance)}</td>
+    <td><span class="badge ${statusBadge(a.status)}">${statusLabel(a.status)}</span></td>
+    <td data-role="admin,accountant" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openAdvDetail('${a.id}')">👁️</button></td>
+  </tr>`).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:16px">No advances yet</td></tr>';
+}
+async function saveEmployeeAdvance(){
+  const name=($('adv-name')&&$('adv-name').value.trim())||'';
+  const amount=+(($('adv-amount')&&$('adv-amount').value)||0);
+  if(!name){toast('Employee name required','error');return;}
+  if(!amount||amount<=0){toast('Amount must be greater than 0','error');return;}
+  const body={
+    employeeName:name, storeId:($('adv-store')&&$('adv-store').value)||'HO',
+    date:($('adv-date')&&$('adv-date').value)||today(), amount,
+    reason:($('adv-reason')&&$('adv-reason').value)||'', notes:($('adv-notes')&&$('adv-notes').value)||'',
+    recordCashOutflow:$('adv-cash')?$('adv-cash').checked:true,
+  };
+  const res=await api('/api/ho/employee-advances',{method:'POST',body});
+  if(res&&res.ok){
+    toast('✅ Advance recorded');
+    ['adv-name','adv-amount','adv-reason','adv-notes'].forEach(id=>{if($(id))$(id).value='';});
+    await loadAll();loadEmployeeAdvances();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function openAdvDetail(id){
+  const a=__advList.find(x=>x.id===id);
+  if(!a)return;
+  __advDetailId=id;
+  if($('adv-detail-title'))$('adv-detail-title').textContent='🤲 '+a.employeeName;
+  if($('adv-detail-kpis'))$('adv-detail-kpis').innerHTML=[
+    ['Advanced',fmt(a.amount),''],['Repaid',fmt(a.repaidAmount),'green'],['Balance',fmt(a.balance),a.balance>0.005?'amber':'green'],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value" style="font-size:16px">${v}</div></div>`).join('');
+  const res=await api(`/api/ho/employee-advances/${encodeURIComponent(id)}/repayments`);
+  const reps=(res&&res.data)||[];
+  if($('adv-repay-history'))$('adv-repay-history').innerHTML=reps.map(r=>`<tr><td>${r.date}</td><td class="fw7">${fmt(r.amount)}</td><td><span class="badge badge-blue">${r.method}</span></td><td style="font-size:11px">${r.notes||'—'}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:12px">No repayments yet</td></tr>';
+  const closed=a.writtenOff||a.balance<=0.005;
+  if($('adv-repay-form'))$('adv-repay-form').style.display=closed?'none':'grid';
+  if($('adv-writeoff-btn'))$('adv-writeoff-btn').style.display=closed?'none':'inline-flex';
+  $('adv-detail-modal').style.display='flex';
+}
+function closeAdvDetail(){$('adv-detail-modal').style.display='none';__advDetailId=null;}
+async function recordAdvRepayment(){
+  if(!__advDetailId)return;
+  const amount=+(($('adv-repay-amt')&&$('adv-repay-amt').value)||0);
+  if(!amount||amount<=0){toast('Enter a valid amount','error');return;}
+  const body={amount,method:($('adv-repay-method')&&$('adv-repay-method').value)||'Cash',date:today()};
+  const res=await api(`/api/ho/employee-advances/${encodeURIComponent(__advDetailId)}/repay`,{method:'POST',body});
+  if(res&&res.ok){
+    toast('✅ Repayment recorded — new balance '+fmt(res.newBalance));
+    if($('adv-repay-amt'))$('adv-repay-amt').value='';
+    await loadAll();await loadEmployeeAdvances();openAdvDetail(__advDetailId);
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function writeOffAdvance(){
+  if(!__advDetailId)return;
+  if(!confirm('Write off the remaining balance of this advance? This books it as a Bad Debt expense on the P&L and cannot be undone.'))return;
+  const res=await api(`/api/ho/employee-advances/${encodeURIComponent(__advDetailId)}/write-off`,{method:'POST'});
+  if(res&&res.ok){
+    toast(`📦 Written off ${fmt(res.writtenOffAmount)}`);
+    closeAdvDetail();await loadAll();loadEmployeeAdvances();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function deleteAdvance(){
+  if(!__advDetailId)return;
+  if(!confirm('Delete this advance and all its repayment history? This cannot be undone.'))return;
+  const res=await api(`/api/ho/employee-advances/${encodeURIComponent(__advDetailId)}`,{method:'DELETE'});
+  if(res&&res.ok){
+    toast('🗑️ Deleted');closeAdvDetail();await loadAll();loadEmployeeAdvances();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+function exportEmployeeAdvances(){
+  _csvDownload(__advList,[['Employee','employeeName'],['Store','storeId'],['Date','date'],['Reason','reason'],['Amount','amount'],['Repaid','repaidAmount'],['Balance','balance'],['Status','status']],'employee_advances_'+today()+'.csv');
+}
+
+// ---------- Accrued Expenses ----------
+let __acrList=[];
+function populateAccStoreSelect(){
+  const el=$('acr-store');
+  if(!el)return;
+  el.innerHTML='<option value="HO">Head Office</option>'+(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+}
+async function loadAccruedExpenses(){
+  const res=await api('/api/ho/accrued-expenses');
+  if(!res||!res.ok){toast('Failed to load accrued expenses','error');return;}
+  __acrList=res.data||[];
+  if($('acr-kpis'))$('acr-kpis').innerHTML=[
+    ['Unsettled (Payable)',fmt(res.totalUnsettled||0),'amber'],
+    ['Total Entries',__acrList.length,''],
+  ].map(([l,v,c])=>`<div class="kpi ${c}"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('');
+  if($('acr-table'))$('acr-table').innerHTML=__acrList.map(a=>`<tr>
+    <td class="fw7">${a.name}</td><td>${a.category}</td><td>${a.storeId}</td><td>${a.date}</td><td>${fmt(a.amount)}</td>
+    <td><span class="badge ${a.settled?'badge-green':'badge-amber'}">${a.settled?'Paid':'Unpaid'}</span></td>
+    <td data-role="admin,accountant">${a.settled?'—':`<button class="btn btn-green btn-sm" onclick="settleAccrued('${a.id}')">✅ Mark Paid</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteAccrued('${a.id}')">🗑️</button>`}</td>
+  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:16px">No accrued expenses yet</td></tr>';
+}
+async function saveAccruedExpense(){
+  const name=($('acr-name')&&$('acr-name').value.trim())||'';
+  const amount=+(($('acr-amount')&&$('acr-amount').value)||0);
+  if(!name){toast('Name required','error');return;}
+  if(!amount||amount<=0){toast('Amount must be greater than 0','error');return;}
+  const body={
+    name, category:($('acr-category')&&$('acr-category').value)||'Other', storeId:($('acr-store')&&$('acr-store').value)||'HO',
+    date:($('acr-date')&&$('acr-date').value)||today(), amount, notes:($('acr-notes')&&$('acr-notes').value)||'',
+  };
+  const res=await api('/api/ho/accrued-expenses',{method:'POST',body});
+  if(res&&res.ok){
+    toast('✅ Accrued expense recorded');
+    ['acr-name','acr-amount','acr-notes'].forEach(id=>{if($(id))$(id).value='';});
+    await loadAll();loadAccruedExpenses();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function settleAccrued(id){
+  if(!confirm('Mark this as paid? This records the real cash outflow now.'))return;
+  const res=await api(`/api/ho/accrued-expenses/${encodeURIComponent(id)}/settle`,{method:'POST'});
+  if(res&&res.ok){toast('✅ Marked as paid');await loadAll();loadAccruedExpenses();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function deleteAccrued(id){
+  if(!confirm('Delete this accrued expense? This also removes its P&L expense entry.'))return;
+  const res=await api(`/api/ho/accrued-expenses/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){toast('🗑️ Deleted');await loadAll();loadAccruedExpenses();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+function exportAccruedExpenses(){
+  _csvDownload(__acrList,[['Name','name'],['Category','category'],['Store','storeId'],['Date','date'],['Amount','amount'],['Settled','settled']],'accrued_expenses_'+today()+'.csv');
+}
+
 function saveCapital(){}
 async function testConn(){const url=($('api-url')&&$('api-url').value.trim())||CFG.apiUrl;CFG.apiUrl=url.replace(/\/$/,'');localStorage.setItem('anta_ho_api',CFG.apiUrl);const div=$('conn-res');if(div){div.style.display='block';div.innerHTML='⏳ Testing...';}const res=await api('/api/health');if(res&&res.ok){if(div){div.innerHTML='✅ Connected! '+res.app+' v'+res.version;div.style.color='var(--green)';}setSyncStatus('online','Connected');toast('✅ Connected');if($('server-info'))$('server-info').textContent='DB: '+(res.db||'sqlite')+' · modules: '+(res.modules||[]).join(',');}else{if(div){div.innerHTML='❌ Failed';div.style.color='var(--red)';}toast('❌ Failed','error');}}
 async function loadSettingsForm(){
@@ -2175,7 +2409,7 @@ const HO_I18N = {
     'store-grn':'Send to Stores (GRN)', transfer:'Store Transfer', products:'Product Master', pl:'P&L Statement',
     'balance-sheet':'Balance Sheet', cashflow:'Cash Flow', 'supplier-accounts':'Supplier Accounts',
     'expenses-ho':'Expenses', accounts:'Chart of Accounts', promotions:'Promotions', license:'License',
-    capital:'Capital & Equity', 'fixed-assets':'Fixed Assets', reports:'Sales Reports', 'inventory-ho':'Inventory — All',
+    capital:'Capital & Equity', 'fixed-assets':'Fixed Assets', 'prepaid-expenses':'Prepaid Expenses', reports:'Sales Reports', 'inventory-ho':'Inventory — All',
     'stores-admin':'Manage Stores', users:'Users & PINs', banks:'Banks & Payments', settings:'Settings',
     customers:'Customers', 'stock-aging':'Stock Aging', 'audit-log':'Audit Log', 'barcode-labels':'Barcode Labels',
     'purchase-orders':'Purchase Orders', handovers:'Cash Handovers',

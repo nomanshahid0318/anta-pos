@@ -93,6 +93,9 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('accounts')" data-role="admin,accountant"><span class="ico">📒</span>Chart of Accounts</div>
     <div class="nav-item" onclick="show('capital')" data-role="admin,manager,accountant"><span class="ico">🏦</span>Capital & Equity</div>
     <div class="nav-item" onclick="show('fixed-assets')" data-role="admin,manager,accountant"><span class="ico">🏗️</span>Fixed Assets</div>
+    <div class="nav-item" onclick="show('prepaid-expenses')" data-role="admin,manager,accountant"><span class="ico">📆</span>Prepaid Expenses</div>
+    <div class="nav-item" onclick="show('employee-advances')" data-role="admin,manager,accountant"><span class="ico">🤲</span>Employee Advances</div>
+    <div class="nav-item" onclick="show('accrued-expenses')" data-role="admin,manager,accountant"><span class="ico">⏳</span>Accrued Expenses</div>
     <div class="nav-sec">Reports</div>
     <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
@@ -1258,6 +1261,129 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray4);margin:6px 0 10px"><input type="checkbox" id="fa-cash" checked> Also record this as a cash outflow in Cash Flow (Investing)</label>
         <button class="btn btn-primary btn-sm" onclick="saveFixedAsset()">💾 Save Asset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREPAID EXPENSES -->
+  <div id="screen-prepaid-expenses" class="screen">
+    <div style="max-width:1000px">
+      <div class="kpi-grid" id="ppd-kpis"></div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="card-title" style="margin:0">📆 Prepaid / Deferred Expenses</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportPrepaidExpenses()">⬇️ Export</button>
+        </div>
+        <p style="font-size:11px;color:var(--gray4);margin:8px 0 11px">Payments made now that cover future months — billboard/advertising paid upfront, prepaid rent, insurance, license fees, subscriptions, etc. The remaining (not-yet-amortized) balance shown here automatically flows into the Balance Sheet as an asset, and the monthly amortization automatically flows into the P&L Statement as an expense — one whole month at a time, evenly.</p>
+        <div class="table-wrapper" style="overflow-x:auto">
+        <table><thead><tr><th>Name</th><th>Category</th><th>Store</th><th>Start Date</th><th>Total Paid</th><th>Monthly</th><th>Amortized</th><th>Remaining</th><th>Status</th><th data-role="admin,accountant">Actions</th></tr></thead>
+        <tbody id="ppd-table"></tbody></table>
+        </div>
+      </div>
+      <div class="card" data-role="admin,accountant">
+        <div class="card-title">➕ Add Prepaid Expense</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="ppd-name" placeholder="e.g. Billboard — Airport Road"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-input" id="ppd-category">
+              <option>Advertising</option><option>Rent</option><option>Insurance</option>
+              <option>License</option><option>Subscription</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="ppd-store"></select></div>
+          <div class="form-group"><label class="form-label">Start Date</label><input class="form-input" type="date" id="ppd-date"></div>
+          <div class="form-group"><label class="form-label">Total Amount (LYD)</label><input class="form-input" type="number" id="ppd-amount" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Coverage (months)</label><input class="form-input" type="number" id="ppd-months" value="12" min="1"></div>
+          <div class="form-group" style="grid-column:span 3"><label class="form-label">Notes (optional)</label><input class="form-input" id="ppd-notes" placeholder="e.g. contract #, vendor"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray4);margin:6px 0 10px"><input type="checkbox" id="ppd-cash" checked> Also record this as a cash outflow in Cash Flow</label>
+        <button class="btn btn-primary btn-sm" onclick="savePrepaidExpense()">💾 Save Prepaid Expense</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEE ADVANCES -->
+  <div id="screen-employee-advances" class="screen">
+    <div style="max-width:1050px">
+      <div class="kpi-grid" id="adv-kpis"></div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="card-title" style="margin:0">🤲 Employee Advances / Loans</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportEmployeeAdvances()">⬇️ Export</button>
+        </div>
+        <p style="font-size:11px;color:var(--gray4);margin:8px 0 11px">Cash advanced or loaned to an employee — this is NOT an expense, it's a receivable the company expects back (in cash or via salary deduction). The outstanding balance shown here automatically flows into the Balance Sheet as an asset. Only a formal Write Off turns the unpaid remainder into a real Bad Debt expense on the P&L.</p>
+        <div class="table-wrapper" style="overflow-x:auto">
+        <table><thead><tr><th>Employee</th><th>Store</th><th>Date</th><th>Reason</th><th>Amount</th><th>Repaid</th><th>Balance</th><th>Status</th><th data-role="admin,accountant">Actions</th></tr></thead>
+        <tbody id="adv-table"></tbody></table>
+        </div>
+      </div>
+      <div class="card" data-role="admin,accountant">
+        <div class="card-title">➕ Give New Advance</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Employee Name</label><input class="form-input" id="adv-name" placeholder="e.g. Ahmed Ali"></div>
+          <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="adv-store"></select></div>
+          <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="adv-date"></div>
+          <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="adv-amount" placeholder="0.00"></div>
+          <div class="form-group" style="grid-column:span 2"><label class="form-label">Reason</label><input class="form-input" id="adv-reason" placeholder="e.g. Medical emergency, Eid advance"></div>
+          <div class="form-group" style="grid-column:span 3"><label class="form-label">Notes (optional)</label><input class="form-input" id="adv-notes" placeholder="optional"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray4);margin:6px 0 10px"><input type="checkbox" id="adv-cash" checked> Also record this as a cash outflow in Cash Flow</label>
+        <button class="btn btn-primary btn-sm" onclick="saveEmployeeAdvance()">💾 Give Advance</button>
+      </div>
+    </div>
+    <div id="adv-detail-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAdvDetail()">
+      <div class="modal" style="width:520px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div class="modal-title" id="adv-detail-title" style="margin-bottom:0">🤲 Advance</div>
+          <button onclick="closeAdvDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray4);line-height:1;padding:2px 4px">✕</button>
+        </div>
+        <div class="kpi-grid" id="adv-detail-kpis" style="margin-bottom:12px"></div>
+        <div class="card-title" style="font-size:12px">🧾 Repayment History</div>
+        <table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Notes</th></tr></thead>
+        <tbody id="adv-repay-history"></tbody></table>
+        <div class="grid-3 mt" id="adv-repay-form" style="align-items:end">
+          <div class="form-group"><label class="form-label">Amount</label><input class="form-input" type="number" id="adv-repay-amt" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Method</label>
+            <select class="form-input" id="adv-repay-method"><option>Cash</option><option>Salary Deduction</option></select>
+          </div>
+          <button class="btn btn-green btn-sm" onclick="recordAdvRepayment()">✅ Record Repayment</button>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:12px">
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="writeOffAdvance()" id="adv-writeoff-btn">📦 Write Off Remaining Balance</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteAdvance()">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACCRUED EXPENSES -->
+  <div id="screen-accrued-expenses" class="screen">
+    <div style="max-width:1000px">
+      <div class="kpi-grid" id="acr-kpis"></div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="card-title" style="margin:0">⏳ Accrued Expenses</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportAccruedExpenses()">⬇️ Export</button>
+        </div>
+        <p style="font-size:11px;color:var(--gray4);margin:8px 0 11px">Expense already incurred (service/benefit already used, e.g. this month's electricity) but not yet paid or billed — the mirror of Prepaid Expenses. Recognized on the P&L immediately, carried as a Liability until you mark it Paid.</p>
+        <table><thead><tr><th>Name</th><th>Category</th><th>Store</th><th>Date</th><th>Amount</th><th>Status</th><th data-role="admin,accountant">Actions</th></tr></thead>
+        <tbody id="acr-table"></tbody></table>
+      </div>
+      <div class="card" data-role="admin,accountant">
+        <div class="card-title">➕ Add Accrued Expense</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="acr-name" placeholder="e.g. August Electricity Bill"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-input" id="acr-category">
+              <option>Utilities</option><option>Rent</option><option>Salaries</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="acr-store"></select></div>
+          <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="acr-date"></div>
+          <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="acr-amount" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Notes (optional)</label><input class="form-input" id="acr-notes" placeholder="optional"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveAccruedExpense()">💾 Save Accrued Expense</button>
       </div>
     </div>
   </div>

@@ -110,6 +110,103 @@ class FixedAsset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
+class PrepaidExpense(Base):
+    """A payment made now that covers future months (billboard/advertising
+    paid upfront, prepaid rent, insurance, licenses, subscriptions, etc.).
+    Recorded as an asset at payment time, then recognized into P&L expense
+    evenly, one month at a time, over the coverage period — instead of
+    hitting the whole amount as a one-time expense in the month it was
+    paid, which would understate that month's real profit and overstate
+    later months'.
+    """
+
+    __tablename__ = "prepaid_expenses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    prepaid_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    category: Mapped[str] = mapped_column(String(64), default="Other")  # Advertising, Rent, Insurance, License, Subscription, Other
+    store_id: Mapped[str] = mapped_column(String(32), default="HO")
+    start_date: Mapped[str] = mapped_column(String(16))
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    months: Mapped[int] = mapped_column(Integer, default=1)
+    pay_method: Mapped[str] = mapped_column(String(32), default="Cash")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    cf_item_id: Mapped[str] = mapped_column(String(64), default="")
+    written_off: Mapped[bool] = mapped_column(Boolean, default=False)
+    disposed_date: Mapped[str] = mapped_column(String(16), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class EmployeeAdvance(Base):
+    """Cash advanced or loaned to an employee. This is NOT an expense — the
+    company expects it back (in cash or deducted from salary), so it's
+    recorded as a receivable (Current Asset), not a cost. Only if it's
+    ever formally written off (employee left without repaying, etc.) does
+    the unpaid remainder become a real Bad Debt expense.
+    """
+
+    __tablename__ = "employee_advances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    advance_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    employee_name: Mapped[str] = mapped_column(String(128))
+    store_id: Mapped[str] = mapped_column(String(32), default="HO")
+    date: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    repaid_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    reason: Mapped[str] = mapped_column(String(255), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    cf_item_id: Mapped[str] = mapped_column(String(64), default="")
+    written_off: Mapped[bool] = mapped_column(Boolean, default=False)
+    written_off_date: Mapped[str] = mapped_column(String(16), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class EmployeeAdvanceRepayment(Base):
+    """One repayment (cash handed back, or deducted from a salary run)
+    against an EmployeeAdvance — kept as its own ledger so there's a full
+    history, not just a running total.
+    """
+
+    __tablename__ = "employee_advance_repayments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    repayment_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    advance_id: Mapped[str] = mapped_column(String(64), index=True)
+    date: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    method: Mapped[str] = mapped_column(String(32), default="Cash")  # Cash | Salary Deduction
+    notes: Mapped[str] = mapped_column(String(255), default="")
+    cf_item_id: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class AccruedExpense(Base):
+    """Expense already incurred (benefit/service already used) but not yet
+    paid or billed — the mirror image of a Prepaid Expense. E.g. this
+    month's electricity was used but the bill hasn't arrived/been paid
+    yet. Recorded as a Liability now; when actually paid, it's settled
+    (removed) without hitting P&L again — the expense was already
+    recognized when accrued.
+    """
+
+    __tablename__ = "accrued_expenses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    accrual_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    category: Mapped[str] = mapped_column(String(64), default="Other")
+    store_id: Mapped[str] = mapped_column(String(32), default="HO")
+    date: Mapped[str] = mapped_column(String(16))
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    settled: Mapped[bool] = mapped_column(Boolean, default=False)
+    settled_date: Mapped[str] = mapped_column(String(16), default="")
+    exp_id: Mapped[str] = mapped_column(String(64), default="")  # linked Expense row (for P&L)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class PurchaseOrder(Base):
     """A commitment to buy stock from a supplier, before it's physically
     received. Separate from Supplier GRN (which records actual receipt).

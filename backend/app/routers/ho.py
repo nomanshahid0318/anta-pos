@@ -17,7 +17,8 @@ from ..database import get_db
 from ..models import (
     Expense, HOWarehouse, Inventory, Product, Return, Sale, Store, StoreGRN, SupplierGRN, Transfer,
 )
-from ..models_accounting import BSEntry, CapitalEntry, CFItem, FixedAsset, PurchaseOrder, PurchaseOrderLine, Supplier, SupplierTxn
+from ..models_accounting import AccruedExpense, BSEntry, CapitalEntry, CFItem, EmployeeAdvance, EmployeeAdvanceRepayment, FixedAsset, PrepaidExpense, PurchaseOrder, PurchaseOrderLine, Supplier, SupplierTxn
+from ..services import amortization as amz
 from ..services import depreciation as depr
 from ..services.audit import log_audit
 from ..services.inventory import update_ho_warehouse, update_inv
@@ -118,6 +119,44 @@ class FixedAssetIn(BaseModel):
     # outflow, since buying a fixed asset is a real cash event even though
     # it isn't a P&L expense.
     recordCashOutflow: bool = True
+
+
+class PrepaidExpenseIn(BaseModel):
+    name: str
+    category: str = "Other"
+    storeId: str = "HO"
+    startDate: Optional[str] = None
+    totalAmount: float
+    months: int = 1
+    payMethod: str = "Cash"
+    notes: str = ""
+    recordCashOutflow: bool = True
+
+
+class EmployeeAdvanceIn(BaseModel):
+    employeeName: str
+    storeId: str = "HO"
+    date: Optional[str] = None
+    amount: float
+    reason: str = ""
+    notes: str = ""
+    recordCashOutflow: bool = True
+
+
+class EmployeeAdvanceRepayIn(BaseModel):
+    date: Optional[str] = None
+    amount: float
+    method: str = "Cash"
+    notes: str = ""
+
+
+class AccruedExpenseIn(BaseModel):
+    name: str
+    category: str = "Other"
+    storeId: str = "HO"
+    date: Optional[str] = None
+    amount: float
+    notes: str = ""
 
 
 class BSIn(BaseModel):
@@ -1003,12 +1042,18 @@ def profit_loss(
     # netProfit, the true bottom line.
     fa_rows = db.query(FixedAsset).all()
     depreciation_expense = sum(depr.depreciation_for_period(fa, date_from, date_to) for fa in fa_rows)
-    net_profit = ebitda - depreciation_expense
+    # Amortization of Prepaid/Deferred Expenses (billboard/advertising paid
+    # upfront, prepaid rent, insurance, licenses, subscriptions, etc.) —
+    # same idea: recognized evenly over the period instead of all at once.
+    pe_rows = db.query(PrepaidExpense).all()
+    amortization_expense = sum(amz.amortization_for_period(pe, date_from, date_to) for pe in pe_rows)
+    net_profit = ebitda - depreciation_expense - amortization_expense
 
     return {
         "ok": True, "status": "ok", "revenue": revenue, "returns": returns, "netRevenue": net_revenue,
         "cogs": cogs, "grossProfit": gross, "grossMargin": gm, "totalExpenses": total_expenses, "ebitda": ebitda,
-        "depreciationExpense": round(depreciation_expense, 2), "netProfit": round(net_profit, 2),
+        "depreciationExpense": round(depreciation_expense, 2), "amortizationExpense": round(amortization_expense, 2),
+        "netProfit": round(net_profit, 2),
     }
 
 
@@ -1161,6 +1206,393 @@ def delete_capital(entry_id: str, db: Annotated[Session, Depends(get_db)], user:
         if cf:
             db.delete(cf)
     log_audit(db, user, "delete", "capital", entry_id, f"Deleted capital entry: {row.type} — {row.amount}", old_value={"type": row.type, "amount": row.amount, "description": row.description, "date": row.date})
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.get("/prepaid-expenses")
+def list_prepaid_expenses(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    """Prepaid/Deferred Expenses Register — payments made now that cover
+    future months (billboard/advertising paid upfront, prepaid rent,
+    insurance, licenses, subscriptions, etc.), amortized straight-line,
+    one whole month at a time, over the coverage period.
+    """
+    as_of = today_str()
+    rows = db.query(PrepaidExpense).order_by(PrepaidExpense.id.desc()).all()
+    data = []
+    total_amount = total_amortized = total_remaining = 0.0
+    for r in rows:
+        sched = amz.schedule(r, as_of)
+        total_amount += float(r.total_amount or 0)
+        total_amortized += sched["amortizedToDate"]
+        total_remaining += sched["remainingBalance"]
+        data.append({
+            "id": r.prepaid_id, "name": r.name, "category": r.category, "storeId": r.store_id,
+            "startDate": r.start_date, "totalAmount": r.total_amount, "months": r.months,
+            "payMethod": r.pay_method, "notes": r.notes,
+            "writtenOff": r.written_off, "disposedDate": r.disposed_date,
+            **sched,
+        })
+    return {
+        "ok": True, "data": data,
+        "totalAmount": round(total_amount, 2), "totalAmortized": round(total_amortized, 2),
+        "totalRemaining": round(total_remaining, 2),
+    }
+
+
+@router.post("/prepaid-expenses")
+def save_prepaid_expense(
+    body: PrepaidExpenseIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    if body.totalAmount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    if body.months <= 0:
+        raise HTTPException(400, "Coverage months must be greater than 0")
+    pid = f"PPD-{int(time.time()*1000)}"
+    sdate = body.startDate or today_str()
+    row = PrepaidExpense(
+        prepaid_id=pid, name=body.name, category=body.category or "Other", store_id=body.storeId or "HO",
+        start_date=sdate, total_amount=body.totalAmount, months=body.months,
+        pay_method=body.payMethod or "Cash", notes=body.notes or "",
+    )
+    db.add(row)
+    if body.recordCashOutflow and body.totalAmount > 0:
+        cf_id = f"CF-{int(time.time()*1000)}"
+        db.add(CFItem(
+            item_id=cf_id, section="operating",
+            label=f"Prepaid Expense — {body.name}", value=-abs(body.totalAmount), date=sdate,
+        ))
+        row.cf_item_id = cf_id
+    db.commit()
+    return {"ok": True, "status": "ok", "id": pid}
+
+
+@router.put("/prepaid-expenses/{prepaid_id}")
+def update_prepaid_expense(
+    prepaid_id: str, body: PrepaidExpenseIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    row = db.query(PrepaidExpense).filter(PrepaidExpense.prepaid_id == prepaid_id).first()
+    if not row:
+        raise HTTPException(404, "Prepaid expense not found")
+    if body.totalAmount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    if body.months <= 0:
+        raise HTTPException(400, "Coverage months must be greater than 0")
+    row.name = body.name
+    row.category = body.category or "Other"
+    row.store_id = body.storeId or "HO"
+    row.start_date = body.startDate or row.start_date
+    row.total_amount = body.totalAmount
+    row.months = body.months
+    row.pay_method = body.payMethod or "Cash"
+    row.notes = body.notes or ""
+    cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first() if row.cf_item_id else None
+    if body.recordCashOutflow and body.totalAmount > 0:
+        if cf:
+            cf.label, cf.value, cf.date = f"Prepaid Expense — {body.name}", -abs(body.totalAmount), row.start_date
+        else:
+            cf_id = f"CF-{int(time.time()*1000)}"
+            db.add(CFItem(item_id=cf_id, section="operating", label=f"Prepaid Expense — {body.name}", value=-abs(body.totalAmount), date=row.start_date))
+            row.cf_item_id = cf_id
+    elif cf:
+        db.delete(cf)
+        row.cf_item_id = ""
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.post("/prepaid-expenses/{prepaid_id}/write-off")
+def write_off_prepaid_expense(
+    prepaid_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+    date: Optional[str] = None,
+):
+    """Stop amortizing early — e.g. the billboard contract was cancelled,
+    or the prepaid rent was refunded, before the coverage period ended.
+    """
+    row = db.query(PrepaidExpense).filter(PrepaidExpense.prepaid_id == prepaid_id).first()
+    if not row:
+        raise HTTPException(404, "Prepaid expense not found")
+    row.written_off = True
+    row.disposed_date = date or today_str()
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/prepaid-expenses/{prepaid_id}")
+def delete_prepaid_expense(
+    prepaid_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+):
+    row = db.query(PrepaidExpense).filter(PrepaidExpense.prepaid_id == prepaid_id).first()
+    if not row:
+        raise HTTPException(404, "Prepaid expense not found")
+    if row.cf_item_id:
+        cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first()
+        if cf:
+            db.delete(cf)
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.get("/employee-advances")
+def list_employee_advances(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    """Employee Advances / Loans register. Not an expense — a receivable
+    (the company expects it back, in cash or via salary deduction). Only
+    a formal write-off turns the unpaid remainder into a real expense.
+    """
+    rows = db.query(EmployeeAdvance).order_by(EmployeeAdvance.id.desc()).all()
+    data = []
+    total_advanced = total_repaid = total_outstanding = 0.0
+    for r in rows:
+        balance = round(float(r.amount or 0) - float(r.repaid_amount or 0), 2)
+        total_advanced += float(r.amount or 0)
+        total_repaid += float(r.repaid_amount or 0)
+        if not r.written_off:
+            total_outstanding += balance
+        data.append({
+            "id": r.advance_id, "employeeName": r.employee_name, "storeId": r.store_id, "date": r.date,
+            "amount": r.amount, "repaidAmount": r.repaid_amount, "balance": balance,
+            "reason": r.reason, "notes": r.notes, "writtenOff": r.written_off, "writtenOffDate": r.written_off_date,
+            "status": "written_off" if r.written_off else ("paid" if balance <= 0.005 else "outstanding"),
+        })
+    return {
+        "ok": True, "data": data,
+        "totalAdvanced": round(total_advanced, 2), "totalRepaid": round(total_repaid, 2),
+        "totalOutstanding": round(total_outstanding, 2),
+    }
+
+
+@router.post("/employee-advances")
+def create_employee_advance(
+    body: EmployeeAdvanceIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    if body.amount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    aid = f"ADV-{int(time.time()*1000)}"
+    adate = body.date or today_str()
+    row = EmployeeAdvance(
+        advance_id=aid, employee_name=body.employeeName, store_id=body.storeId or "HO",
+        date=adate, amount=body.amount, reason=body.reason or "", notes=body.notes or "",
+    )
+    db.add(row)
+    if body.recordCashOutflow and body.amount > 0:
+        cf_id = f"CF-{int(time.time()*1000)}"
+        db.add(CFItem(
+            item_id=cf_id, section="operating",
+            label=f"Employee Advance — {body.employeeName}", value=-abs(body.amount), date=adate,
+        ))
+        row.cf_item_id = cf_id
+    db.commit()
+    return {"ok": True, "status": "ok", "id": aid}
+
+
+@router.get("/employee-advances/{advance_id}/repayments")
+def list_advance_repayments(
+    advance_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(_admin)],
+):
+    row = db.query(EmployeeAdvance).filter(EmployeeAdvance.advance_id == advance_id).first()
+    if not row:
+        raise HTTPException(404, "Advance not found")
+    reps = db.query(EmployeeAdvanceRepayment).filter(EmployeeAdvanceRepayment.advance_id == advance_id).order_by(EmployeeAdvanceRepayment.id.asc()).all()
+    return {"ok": True, "data": [{
+        "id": r.repayment_id, "date": r.date, "amount": r.amount, "method": r.method, "notes": r.notes,
+    } for r in reps]}
+
+
+@router.post("/employee-advances/{advance_id}/repay")
+def repay_employee_advance(
+    advance_id: str, body: EmployeeAdvanceRepayIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    row = db.query(EmployeeAdvance).filter(EmployeeAdvance.advance_id == advance_id).first()
+    if not row:
+        raise HTTPException(404, "Advance not found")
+    if row.written_off:
+        raise HTTPException(400, "This advance was written off — cannot record further repayments")
+    balance = float(row.amount or 0) - float(row.repaid_amount or 0)
+    if body.amount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    if body.amount > balance + 0.005:
+        raise HTTPException(400, f"Repayment ({body.amount}) exceeds outstanding balance ({round(balance, 2)})")
+    rdate = body.date or today_str()
+    rid = f"ADVR-{int(time.time()*1000)}"
+    rep = EmployeeAdvanceRepayment(
+        repayment_id=rid, advance_id=advance_id, date=rdate, amount=body.amount,
+        method=body.method or "Cash", notes=body.notes or "",
+    )
+    db.add(rep)
+    row.repaid_amount = round(float(row.repaid_amount or 0) + body.amount, 2)
+    # Always record the cash-flow effect, even for "Salary Deduction" —
+    # this system doesn't track a separate payroll/salary expense, so a
+    # salary-deducted repayment still needs to register as cash the
+    # company effectively keeps (money that would otherwise have gone out
+    # as wages, didn't). Skipping this for salary deductions breaks the
+    # Balance Sheet equation (verified: assets stopped matching
+    # liabilities+equity by exactly the skipped amount).
+    cf_id = f"CF-{int(time.time()*1000)}"
+    db.add(CFItem(
+        item_id=cf_id, section="operating",
+        label=f"Employee Advance Repayment — {row.employee_name}" + (" (salary deduction)" if body.method == "Salary Deduction" else ""),
+        value=abs(body.amount), date=rdate,
+    ))
+    rep.cf_item_id = cf_id
+    db.commit()
+    return {"ok": True, "status": "ok", "id": rid, "newBalance": round(float(row.amount or 0) - float(row.repaid_amount or 0), 2)}
+
+
+@router.post("/employee-advances/{advance_id}/write-off")
+def write_off_employee_advance(
+    advance_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+    date: Optional[str] = None,
+):
+    """The employee left (or otherwise won't repay) with a balance still
+    outstanding — this closes the receivable and books the unpaid
+    remainder as a real Bad Debt expense, through the normal Expense
+    posting path so it flows into the P&L like any other expense.
+    """
+    row = db.query(EmployeeAdvance).filter(EmployeeAdvance.advance_id == advance_id).first()
+    if not row:
+        raise HTTPException(404, "Advance not found")
+    if row.written_off:
+        raise HTTPException(400, "Already written off")
+    balance = round(float(row.amount or 0) - float(row.repaid_amount or 0), 2)
+    wdate = date or today_str()
+    if balance > 0.005:
+        exp_id = f"EXP-{int(time.time()*1000)}"
+        exp = Expense(
+            exp_id=exp_id, date=wdate, store_id=row.store_id, store="HO",
+            category="Bad Debt / Write-off", sub_category="Employee Advance",
+            description=f"Written off — {row.employee_name} (unpaid advance {advance_id})",
+            amount=balance, pay_method="Non-cash", reference=advance_id, notes=row.notes or "",
+        )
+        db.add(exp)
+        # Deliberately NOT calling post_expense_journal() here — it always
+        # credits Cash/Bank, which would be wrong (no cash actually moves
+        # on a write-off; the receivable itself is what's being reduced
+        # to zero). The Expense row alone is enough — P&L sums straight
+        # from the Expense table, not from journal entries.
+    row.written_off = True
+    row.written_off_date = wdate
+    db.commit()
+    return {"ok": True, "status": "ok", "writtenOffAmount": balance}
+
+
+@router.delete("/employee-advances/{advance_id}")
+def delete_employee_advance(
+    advance_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+):
+    row = db.query(EmployeeAdvance).filter(EmployeeAdvance.advance_id == advance_id).first()
+    if not row:
+        raise HTTPException(404, "Advance not found")
+    if row.cf_item_id:
+        cf = db.query(CFItem).filter(CFItem.item_id == row.cf_item_id).first()
+        if cf:
+            db.delete(cf)
+    reps = db.query(EmployeeAdvanceRepayment).filter(EmployeeAdvanceRepayment.advance_id == advance_id).all()
+    for rep in reps:
+        if rep.cf_item_id:
+            cf = db.query(CFItem).filter(CFItem.item_id == rep.cf_item_id).first()
+            if cf:
+                db.delete(cf)
+        db.delete(rep)
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.get("/accrued-expenses")
+def list_accrued_expenses(db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_admin)]):
+    """Accrued Expenses register — the mirror of Prepaid Expenses. Expense
+    already incurred (this month's electricity, etc.) but not yet paid or
+    billed. Recognized on the P&L immediately (it's a real cost of this
+    period), and carried as a Liability until actually paid.
+    """
+    rows = db.query(AccruedExpense).order_by(AccruedExpense.id.desc()).all()
+    data = [{
+        "id": r.accrual_id, "name": r.name, "category": r.category, "storeId": r.store_id, "date": r.date,
+        "amount": r.amount, "notes": r.notes, "settled": r.settled, "settledDate": r.settled_date,
+    } for r in rows]
+    unsettled_total = sum(r.amount or 0 for r in rows if not r.settled)
+    return {"ok": True, "data": data, "totalUnsettled": round(unsettled_total, 2)}
+
+
+@router.post("/accrued-expenses")
+def create_accrued_expense(
+    body: AccruedExpenseIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    if body.amount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    aid = f"ACR-{int(time.time()*1000)}"
+    adate = body.date or today_str()
+    # The expense is recognized right now — the benefit/service was
+    # already used this period, whether or not it's been paid for yet.
+    exp_id = f"EXP-{int(time.time()*1000)}"
+    exp = Expense(
+        exp_id=exp_id, date=adate, store_id=body.storeId or "HO", store="HO",
+        category=body.category or "Other", sub_category="Accrued",
+        description=f"Accrued — {body.name}", amount=body.amount, pay_method="Non-cash",
+        reference=aid, notes=body.notes or "",
+    )
+    db.add(exp)
+    row = AccruedExpense(
+        accrual_id=aid, name=body.name, category=body.category or "Other", store_id=body.storeId or "HO",
+        date=adate, amount=body.amount, notes=body.notes or "", exp_id=exp_id,
+    )
+    db.add(row)
+    db.commit()
+    return {"ok": True, "status": "ok", "id": aid}
+
+
+@router.post("/accrued-expenses/{accrual_id}/settle")
+def settle_accrued_expense(
+    accrual_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+    date: Optional[str] = None,
+    pay_method: str = "Cash",
+):
+    """The bill actually got paid — record the real cash outflow now.
+    Does NOT create a second Expense (that already happened when this was
+    accrued) — only the liability clears and cash moves.
+    """
+    row = db.query(AccruedExpense).filter(AccruedExpense.accrual_id == accrual_id).first()
+    if not row:
+        raise HTTPException(404, "Accrued expense not found")
+    if row.settled:
+        raise HTTPException(400, "Already settled")
+    sdate = date or today_str()
+    cf_id = f"CF-{int(time.time()*1000)}"
+    db.add(CFItem(
+        item_id=cf_id, section="operating",
+        label=f"Paid accrued expense — {row.name}", value=-abs(row.amount), date=sdate,
+    ))
+    row.settled = True
+    row.settled_date = sdate
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
+@router.delete("/accrued-expenses/{accrual_id}")
+def delete_accrued_expense(
+    accrual_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin"))],
+):
+    row = db.query(AccruedExpense).filter(AccruedExpense.accrual_id == accrual_id).first()
+    if not row:
+        raise HTTPException(404, "Accrued expense not found")
+    if row.exp_id:
+        exp = db.query(Expense).filter(Expense.exp_id == row.exp_id).first()
+        if exp:
+            db.delete(exp)
     db.delete(row)
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -1373,15 +1805,29 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     returns = sum(r.amount or 0 for r in rets)
     net_rev = revenue - returns
     total_exp = sum(e.amount or 0 for e in exps)
+    # "Bad Debt / Write-off" expenses (e.g. an unrecoverable employee
+    # advance) are real for P&L — they correctly reduce profit — but no
+    # cash actually moves for them (it's Dr Expense / Cr the receivable
+    # being written off, not Cr Cash). They must be excluded here or the
+    # cash estimate below would incorrectly drop by that amount too.
+    # Same logic for "Accrued" expenses not yet settled — recognized on
+    # the P&L now, but no cash has left yet (settling one later adds its
+    # own Cash Flow entry, which cf_net already picks up).
+    _non_cash = lambda e: (e.category or "") == "Bad Debt / Write-off" or (e.sub_category or "") == "Accrued"
+    total_exp_cash = sum(e.amount or 0 for e in exps if not _non_cash(e))
     net_profit_before_depr = net_rev - total_exp
     as_of = today_str()
     fa_rows = db.query(FixedAsset).all()
     total_accum_depr = sum(depr.schedule(fa, as_of)["accumulatedDepreciation"] for fa in fa_rows)
-    # Retained Earnings reflects lifetime depreciation too (Dr Depreciation
-    # Expense / Cr Accumulated Depreciation) — this is what keeps
-    # Assets = Liabilities + Equity once Fixed Assets below are shown at
-    # net book value instead of full purchase cost.
-    net_profit = net_profit_before_depr - total_accum_depr
+    pe_rows_bs = db.query(PrepaidExpense).all()
+    total_amortized = sum(amz.schedule(pe, as_of)["amortizedToDate"] for pe in pe_rows_bs)
+    ea_rows_bs = db.query(EmployeeAdvance).filter(EmployeeAdvance.written_off.is_(False)).all()
+    # Retained Earnings reflects lifetime depreciation AND amortization too
+    # (Dr Expense / Cr Accumulated Depreciation-or-Prepaid-Asset) — this is
+    # what keeps Assets = Liabilities + Equity once Fixed Assets and
+    # Prepaid Expenses below are shown at their net/remaining value instead
+    # of full original cost.
+    net_profit = net_profit_before_depr - total_accum_depr - total_amortized
     stock_value = 0.0
     for inv in db.query(Inventory).all():
         p = db.query(Product).filter(Product.barcode == inv.barcode).first()
@@ -1399,7 +1845,7 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     # brought in as capital or spent on a fixed asset silently vanished
     # from the Balance Sheet instead of showing up as cash.
     cf_net = sum(c.value or 0 for c in db.query(CFItem).all())
-    cash_est = max(cash_sales - total_exp - sup_paid_all + cf_net, 0)
+    cash_est = max(cash_sales - total_exp_cash - sup_paid_all + cf_net, 0)
     bs_rows = db.query(BSEntry).all()
     sup_pay = 0.0
     sup_advance = 0.0
@@ -1420,6 +1866,18 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
         {"label": "Cash & Bank (estimated)", "value": cash_est, "auto": True},
         {"label": "Inventory / Stock Value", "value": stock_value, "auto": True},
     ] + ([{"label": "Advance to Suppliers", "value": sup_advance, "auto": True}] if sup_advance > 0 else []) + [
+        {
+            "label": f"{pe.name} (paid {pe.total_amount:,.0f}, amortized {amz.schedule(pe, as_of)['amortizedToDate']:,.0f})",
+            "value": amz.schedule(pe, as_of)["remainingBalance"], "auto": True,
+        }
+        for pe in pe_rows_bs if not amz.schedule(pe, as_of)["fullyAmortized"]
+    ] + [
+        {
+            "label": f"Advance — {ea.employee_name} (of {ea.amount:,.0f}, repaid {ea.repaid_amount:,.0f})",
+            "value": round(float(ea.amount or 0) - float(ea.repaid_amount or 0), 2), "auto": True,
+        }
+        for ea in ea_rows_bs if round(float(ea.amount or 0) - float(ea.repaid_amount or 0), 2) > 0.005
+    ] + [
         {"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-current"
     ]
     fixed_assets = [
@@ -1429,7 +1887,9 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
         }
         for fa in fa_rows if not fa.disposed
     ] + [{"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "asset-fixed"]
-    liabilities = [{"label": "Supplier Payables", "value": sup_pay, "auto": True}] + [
+    ac_rows_bs = db.query(AccruedExpense).filter(AccruedExpense.settled.is_(False)).all()
+    total_accrued = sum(a.amount or 0 for a in ac_rows_bs)
+    liabilities = ([{"label": "Accrued Expenses Payable", "value": round(total_accrued, 2), "auto": True}] if total_accrued > 0 else []) + [{"label": "Supplier Payables", "value": sup_pay, "auto": True}] + [
         {"id": r.entry_id, "label": r.description, "value": r.amount, "auto": False} for r in bs_rows if r.type == "liability"
     ]
     caps = db.query(CapitalEntry).all()
@@ -1463,7 +1923,9 @@ def cashflow(
     sales, expenses = sq.all(), eq.all()
     cash_in = sum(s.total or 0 for s in sales if (s.payment or "") == "Cash")
     bank_in = sum(s.total or 0 for s in sales if (s.payment or "") != "Cash")
-    total_exp = sum(e.amount or 0 for e in expenses)
+    # Bad Debt / Write-off and not-yet-settled Accrued expenses are
+    # non-cash at the point they're recognized — exclude them here too.
+    total_exp = sum(e.amount or 0 for e in expenses if (e.category or "") != "Bad Debt / Write-off" and (e.sub_category or "") != "Accrued")
     tq = db.query(SupplierTxn).filter(SupplierTxn.type == "payment")
     if date_from:
         tq = tq.filter(SupplierTxn.date >= date_from)
