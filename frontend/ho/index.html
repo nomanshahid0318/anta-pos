@@ -1430,7 +1430,10 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="card-title" style="margin:0">⚖️ Trial Balance</div>
-        <button class="btn btn-ghost btn-sm" onclick="loadTrialBalance()">🔄 Refresh</button>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-ghost btn-sm" onclick="exportTrialBalance()">⬇️ Export</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTrialBalance()">🔄 Refresh</button>
+        </div>
       </div>
       <div id="tb-status" style="font-size:11px;margin-bottom:9px"></div>
       <table><thead><tr><th>Code</th><th>Account</th><th>Type</th><th class="text-right">Debit</th><th class="text-right">Credit</th><th class="text-right">Balance</th></tr></thead>
@@ -1448,6 +1451,7 @@ body{display:flex;height:100vh;overflow:hidden}
           <select class="form-input" style="width:150px;padding:5px 9px" id="je-filter" onchange="loadJournals()">
             <option value="">All Sources</option><option value="sale">Sales</option><option value="expense">Expenses</option><option value="manual">Manual</option>
           </select>
+          <button class="btn btn-ghost btn-sm" onclick="exportJournals()">⬇️ Export</button>
           <button class="btn btn-ghost btn-sm" onclick="loadJournals()">🔄 Refresh</button>
         </div>
       </div>

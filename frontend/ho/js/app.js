@@ -2588,6 +2588,7 @@ async function togglePromo(id){
   const res=await api('/api/promotions/'+encodeURIComponent(id)+'/toggle',{method:'POST',body:{}});
   if(res&&res.ok){loadPromosHO();toast(res.active?'Activated':'Deactivated');}
 }
+let __tbRows=[],__jeRows=[];
 async function loadCOA(){
   const res=await api('/api/accounts/coa');
   const el=$('coa-table'); if(!el)return;
@@ -2596,16 +2597,21 @@ async function loadCOA(){
 async function loadTrialBalance(){
   const res=await api('/api/accounts/trial-balance');
   if(!res||!res.ok)return;
+  __tbRows=res.data||[];
   if($('tb-status'))$('tb-status').innerHTML=res.balanced
     ?`<span class="badge badge-green">✅ Balanced</span> <span style="color:var(--gray4)">Total Debit ${fmt(res.totalDebit)} = Total Credit ${fmt(res.totalCredit)}</span>`
     :`<span class="badge badge-red">⚠️ Out of balance</span> <span style="color:var(--gray4)">Debit ${fmt(res.totalDebit)} vs Credit ${fmt(res.totalCredit)}</span>`;
   if($('tb-table'))$('tb-table').innerHTML=(res.data||[]).map(r=>`<tr><td class="fw7" style="font-family:monospace">${r.code}</td><td>${r.name}</td><td><span class="badge badge-blue">${r.type}</span></td><td class="text-right">${fmt(r.debit)}</td><td class="text-right">${fmt(r.credit)}</td><td class="text-right fw7">${fmt(Math.abs(r.balance))}${r.balance<0?' CR':''}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No activity yet</td></tr>';
+}
+function exportTrialBalance(){
+  _csvDownload(__tbRows,[['Code','code'],['Account','name'],['Type','type'],['Debit','debit'],['Credit','credit'],['Balance','balance']],'trial_balance_'+today()+'.csv');
 }
 async function loadJournals(){
   const src=$('je-filter')?$('je-filter').value:'';
   const res=await api('/api/accounts/journals?limit=100'+(src?('&source_type='+encodeURIComponent(src)):''));
   const el=$('je-list'); if(!el)return;
   const rows=(res&&res.data)||[];
+  __jeRows=rows;
   const srcBadge=t=>({sale:'badge-green',expense:'badge-amber',manual:'badge-blue'}[t]||'badge-gray');
   el.innerHTML=rows.map(j=>{
     const totalDr=(j.lines||[]).reduce((a,l)=>a+(+l.debit||0),0);
@@ -2618,6 +2624,14 @@ async function loadJournals(){
       <table style="font-size:11.5px"><tbody>${(j.lines||[]).map(l=>`<tr><td style="font-family:monospace;padding:2px 6px 2px 0">${l.accountCode}</td><td style="padding:2px 6px">${l.accountName}</td><td class="text-right" style="padding:2px 6px">${l.debit?fmt(l.debit):''}</td><td class="text-right" style="padding:2px 0;color:var(--gray4)">${l.credit?fmt(l.credit):''}</td></tr>`).join('')}</tbody></table>
     </div>`;
   }).join('')||'<div style="text-align:center;color:var(--gray3);padding:20px">No journal entries yet</div>';
+}
+function exportJournals(){
+  const flat=[];
+  __jeRows.forEach(j=>(j.lines||[]).forEach(l=>flat.push({
+    entry:j.id, date:j.date, sourceType:j.sourceType, sourceId:j.sourceId, memo:j.memo,
+    accountCode:l.accountCode, accountName:l.accountName, debit:l.debit, credit:l.credit,
+  })));
+  _csvDownload(flat,[['Entry','entry'],['Date','date'],['Source Type','sourceType'],['Source ID','sourceId'],['Memo','memo'],['Account Code','accountCode'],['Account Name','accountName'],['Debit','debit'],['Credit','credit']],'journal_entries_'+today()+'.csv');
 }
 async function loadLicense(){
   const res=await api('/api/license/status');
