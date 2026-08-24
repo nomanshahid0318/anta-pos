@@ -24,7 +24,6 @@ from .routers import handover_routes
 from .routers import purchase_orders as purchase_orders_routes
 from .routers import customers as customers_routes
 from .routers import shifts as shifts_routes
-from .routers import prepaid_expenses as prepaid_expenses_routes
 
 settings = get_settings()
 APP_DIR = Path(__file__).resolve().parent
@@ -86,7 +85,6 @@ def create_app() -> FastAPI:
     app.include_router(purchase_orders_routes.router)
     app.include_router(customers_routes.router)
     app.include_router(shifts_routes.router)
-    app.include_router(prepaid_expenses_routes.router)
 
     @app.on_event("startup")
     def _startup():
