@@ -101,7 +101,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
-    <div class="nav-item" onclick="show('stock-counts')" data-role="admin,manager,warehouse"><span class="ico">📋</span>Stock Count</div>
+    <div class="nav-item" onclick="show('stock-counts')" data-role="admin,manager,warehouse"><span class="ico">📋</span>Stock Take</div>
     <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
     <div class="nav-sec">Admin</div>
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
@@ -791,12 +791,20 @@ body{display:flex;height:100vh;overflow:hidden}
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="card-title" style="margin:0" id="sc-detail-title">📋 Count Detail</div>
         <div style="display:flex;gap:7px">
-          <button class="btn btn-ghost btn-sm" onclick="saveCountLines()">💾 Save Entries</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportVarianceReport()">⬇️ Export Variance Report</button>
           <button class="btn btn-green btn-sm" data-role="admin,manager" onclick="approveStockCount()">✅ Approve &amp; Apply Adjustments</button>
         </div>
       </div>
-      <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Enter the physically counted quantity for each item. Leave blank to skip an item (won't be adjusted). A reason is recommended for any variance.</p>
-      <table><thead><tr><th>Barcode</th><th>Product</th><th>System Qty</th><th>Physical Qty</th><th>Variance</th><th>Reason</th></tr></thead>
+      <div style="margin:10px 0;padding:10px;background:var(--gray0);border-radius:8px" id="sc-upload-section">
+        <div style="font-size:11px;color:var(--gray4);margin-bottom:8px">📤 Scan every item on the shelf with a barcode scanner into Excel/CSV (one row per scan — scanning the same item twice is fine, quantities are added automatically), then upload the file here. Columns: <b>Barcode</b>, <b>Qty</b> (optional, defaults to 1 per row).</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="downloadCountTemplate()">⬇️ Download Template</button>
+          <input type="file" id="sc-file" style="display:none" accept=".xlsx,.csv" onchange="uploadCountFile(this.files[0])">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('sc-file').click()">📂 Upload Scanned File</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Variance = Physical − System. Items in red are short, green are over. "New" items were physically found but weren't in the system's expected list for this store at all.</p>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>System Qty</th><th>Physical Qty</th><th>Variance</th></tr></thead>
       <tbody id="sc-lines-table"></tbody></table>
     </div>
     <div class="card" data-role="admin,manager">

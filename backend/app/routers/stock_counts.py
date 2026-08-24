@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
-from ..models import Inventory
+from ..models import Inventory, Product
 from ..models_stockcount import StockCount, StockCountLine
 from ..services.audit import log_audit
 from ..services.inventory import get_or_create_inv
@@ -98,6 +98,58 @@ def list_counts(db: Annotated[Session, Depends(get_db)], user: Annotated[Current
             "totalLines": len(lines), "countedLines": len(counted_lines), "varianceLines": len(variance_lines),
         })
     return {"ok": True, "data": out}
+
+
+class UploadCountLine(BaseModel):
+    barcode: str
+    qty: int = 1
+
+
+class UploadCountIn(BaseModel):
+    lines: list[UploadCountLine] = Field(default_factory=list)
+
+
+@router.post("/{count_id}/upload")
+def upload_count(
+    count_id: str, body: UploadCountIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "warehouse"))],
+):
+    """Bulk-load a physical count from a scanned Excel/CSV file — the real
+    workflow: staff scans every barcode on the shelf (a barcode scanner
+    just types the number + Enter into Excel, so scanning the same item
+    twice = two rows / a qty of 2), then this file gets uploaded here
+    instead of anyone typing quantities by hand.
+
+    Duplicate barcodes in the file are summed. A barcode that was never
+    in the original system snapshot (something physically found that the
+    system didn't expect at all) gets a new line with systemQty=0, so it
+    still shows up as a positive variance rather than being silently
+    dropped.
+    """
+    row = db.query(StockCount).filter(StockCount.count_id == count_id).first()
+    if not row:
+        raise HTTPException(404, "Count not found")
+    if row.status != "draft":
+        raise HTTPException(400, "This count is already approved and locked")
+    scanned: dict[str, int] = {}
+    for l in body.lines:
+        if not l.barcode:
+            continue
+        scanned[l.barcode] = scanned.get(l.barcode, 0) + int(l.qty or 1)
+    lines_by_barcode = {l.barcode: l for l in db.query(StockCountLine).filter(StockCountLine.count_id == count_id).all()}
+    matched = 0
+    new_items = 0
+    for barcode, qty in scanned.items():
+        line = lines_by_barcode.get(barcode)
+        if line:
+            line.physical_qty = qty
+            matched += 1
+        else:
+            prod = db.query(Product).filter(Product.barcode == barcode).first()
+            db.add(StockCountLine(count_id=count_id, barcode=barcode, name=(prod.name if prod else barcode), system_qty=0, physical_qty=qty))
+            new_items += 1
+    db.commit()
+    return {"ok": True, "status": "ok", "matched": matched, "newItemsFound": new_items, "totalScanned": len(scanned)}
 
 
 @router.put("/{count_id}/lines")

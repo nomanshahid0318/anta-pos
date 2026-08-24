@@ -102,7 +102,7 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Count','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
@@ -2282,27 +2282,37 @@ async function openStockCount(id){
   if(!res||!res.ok){toast('Failed to load','error');return;}
   __scCurrent=res;
   if($('sc-detail-title'))$('sc-detail-title').textContent=`📋 ${res.id} — ${res.storeName} (${res.status})`;
-  const locked=res.status!=='draft';
-  if($('sc-lines-table'))$('sc-lines-table').innerHTML=(res.lines||[]).map((l,i)=>`<tr>
-    <td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}</td><td>${l.systemQty}</td>
-    <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="sc-phys-${i}" data-barcode="${l.barcode}" value="${l.physicalQty!=null?l.physicalQty:''}" ${locked?'disabled':''}></td>
-    <td class="fw7" style="color:${l.variance>0?'var(--green)':l.variance<0?'var(--red)':'var(--gray4)'}">${l.variance!=null?l.variance:'—'}</td>
-    <td><input class="form-input" style="padding:4px 7px" id="sc-reason-${i}" value="${l.reason||''}" ${locked?'disabled':''}></td>
-  </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--gray3);padding:14px">No items</td></tr>';
-  document.querySelectorAll('#sc-detail-card [data-role]').forEach(el=>{}); // role visibility already applied globally
+  if($('sc-upload-section'))$('sc-upload-section').style.display=res.status==='draft'?'block':'none';
+  renderVarianceTable(res.lines||[]);
   $('sc-detail-card').style.display='block';
   $('sc-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
-async function saveCountLines(){
+function renderVarianceTable(lines){
+  if($('sc-lines-table'))$('sc-lines-table').innerHTML=lines.map(l=>{
+    const isNew=l.systemQty===0&&l.physicalQty>0&&l.variance===l.physicalQty;
+    const vColor=l.variance==null?'var(--gray4)':l.variance>0?'var(--green)':l.variance<0?'var(--red)':'var(--gray4)';
+    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td></tr>`;
+  }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:14px">No items</td></tr>';
+}
+function downloadCountTemplate(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['Barcode,Qty\n8001000000001,1\n8001000000001,1\n'],{type:'text/csv'}));
+  a.download='stock_take_scan_template.csv';a.click();
+}
+async function uploadCountFile(file){
+  if(!file||!__scCurrent)return;
+  const rows=await readExcel(file);
+  const lines=rows.map(r=>({barcode:cleanId(r.Barcode||r.barcode),qty:+(r.Qty||r.qty||1)})).filter(l=>l.barcode);
+  if(!lines.length){toast('No valid barcode rows found in file','error');return;}
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/upload`,{method:'POST',body:{lines}});
+  if(res&&res.ok){
+    toast(`✅ ${res.totalScanned} unique barcode(s) processed — ${res.matched} matched, ${res.newItemsFound} new item(s) found`);
+    openStockCount(__scCurrent.id);loadStockCounts();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Upload failed'),'error');
+}
+function exportVarianceReport(){
   if(!__scCurrent)return;
-  const inputs=document.querySelectorAll('[id^="sc-phys-"]');
-  const lines=[...inputs].filter(inp=>inp.value!=='').map(inp=>{
-    const i=inp.id.split('-')[2];
-    return {barcode:inp.dataset.barcode,physicalQty:+inp.value,reason:($('sc-reason-'+i)?.value)||''};
-  });
-  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
-  if(res&&res.ok){toast(`✅ ${res.updated} entries saved`);openStockCount(__scCurrent.id);loadStockCounts();}
-  else toast('❌ Failed','error');
+  _csvDownload(__scCurrent.lines||[],[['Barcode','barcode'],['Product','name'],['System Qty','systemQty'],['Physical Qty','physicalQty'],['Variance','variance']],`variance_report_${__scCurrent.id}_${today()}.csv`);
 }
 async function approveStockCount(){
   if(!__scCurrent)return;
