@@ -833,9 +833,11 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="card-title" style="margin:0" id="sc-detail-title">📋 Count Detail</div>
         <div style="display:flex;gap:7px">
           <button class="btn btn-ghost btn-sm" onclick="exportVarianceReport()">⬇️ Export Variance Report</button>
+          <button class="btn btn-ghost btn-sm" data-role="admin,manager,warehouse" onclick="saveLineCategories()">💾 Save Categories</button>
           <button class="btn btn-green btn-sm" data-role="admin,manager" onclick="approveStockCount()">✅ Approve &amp; Apply Adjustments</button>
         </div>
       </div>
+      <div id="sc-shortage-summary" style="font-weight:700;color:var(--red);margin-bottom:8px;font-size:12px"></div>
       <div style="margin:10px 0;padding:10px;background:var(--gray0);border-radius:8px" id="sc-upload-section">
         <div style="font-size:11px;color:var(--gray4);margin-bottom:8px">📤 Scan every item on the shelf with a barcode scanner into Excel/CSV (one row per scan — scanning the same item twice is fine, quantities are added automatically), then upload the file here. Columns: <b>Barcode</b>, <b>Qty</b> (optional, defaults to 1 per row).</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -845,7 +847,7 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
       </div>
       <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Variance = Physical − System. Items in red are short, green are over. "New" items were physically found but weren't in the system's expected list for this store at all.</p>
-      <table><thead><tr><th>Barcode</th><th>Product</th><th>System Qty</th><th>Physical Qty</th><th>Variance</th></tr></thead>
+      <table><thead><tr><th>Barcode</th><th>Product</th><th>System Qty</th><th>Physical Qty</th><th>Variance</th><th>Value</th><th>Category (if shortage)</th></tr></thead>
       <tbody id="sc-lines-table"></tbody></table>
     </div>
     <div class="card" data-role="admin,manager">
@@ -1055,6 +1057,7 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="grid-2">
           <div class="form-group"><label class="form-label">Max Discount % (no approval)</label><input class="form-input" type="number" id="thr-discount" placeholder="15"></div>
           <div class="form-group"><label class="form-label">Max Return Amount (no approval)</label><input class="form-input" type="number" id="thr-return" placeholder="100"></div>
+          <div class="form-group"><label class="form-label">Max Stock Shortage Value (manager can approve)</label><input class="form-input" type="number" id="thr-shortage" placeholder="500"></div>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveThresholds()">💾 Save Thresholds</button>
       </div>

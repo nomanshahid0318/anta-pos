@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
-from ..models import Inventory, Product
+from ..models import Expense, Inventory, Product, Setting, User
 from ..models_stockcount import StockCount, StockCountLine
+from ..models_accounting import EmployeeAdvance
 from ..services.audit import log_audit
 from ..services.inventory import get_or_create_inv
 from ..utils import today_str
@@ -28,8 +29,10 @@ class StartCountIn(BaseModel):
 
 class CountLineUpdate(BaseModel):
     barcode: str
-    physicalQty: int
+    physicalQty: Optional[int] = None
     reason: str = ""
+    category: Optional[str] = None  # shrinkage | employee_fault | investigation
+    employeeUserId: Optional[str] = None
 
 
 class SubmitCountIn(BaseModel):
@@ -50,6 +53,7 @@ def _line_out(l: StockCountLine) -> dict:
     return {
         "barcode": l.barcode, "name": l.name, "systemQty": l.system_qty,
         "physicalQty": l.physical_qty, "variance": variance, "reason": l.reason,
+        "category": l.category, "employeeUserId": l.employee_user_id,
     }
 
 
@@ -74,10 +78,16 @@ def get_count(count_id: str, db: Annotated[Session, Depends(get_db)], user: Anno
     if not row:
         raise HTTPException(404, "Count not found")
     lines = db.query(StockCountLine).filter(StockCountLine.count_id == count_id).order_by(StockCountLine.id.asc()).all()
+    costs = {p.barcode: p.cost or 0 for p in db.query(Product).filter(Product.barcode.in_([l.barcode for l in lines])).all()}
+    out_lines = []
+    for l in lines:
+        d = _line_out(l)
+        d["cost"] = costs.get(l.barcode, 0)
+        out_lines.append(d)
     return {
         "ok": True, "id": row.count_id, "storeId": row.store_id, "storeName": row.store_name,
         "date": row.date, "status": row.status, "countedBy": row.counted_by, "approvedBy": row.approved_by,
-        "notes": row.notes, "lines": [_line_out(l) for l in lines],
+        "notes": row.notes, "lines": out_lines,
     }
 
 
@@ -168,8 +178,14 @@ def update_count_lines(
         line = lines_by_barcode.get(u.barcode)
         if not line:
             continue
-        line.physical_qty = u.physicalQty
-        line.reason = u.reason or ""
+        if u.physicalQty is not None:
+            line.physical_qty = u.physicalQty
+        if u.reason:
+            line.reason = u.reason
+        if u.category:
+            line.category = u.category
+        if u.employeeUserId is not None:
+            line.employee_user_id = u.employeeUserId
         updated += 1
     db.commit()
     return {"ok": True, "status": "ok", "updated": updated}
@@ -180,12 +196,25 @@ def approve_count(
     count_id: str, db: Annotated[Session, Depends(get_db)],
     user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
 ):
-    """Manager/admin-only — this is the actual internal control: a
-    warehouse/cashier can COUNT and enter physical quantities, but only a
-    manager or admin can APPROVE the count, which is the moment the
-    variance actually changes real inventory (and therefore Balance Sheet
-    stock value). Lines without a physical count entered are skipped
-    (treated as "not yet counted", not zero).
+    """This is the moment a physical count's variance becomes real:
+    Inventory changes, AND the financial "other side" is posted so the
+    Balance Sheet stays in balance — a shortage can't just shrink
+    Inventory Value without a matching Expense (or Employee Advance)
+    appearing somewhere, or Assets would stop equalling Liabilities+Equity.
+
+    Per line with a shortage (negative variance), category decides where
+    the value goes:
+      - shrinkage / investigation → "Inventory Shrinkage" Expense (a real,
+        non-cash P&L cost — the company absorbs it)
+      - employee_fault → an Employee Advance Receivable against the named
+        employee instead (no P&L hit — they owe it back, the company
+        hasn't actually lost the money)
+    Overage (extra found) always posts as a non-cash "Inventory Gain"
+    (a negative Expense, so it reduces total costs / raises profit).
+
+    If the total shortage value on this count exceeds the configured
+    threshold, only an Admin (not a Manager) can approve — Lines without
+    a physical count entered are skipped (treated as "not yet counted").
     """
     row = db.query(StockCount).filter(StockCount.count_id == count_id).first()
     if not row:
@@ -193,6 +222,24 @@ def approve_count(
     if row.status != "draft":
         raise HTTPException(400, "Already approved")
     lines = db.query(StockCountLine).filter(StockCountLine.count_id == count_id).all()
+
+    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key == "stock_count_admin_threshold").all()}
+    admin_threshold = float(settings_map.get("stock_count_admin_threshold", 500))
+    products = {p.barcode: p for p in db.query(Product).filter(Product.barcode.in_([l.barcode for l in lines])).all()}
+    total_shortage_value = 0.0
+    for l in lines:
+        if l.physical_qty is None:
+            continue
+        variance = l.physical_qty - l.system_qty
+        if variance < 0:
+            cost = float(products[l.barcode].cost or 0) if l.barcode in products else 0
+            total_shortage_value += abs(variance) * cost
+    if total_shortage_value > admin_threshold and user.role != "admin":
+        raise HTTPException(
+            403,
+            f"Total shortage value ({round(total_shortage_value,2)}) exceeds the admin-approval threshold ({admin_threshold}) — an Admin must approve this count.",
+        )
+
     applied = 0
     for l in lines:
         if l.physical_qty is None:
@@ -204,17 +251,45 @@ def approve_count(
         inv.adjustments = (inv.adjustments or 0) + variance
         inv.recalc()
         applied += 1
+        cost = float(products[l.barcode].cost or 0) if l.barcode in products else 0
+        value = round(abs(variance) * cost, 2)
+
+        if variance > 0:
+            # Overage — non-cash gain, reduces total costs on the P&L.
+            db.add(Expense(
+                exp_id=f"EXP-{int(time.time()*1000)}-{l.id}", date=row.date, store_id=row.store_id, store=row.store_name,
+                category="Inventory Gain (Stock Count)", sub_category="Non-cash",
+                description=f"Overage found — {l.name} (+{variance})", amount=-value, pay_method="Non-cash",
+                reference=count_id, notes=l.reason or "",
+            ))
+        elif l.category == "employee_fault" and l.employee_user_id:
+            emp = db.query(User).filter(User.user_id == l.employee_user_id).first()
+            db.add(EmployeeAdvance(
+                advance_id=f"ADV-{int(time.time()*1000)}-{l.id}", employee_name=emp.name if emp else l.employee_user_id,
+                store_id=row.store_id, date=row.date, amount=value,
+                reason=f"Stock shortage — {l.name} ({variance})", notes=l.reason or "",
+            ))
+        else:
+            # Default: shrinkage (or investigation, pending reclassification later) — company absorbs it as a non-cash expense.
+            tag = " — pending investigation" if l.category == "investigation" else ""
+            db.add(Expense(
+                exp_id=f"EXP-{int(time.time()*1000)}-{l.id}", date=row.date, store_id=row.store_id, store=row.store_name,
+                category="Inventory Shrinkage", sub_category="Non-cash",
+                description=f"Shortage{tag} — {l.name} ({variance})", amount=value, pay_method="Non-cash",
+                reference=count_id, notes=l.reason or "",
+            ))
+
         log_audit(
             db, user, "update", "stock_adjustment", l.barcode,
-            f"Stock count adjustment: {l.name} — system {l.system_qty}, counted {l.physical_qty} ({'+' if variance > 0 else ''}{variance})",
-            old_value={"systemQty": l.system_qty}, new_value={"physicalQty": l.physical_qty, "variance": variance, "reason": l.reason},
+            f"Stock count: {l.name} — system {l.system_qty}, counted {l.physical_qty} ({'+' if variance > 0 else ''}{variance}), value {value}, category {l.category if variance < 0 else 'overage'}",
+            old_value={"systemQty": l.system_qty}, new_value={"physicalQty": l.physical_qty, "variance": variance, "category": l.category, "value": value},
         )
     row.status = "approved"
     row.approved_by = user.name
     from datetime import datetime
     row.approved_at = datetime.utcnow()
     db.commit()
-    return {"ok": True, "status": "ok", "linesAdjusted": applied}
+    return {"ok": True, "status": "ok", "linesAdjusted": applied, "totalShortageValue": round(total_shortage_value, 2)}
 
 
 @router.post("/quick-adjust")

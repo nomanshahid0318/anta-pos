@@ -136,6 +136,10 @@ def _auto_migrate() -> None:
         "inventory": {
             "adjustments": "INTEGER DEFAULT 0",
         },
+        "stock_count_lines": {
+            "category": "VARCHAR(24) DEFAULT 'shrinkage'",
+            "employee_user_id": "VARCHAR(32) DEFAULT ''",
+        },
     }
     is_postgres = not settings.database_url.startswith("sqlite")
     inspector = inspect(engine)

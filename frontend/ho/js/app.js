@@ -2284,16 +2284,64 @@ async function openStockCount(id){
   __scCurrent=res;
   if($('sc-detail-title'))$('sc-detail-title').textContent=`📋 ${res.id} — ${res.storeName} (${res.status})`;
   if($('sc-upload-section'))$('sc-upload-section').style.display=res.status==='draft'?'block':'none';
+  if(res.status==='draft'&&!__scEmployees[res.storeId]){
+    const ur=await api('/api/auth/users');
+    const all=(ur&&(ur.data||ur))||[];
+    __scEmployees[res.storeId]=Array.isArray(all)?all.filter(u=>u.store_id===res.storeId&&u.active!==false):[];
+  }
   renderVarianceTable(res.lines||[]);
   $('sc-detail-card').style.display='block';
   $('sc-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
+let __scEmployees={};
 function renderVarianceTable(lines){
-  if($('sc-lines-table'))$('sc-lines-table').innerHTML=lines.map(l=>{
+  const locked=!__scCurrent||__scCurrent.status!=='draft';
+  const emps=(__scCurrent&&__scEmployees[__scCurrent.storeId])||[];
+  let totalShortageValue=0;
+  const rowsHtml=lines.map((l,i)=>{
     const isNew=l.systemQty===0&&l.physicalQty>0&&l.variance===l.physicalQty;
     const vColor=l.variance==null?'var(--gray4)':l.variance>0?'var(--green)':l.variance<0?'var(--red)':'var(--gray4)';
-    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td></tr>`;
-  }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:14px">No items</td></tr>';
+    const isShortage=l.variance!=null&&l.variance<0;
+    const value=isShortage?Math.abs(l.variance)*(l.cost||0):0;
+    if(isShortage)totalShortageValue+=value;
+    let categoryCell='—';
+    if(isShortage&&!locked){
+      const empOptions=emps.map(e=>`<option value="${e.user_id||e.userId}" ${l.employeeUserId===(e.user_id||e.userId)?'selected':''}>${e.name}</option>`).join('');
+      categoryCell=`<select class="form-input" style="padding:3px 6px;font-size:10.5px" id="sc-cat-${i}" data-barcode="${l.barcode}" onchange="toggleEmpSelect(${i})">
+        <option value="shrinkage" ${l.category==='shrinkage'?'selected':''}>Shrinkage (company loss)</option>
+        <option value="employee_fault" ${l.category==='employee_fault'?'selected':''}>Employee Fault</option>
+        <option value="investigation" ${l.category==='investigation'?'selected':''}>Under Investigation</option>
+      </select>
+      <select class="form-input" style="padding:3px 6px;font-size:10.5px;margin-top:3px;display:${l.category==='employee_fault'?'block':'none'}" id="sc-emp-${i}"><option value="">Select employee…</option>${empOptions}</select>`;
+    } else if(isShortage){
+      categoryCell=`${l.category}${l.employeeUserId?' ('+(emps.find(e=>(e.user_id||e.userId)===l.employeeUserId)?.name||l.employeeUserId)+')':''}`;
+    }
+    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td><td>${isShortage?fmt(value):'—'}</td><td>${categoryCell}</td></tr>`;
+  }).join('');
+  if($('sc-lines-table'))$('sc-lines-table').innerHTML=rowsHtml||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No items</td></tr>';
+  const summaryEl=$('sc-shortage-summary');
+  if(summaryEl)summaryEl.textContent=totalShortageValue>0?`⚠️ Total shortage value: ${fmt(totalShortageValue)}`:'';
+}
+function toggleEmpSelect(i){
+  const cat=$('sc-cat-'+i)?.value;
+  const empSel=$('sc-emp-'+i);
+  if(empSel)empSel.style.display=cat==='employee_fault'?'block':'none';
+}
+async function saveLineCategories(){
+  if(!__scCurrent)return;
+  const selects=document.querySelectorAll('[id^="sc-cat-"]');
+  const lines=[...selects].map(sel=>{
+    const i=sel.id.split('-')[2];
+    const empSel=$('sc-emp-'+i);
+    const category=sel.value;
+    if(category==='employee_fault'&&(!empSel||!empSel.value)){throw new Error('missing-employee');}
+    return {barcode:sel.dataset.barcode,category,employeeUserId:category==='employee_fault'?empSel.value:''};
+  });
+  try{
+    const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
+    if(res&&res.ok){toast(`✅ ${res.updated} categories saved`);openStockCount(__scCurrent.id);}
+    else toast('❌ Failed to save categories','error');
+  }catch(e){toast('❌ Select an employee for every "Employee Fault" line','error');}
 }
 function downloadCountTemplate(){
   const a=document.createElement('a');
@@ -2430,6 +2478,7 @@ async function saveThresholds(){
   const body={
     discountApprovalThreshold:+(($('thr-discount')&&$('thr-discount').value)||15),
     returnApprovalThreshold:+(($('thr-return')&&$('thr-return').value)||100),
+    stockCountAdminThreshold:+(($('thr-shortage')&&$('thr-shortage').value)||500),
   };
   const res=await api('/api/settings',{method:'PUT',body});
   if(res&&res.ok)toast('✅ Thresholds saved');
@@ -2443,6 +2492,7 @@ async function loadSettingsForm(){
   if($('co-currency'))$('co-currency').value=res.currency||'LYD';
   if($('thr-discount'))$('thr-discount').value=res.discountApprovalThreshold!=null?res.discountApprovalThreshold:15;
   if($('thr-return'))$('thr-return').value=res.returnApprovalThreshold!=null?res.returnApprovalThreshold:100;
+  if($('thr-shortage'))$('thr-shortage').value=res.stockCountAdminThreshold!=null?res.stockCountAdminThreshold:500;
   const img=$('logo-preview-img'),ph=$('logo-preview-placeholder');
   if(res.company_logo){
     if(img){img.src=res.company_logo;img.style.display='block';}

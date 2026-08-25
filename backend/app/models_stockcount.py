@@ -45,3 +45,5 @@ class StockCountLine(Base):
     system_qty: Mapped[int] = mapped_column(Integer, default=0)
     physical_qty: Mapped[int] = mapped_column(Integer, nullable=True)
     reason: Mapped[str] = mapped_column(String(255), default="")
+    category: Mapped[str] = mapped_column(String(24), default="shrinkage")  # shrinkage | employee_fault | investigation — only meaningful for a shortage (negative variance)
+    employee_user_id: Mapped[str] = mapped_column(String(32), default="")  # set when category == employee_fault

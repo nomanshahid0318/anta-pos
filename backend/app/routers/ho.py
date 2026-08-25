@@ -1813,7 +1813,7 @@ def balance_sheet(db: Annotated[Session, Depends(get_db)], user: Annotated[Curre
     # Same logic for "Accrued" expenses not yet settled — recognized on
     # the P&L now, but no cash has left yet (settling one later adds its
     # own Cash Flow entry, which cf_net already picks up).
-    _non_cash = lambda e: (e.category or "") == "Bad Debt / Write-off" or (e.sub_category or "") == "Accrued"
+    _non_cash = lambda e: (e.category or "") in ("Bad Debt / Write-off", "Inventory Shrinkage", "Inventory Gain (Stock Count)") or (e.sub_category or "") == "Accrued"
     total_exp_cash = sum(e.amount or 0 for e in exps if not _non_cash(e))
     net_profit_before_depr = net_rev - total_exp
     as_of = today_str()
@@ -1925,7 +1925,7 @@ def cashflow(
     bank_in = sum(s.total or 0 for s in sales if (s.payment or "") != "Cash")
     # Bad Debt / Write-off and not-yet-settled Accrued expenses are
     # non-cash at the point they're recognized — exclude them here too.
-    total_exp = sum(e.amount or 0 for e in expenses if (e.category or "") != "Bad Debt / Write-off" and (e.sub_category or "") != "Accrued")
+    total_exp = sum(e.amount or 0 for e in expenses if (e.category or "") not in ("Bad Debt / Write-off", "Inventory Shrinkage", "Inventory Gain (Stock Count)") and (e.sub_category or "") != "Accrued")
     tq = db.query(SupplierTxn).filter(SupplierTxn.type == "payment")
     if date_from:
         tq = tq.filter(SupplierTxn.date >= date_from)
