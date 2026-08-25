@@ -57,6 +57,22 @@ def _line_out(l: StockCountLine) -> dict:
     }
 
 
+@router.delete("/{count_id}")
+def delete_count(
+    count_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager"))],
+):
+    row = db.query(StockCount).filter(StockCount.count_id == count_id).first()
+    if not row:
+        raise HTTPException(404, "Count not found")
+    if row.status != "draft":
+        raise HTTPException(400, "Cannot delete an approved count — it already changed real inventory")
+    db.query(StockCountLine).filter(StockCountLine.count_id == count_id).delete()
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}
+
+
 @router.post("/start")
 def start_count(body: StartCountIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "warehouse"))]):
     cid = f"CNT-{int(time.time() * 1000)}"

@@ -824,7 +824,7 @@ body{display:flex;height:100vh;overflow:hidden}
       </div>
       <div class="card">
         <div class="card-title">📂 Recent Counts</div>
-        <table><thead><tr><th>ID</th><th>Store</th><th>Date</th><th>Counted</th><th>Variances</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>ID</th><th>Store</th><th>Date</th><th>Counted</th><th>Variances</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="sc-list"></tbody></table>
       </div>
     </div>
@@ -847,7 +847,25 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
       </div>
       <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Variance = Physical − System. Items in red are short, green are over. "New" items were physically found but weren't in the system's expected list for this store at all.</p>
-      <table><thead><tr><th>Barcode</th><th>Product</th><th>System Qty</th><th>Physical Qty</th><th>Variance</th><th>Value</th><th>Category (if shortage)</th></tr></thead>
+      <div style="display:flex;gap:8px;margin-bottom:9px">
+        <input class="form-input" style="width:260px;padding:5px 9px" id="sc-filter" placeholder="🔍 Filter by barcode or product…" oninput="renderVarianceTable(__scCurrent.lines)">
+        <select class="form-input" style="width:170px;padding:5px 9px" id="sc-filter-status" onchange="renderVarianceTable(__scCurrent.lines)">
+          <option value="">All rows</option>
+          <option value="shortage">Shortages only</option>
+          <option value="overage">Overages only</option>
+          <option value="unscanned">Not scanned</option>
+        </select>
+      </div>
+      <table><thead><tr>
+        <th style="cursor:pointer" onclick="sortSC('barcode')">Barcode ⇅</th>
+        <th style="cursor:pointer" onclick="sortSC('name')">Product ⇅</th>
+        <th style="cursor:pointer" onclick="sortSC('systemQty')">System Qty ⇅</th>
+        <th style="cursor:pointer" onclick="sortSC('physicalQty')">Physical Qty ⇅</th>
+        <th style="cursor:pointer" onclick="sortSC('variance')">Variance ⇅</th>
+        <th style="cursor:pointer" onclick="sortSC('cost')">Unit Cost ⇅</th>
+        <th style="cursor:pointer" onclick="sortSC('value')">Value ⇅</th>
+        <th>Category (if shortage)</th>
+      </tr></thead>
       <tbody id="sc-lines-table"></tbody></table>
     </div>
     <div class="card" data-role="admin,manager">

@@ -2265,7 +2265,28 @@ async function loadStockCounts(){
   const res=await api('/api/stock-counts');
   if(!res||!res.ok){toast('Failed to load counts','error');return;}
   __scList=res.data||[];
-  if($('sc-list'))$('sc-list').innerHTML=__scList.map(c=>`<tr><td class="fw7" style="font-size:11px">${c.id}</td><td>${c.storeName}</td><td>${c.date}</td><td>${c.countedLines}/${c.totalLines}</td><td>${c.varianceLines>0?`<span class="badge badge-amber">${c.varianceLines}</span>`:'—'}</td><td><span class="badge ${c.status==='approved'?'badge-green':'badge-amber'}">${c.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="openStockCount('${c.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No counts yet</td></tr>';
+  if($('sc-list'))$('sc-list').innerHTML=__scList.map(c=>`<tr><td class="fw7" style="font-size:11px">${c.id}</td><td>${c.storeName}</td><td>${c.date}</td><td>${c.countedLines}/${c.totalLines}</td><td>${c.varianceLines>0?`<span class="badge badge-amber">${c.varianceLines}</span>`:'—'}</td><td><span class="badge ${c.status==='approved'?'badge-green':'badge-amber'}">${c.status}</span></td><td>
+    <button class="btn btn-ghost btn-sm" id="sc-eye-${c.id}" onclick="toggleStockCount('${c.id}')">👁️</button>
+    ${c.status==='draft'?`<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteStockCount('${c.id}')">🗑️</button>`:''}
+  </td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No counts yet</td></tr>';
+}
+async function toggleStockCount(id){
+  const card=$('sc-detail-card');
+  if(__scCurrent&&__scCurrent.id===id&&card.style.display==='block'){
+    card.style.display='none';
+    __scCurrent=null;
+    return;
+  }
+  openStockCount(id);
+}
+async function deleteStockCount(id){
+  if(!confirm(`Delete count ${id}? This cannot be undone.`))return;
+  const res=await api(`/api/stock-counts/${encodeURIComponent(id)}`,{method:'DELETE'});
+  if(res&&res.ok){
+    toast('🗑️ Deleted');
+    if(__scCurrent&&__scCurrent.id===id){$('sc-detail-card').style.display='none';__scCurrent=null;}
+    loadStockCounts();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 async function startStockCount(){
   const storeId=$('sc-store')?$('sc-store').value:'';
@@ -2294,19 +2315,50 @@ async function openStockCount(id){
   $('sc-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
 let __scEmployees={};
+let __scSort={key:null,dir:1};
+function sortSC(key){
+  if(__scSort.key===key)__scSort.dir*=-1;
+  else{__scSort.key=key;__scSort.dir=1;}
+  renderVarianceTable(__scCurrent.lines);
+}
 function renderVarianceTable(lines){
   const locked=!__scCurrent||__scCurrent.status!=='draft';
   const emps=(__scCurrent&&__scEmployees[__scCurrent.storeId])||[];
+  const filterText=($('sc-filter')&&$('sc-filter').value||'').toLowerCase();
+  const filterStatus=$('sc-filter-status')?$('sc-filter-status').value:'';
+
+  let rows=lines.map(l=>({
+    ...l,
+    value:round2((l.variance||0)*(l.cost||0)),
+    absShortageValue:l.variance!=null&&l.variance<0?round2(Math.abs(l.variance)*(l.cost||0)):0,
+  }));
+
+  if(filterText)rows=rows.filter(l=>l.barcode.toLowerCase().includes(filterText)||l.name.toLowerCase().includes(filterText));
+  if(filterStatus==='shortage')rows=rows.filter(l=>l.variance!=null&&l.variance<0);
+  else if(filterStatus==='overage')rows=rows.filter(l=>l.variance!=null&&l.variance>0);
+  else if(filterStatus==='unscanned')rows=rows.filter(l=>l.physicalQty==null);
+
+  if(__scSort.key){
+    const k=__scSort.key,d=__scSort.dir;
+    rows.sort((a,b)=>{
+      const av=a[k],bv=b[k];
+      if(av==null&&bv==null)return 0;
+      if(av==null)return 1;
+      if(bv==null)return -1;
+      if(typeof av==='string')return av.localeCompare(bv)*d;
+      return (av-bv)*d;
+    });
+  }
+
   let totalShortageValue=0;
-  const rowsHtml=lines.map((l,i)=>{
+  const rowsHtml=rows.map((l,i)=>{
     const isNew=l.systemQty===0&&l.physicalQty>0&&l.variance===l.physicalQty;
     const vColor=l.variance==null?'var(--gray4)':l.variance>0?'var(--green)':l.variance<0?'var(--red)':'var(--gray4)';
     const isShortage=l.variance!=null&&l.variance<0;
-    const value=isShortage?Math.abs(l.variance)*(l.cost||0):0;
-    if(isShortage)totalShortageValue+=value;
+    if(isShortage)totalShortageValue+=l.absShortageValue;
     let categoryCell='—';
     if(isShortage&&!locked){
-      const empOptions=emps.map(e=>`<option value="${e.user_id||e.userId}" ${l.employeeUserId===(e.user_id||e.userId)?'selected':''}>${e.name}</option>`).join('');
+      const empOptions=emps.map(e=>`<option value="${e.user_id}" ${l.employeeUserId===e.user_id?'selected':''}>${e.name}</option>`).join('');
       categoryCell=`<select class="form-input" style="padding:3px 6px;font-size:10.5px" id="sc-cat-${i}" data-barcode="${l.barcode}" onchange="toggleEmpSelect(${i})">
         <option value="shrinkage" ${l.category==='shrinkage'?'selected':''}>Shrinkage (company loss)</option>
         <option value="employee_fault" ${l.category==='employee_fault'?'selected':''}>Employee Fault</option>
@@ -2314,14 +2366,15 @@ function renderVarianceTable(lines){
       </select>
       <select class="form-input" style="padding:3px 6px;font-size:10.5px;margin-top:3px;display:${l.category==='employee_fault'?'block':'none'}" id="sc-emp-${i}"><option value="">Select employee…</option>${empOptions}</select>`;
     } else if(isShortage){
-      categoryCell=`${l.category}${l.employeeUserId?' ('+(emps.find(e=>(e.user_id||e.userId)===l.employeeUserId)?.name||l.employeeUserId)+')':''}`;
+      categoryCell=`${l.category}${l.employeeUserId?' ('+(emps.find(e=>e.user_id===l.employeeUserId)?.name||l.employeeUserId)+')':''}`;
     }
-    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td><td>${isShortage?fmt(value):'—'}</td><td>${categoryCell}</td></tr>`;
+    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td><td>${fmt(l.cost||0)}</td><td class="fw7" style="color:${vColor}">${l.variance?fmt(Math.abs(l.value)):'—'}</td><td>${categoryCell}</td></tr>`;
   }).join('');
-  if($('sc-lines-table'))$('sc-lines-table').innerHTML=rowsHtml||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No items</td></tr>';
+  if($('sc-lines-table'))$('sc-lines-table').innerHTML=rowsHtml||'<tr><td colspan="8" style="text-align:center;color:var(--gray3);padding:14px">No items match</td></tr>';
   const summaryEl=$('sc-shortage-summary');
   if(summaryEl)summaryEl.textContent=totalShortageValue>0?`⚠️ Total shortage value: ${fmt(totalShortageValue)}`:'';
 }
+function round2(n){return Math.round(n*100)/100;}
 function toggleEmpSelect(i){
   const cat=$('sc-cat-'+i)?.value;
   const empSel=$('sc-emp-'+i);
