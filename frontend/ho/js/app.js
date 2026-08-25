@@ -2305,7 +2305,7 @@ async function openStockCount(id){
   __scCurrent=res;
   if($('sc-detail-title'))$('sc-detail-title').textContent=`📋 ${res.id} — ${res.storeName} (${res.status})`;
   if($('sc-upload-section'))$('sc-upload-section').style.display=res.status==='draft'?'block':'none';
-  if(res.status==='draft'&&!__scEmployees[res.storeId]){
+  if(!__scEmployees[res.storeId]){
     const ur=await api('/api/auth/users');
     const all=(ur&&(ur.data||ur))||[];
     __scEmployees[res.storeId]=Array.isArray(all)?all.filter(u=>u.store_id===res.storeId&&u.active!==false):[];
@@ -2366,7 +2366,7 @@ function renderVarianceTable(lines){
       </select>
       <select class="form-input" style="padding:3px 6px;font-size:10.5px;margin-top:3px;display:${l.category==='employee_fault'?'block':'none'}" id="sc-emp-${i}"><option value="">Select employee…</option>${empOptions}</select>`;
     } else if(isShortage){
-      categoryCell=`${l.category}${l.employeeUserId?' ('+(emps.find(e=>e.user_id===l.employeeUserId)?.name||l.employeeUserId)+')':''}`;
+      categoryCell=`${l.category}${l.employeeUserId?' ('+(emps.find(e=>e.user_id===l.employeeUserId)?.name||l.employeeUserId)+')':''} <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:10px" onclick="openReclassify('${l.barcode}')">🔄 Reclassify</button>`;
     }
     return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td><td>${fmt(l.cost||0)}</td><td class="fw7" style="color:${vColor}">${l.variance?fmt(Math.abs(l.value)):'—'}</td><td>${categoryCell}</td></tr>`;
   }).join('');
@@ -2375,6 +2375,28 @@ function renderVarianceTable(lines){
   if(summaryEl)summaryEl.textContent=totalShortageValue>0?`⚠️ Total shortage value: ${fmt(totalShortageValue)}`:'';
 }
 function round2(n){return Math.round(n*100)/100;}
+async function openReclassify(barcode){
+  if(!__scCurrent)return;
+  const emps=__scEmployees[__scCurrent.storeId]||[];
+  const empList=emps.map((e,i)=>`${i+1}. ${e.name}`).join('\n');
+  const choice=prompt(`Reclassify this shortage to:\n1 = Shrinkage (company loss)\n2 = Employee Fault\n3 = Under Investigation\n\nType 1, 2, or 3:`);
+  if(!choice)return;
+  let category=null,employeeUserId=null;
+  if(choice.trim()==='1')category='shrinkage';
+  else if(choice.trim()==='2')category='employee_fault';
+  else if(choice.trim()==='3')category='investigation';
+  else{toast('Invalid choice','error');return;}
+  if(category==='employee_fault'){
+    if(!emps.length){toast('No employees found for this store','error');return;}
+    const empChoice=prompt(`Select employee:\n${empList}\n\nType the number:`);
+    const idx=parseInt(empChoice,10)-1;
+    if(isNaN(idx)||!emps[idx]){toast('Invalid employee selection','error');return;}
+    employeeUserId=emps[idx].user_id;
+  }
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines/${encodeURIComponent(barcode)}/reclassify`,{method:'POST',body:{category,employeeUserId}});
+  if(res&&res.ok){toast('✅ Reclassified');await loadAll();openStockCount(__scCurrent.id);}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
 function toggleEmpSelect(i){
   const cat=$('sc-cat-'+i)?.value;
   const empSel=$('sc-emp-'+i);
@@ -2416,12 +2438,51 @@ function exportVarianceReport(){
   if(!__scCurrent)return;
   _csvDownload(__scCurrent.lines||[],[['Barcode','barcode'],['Product','name'],['System Qty','systemQty'],['Physical Qty','physicalQty'],['Variance','variance']],`variance_report_${__scCurrent.id}_${today()}.csv`);
 }
-async function approveStockCount(){
+function approveStockCount(){
   if(!__scCurrent)return;
-  if(!confirm('Approve this count? This will apply all variances to Inventory immediately and cannot be undone.'))return;
+  const emps=__scEmployees[__scCurrent.storeId]||[];
+  const shortageLines=(__scCurrent.lines||[]).filter(l=>l.variance!=null&&l.variance<0);
+  const totalValue=shortageLines.reduce((a,l)=>a+Math.abs(l.variance)*(l.cost||0),0);
+  if($('sc-approve-total'))$('sc-approve-total').textContent=shortageLines.length?`⚠️ ${shortageLines.length} shortage line(s) — total value ${fmt(totalValue)}`:'✅ No shortages on this count.';
+  if($('sc-approve-table'))$('sc-approve-table').innerHTML=shortageLines.map((l,i)=>{
+    const empOptions=emps.map(e=>`<option value="${e.user_id}" ${l.employeeUserId===e.user_id?'selected':''}>${e.name}</option>`).join('');
+    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}<input type="hidden" id="sca-bc-${i}" value="${l.barcode}"></td><td>${l.name}</td><td class="fw7" style="color:var(--red)">${l.variance}</td><td>${fmt(Math.abs(l.variance)*(l.cost||0))}</td><td>
+      <select class="form-input" style="padding:3px 6px;font-size:10.5px" id="sca-cat-${i}" onchange="toggleApproveEmp(${i})">
+        <option value="shrinkage" ${l.category==='shrinkage'?'selected':''}>Shrinkage</option>
+        <option value="employee_fault" ${l.category==='employee_fault'?'selected':''}>Employee Fault</option>
+        <option value="investigation" ${l.category==='investigation'?'selected':''}>Investigation</option>
+      </select>
+      <select class="form-input" style="padding:3px 6px;font-size:10.5px;margin-top:3px;display:${l.category==='employee_fault'?'block':'none'}" id="sca-emp-${i}"><option value="">Select employee…</option>${empOptions}</select>
+    </td></tr>`;
+  }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:14px">No shortages — nothing to classify</td></tr>';
+  $('sc-approve-modal').style.display='flex';
+}
+function closeApproveModal(){$('sc-approve-modal').style.display='none';}
+function toggleApproveEmp(i){
+  const cat=$('sca-cat-'+i)?.value;
+  const sel=$('sca-emp-'+i);
+  if(sel)sel.style.display=cat==='employee_fault'?'block':'none';
+}
+async function confirmApproveFlow(){
+  if(!__scCurrent)return;
+  const bcInputs=document.querySelectorAll('[id^="sca-bc-"]');
+  const lines=[...bcInputs].map(inp=>{
+    const i=inp.id.split('-')[2];
+    const category=$('sca-cat-'+i)?.value||'shrinkage';
+    const employeeUserId=category==='employee_fault'?($('sca-emp-'+i)?.value||''):'';
+    if(category==='employee_fault'&&!employeeUserId)throw new Error('missing-employee');
+    return {barcode:inp.value,category,employeeUserId};
+  });
+  try{
+    if(lines.length){
+      const saveRes=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
+      if(!saveRes||!saveRes.ok){toast('❌ Failed to save categories','error');return;}
+    }
+  }catch(e){toast('❌ Select an employee for every "Employee Fault" line','error');return;}
   const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/approve`,{method:'POST'});
   if(res&&res.ok){
     toast(`✅ Approved — ${res.linesAdjusted} item(s) adjusted`);
+    closeApproveModal();
     await loadAll();openStockCount(__scCurrent.id);loadStockCounts();
   } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }

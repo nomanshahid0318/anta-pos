@@ -47,3 +47,5 @@ class StockCountLine(Base):
     reason: Mapped[str] = mapped_column(String(255), default="")
     category: Mapped[str] = mapped_column(String(24), default="shrinkage")  # shrinkage | employee_fault | investigation — only meaningful for a shortage (negative variance)
     employee_user_id: Mapped[str] = mapped_column(String(32), default="")  # set when category == employee_fault
+    posted_expense_id: Mapped[str] = mapped_column(String(64), default="")  # the Expense row created for this line at approval (if shrinkage/investigation)
+    posted_advance_id: Mapped[str] = mapped_column(String(64), default="")  # the EmployeeAdvance row created for this line at approval (if employee_fault)
