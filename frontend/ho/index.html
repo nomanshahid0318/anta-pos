@@ -1092,7 +1092,9 @@ body{display:flex;height:100vh;overflow:hidden}
           <div class="form-group"><label class="form-label">Max Discount % (no approval)</label><input class="form-input" type="number" id="thr-discount" placeholder="15"></div>
           <div class="form-group"><label class="form-label">Max Return Amount (no approval)</label><input class="form-input" type="number" id="thr-return" placeholder="100"></div>
           <div class="form-group"><label class="form-label">Max Stock Shortage Value (manager can approve)</label><input class="form-input" type="number" id="thr-shortage" placeholder="500"></div>
+          <div class="form-group"><label class="form-label">Store Staff Liability % (of shortage value)</label><input class="form-input" type="number" id="thr-staffpct" placeholder="50"></div>
         </div>
+        <p style="font-size:10.5px;color:var(--gray4);margin:4px 0 0">When a shortage is categorized "Store Staff", this % of its value becomes an Employee Advance against the selected employee — the rest stays a company Shrinkage Expense. Set per your own SOP.</p>
         <button class="btn btn-primary btn-sm" onclick="saveThresholds()">💾 Save Thresholds</button>
       </div>
     </div>

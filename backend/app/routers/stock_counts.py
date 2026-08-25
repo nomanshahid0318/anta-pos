@@ -85,15 +85,17 @@ def reclassify_line(
         raise HTTPException(404, "Line not found")
     if line.physical_qty is None or (line.physical_qty - line.system_qty) >= 0:
         raise HTTPException(400, "Only a shortage (negative variance) line can be reclassified")
-    if body.category not in ("shrinkage", "employee_fault", "investigation"):
+    if body.category not in ("shrinkage", "employee_fault", "investigation", "store_staff"):
         raise HTTPException(400, "Invalid category")
-    if body.category == "employee_fault" and not body.employeeUserId:
-        raise HTTPException(400, "An employee must be selected for Employee Fault")
+    if body.category in ("employee_fault", "store_staff") and not body.employeeUserId:
+        raise HTTPException(400, "An employee must be selected for this category")
 
     variance = line.physical_qty - line.system_qty
     product = db.query(Product).filter(Product.barcode == line_barcode).first()
     cost = float(product.cost or 0) if product else 0
     value = round(abs(variance) * cost, 2)
+    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key == "store_staff_liability_percent").all()}
+    staff_percent = float(settings_map.get("store_staff_liability_percent", 50))
 
     # Undo whatever was posted before.
     if line.posted_expense_id:
@@ -109,30 +111,11 @@ def reclassify_line(
             db.delete(old_adv)
         line.posted_advance_id = ""
 
-    # Post the new one.
-    if body.category == "employee_fault":
-        emp = db.query(User).filter(User.user_id == body.employeeUserId).first()
-        advance_id = f"ADV-{int(time.time()*1000)}-{line.id}"
-        db.add(EmployeeAdvance(
-            advance_id=advance_id, employee_name=emp.name if emp else body.employeeUserId,
-            store_id=row.store_id, date=today_str(), amount=value,
-            reason=f"Stock shortage (reclassified) — {line.name} ({variance})", notes=f"Reclassified from {line.category} by {user.name}",
-        ))
-        line.posted_advance_id = advance_id
-        line.employee_user_id = body.employeeUserId
-    else:
-        tag = " — pending investigation" if body.category == "investigation" else ""
-        exp_id = f"EXP-{int(time.time()*1000)}-{line.id}"
-        db.add(Expense(
-            exp_id=exp_id, date=today_str(), store_id=row.store_id, store=row.store_name,
-            category="Inventory Shrinkage", sub_category="Non-cash",
-            description=f"Shortage{tag} (reclassified) — {line.name} ({variance})", amount=value, pay_method="Non-cash",
-            reference=count_id, notes=f"Reclassified from {line.category} by {user.name}",
-        ))
-        line.posted_expense_id = exp_id
-        line.employee_user_id = ""
-
     old_category = line.category
+    line.category = body.category
+    line.employee_user_id = body.employeeUserId or ""
+    _post_shortage(db, line, row.store_id, row.store_name, today_str(), value, variance, staff_percent)
+    line.notes = f"Reclassified from {old_category} by {user.name}" + (f" — {line.notes}" if line.notes else "")
     line.category = body.category
     log_audit(
         db, user, "update", "stock_adjustment", line_barcode,
@@ -293,6 +276,65 @@ def update_count_lines(
     return {"ok": True, "status": "ok", "updated": updated}
 
 
+def _post_shortage(db: Session, line: StockCountLine, store_id: str, store_name: str, date: str, value: float, variance: int, staff_percent: float) -> None:
+    """Posts the financial 'other side' of a shortage line, based on its
+    category. Sets line.posted_expense_id / posted_advance_id so it can
+    be cleanly undone later (reclassify).
+    """
+    if line.category == "employee_fault" and line.employee_user_id:
+        emp = db.query(User).filter(User.user_id == line.employee_user_id).first()
+        advance_id = f"ADV-{int(time.time()*1000)}-{line.id}"
+        db.add(EmployeeAdvance(
+            advance_id=advance_id, employee_name=emp.name if emp else line.employee_user_id,
+            store_id=store_id, date=date, amount=value,
+            reason=f"Stock shortage — {line.name} ({variance})", notes=line.reason or "",
+        ))
+        line.posted_advance_id = advance_id
+        line.posted_expense_id = ""
+    elif line.category == "store_staff" and line.employee_user_id:
+        # Company SOP split: a configurable % is charged to the named
+        # store staff member (Employee Advance), the remainder stays a
+        # company Shrinkage Expense — both sides get posted (when
+        # non-zero) so the full value is always accounted for.
+        pct = max(0.0, min(100.0, staff_percent))
+        staff_share = round(value * pct / 100, 2)
+        company_share = round(value - staff_share, 2)
+        emp = db.query(User).filter(User.user_id == line.employee_user_id).first()
+        if staff_share > 0:
+            advance_id = f"ADV-{int(time.time()*1000)}-{line.id}"
+            db.add(EmployeeAdvance(
+                advance_id=advance_id, employee_name=emp.name if emp else line.employee_user_id,
+                store_id=store_id, date=date, amount=staff_share,
+                reason=f"Stock shortage — Store Staff share ({pct}%) — {line.name} ({variance})", notes=line.reason or "",
+            ))
+            line.posted_advance_id = advance_id
+        else:
+            line.posted_advance_id = ""
+        if company_share > 0:
+            exp_id = f"EXP-{int(time.time()*1000)}-{line.id}"
+            db.add(Expense(
+                exp_id=exp_id, date=date, store_id=store_id, store=store_name,
+                category="Inventory Shrinkage", sub_category="Non-cash",
+                description=f"Shortage — Company share ({100-pct}%) — {line.name} ({variance})", amount=company_share,
+                pay_method="Non-cash", reference=line.count_id, notes=line.reason or "",
+            ))
+            line.posted_expense_id = exp_id
+        else:
+            line.posted_expense_id = ""
+    else:
+        # Default: shrinkage (or investigation, pending reclassification later) — company absorbs it as a non-cash expense.
+        tag = " — pending investigation" if line.category == "investigation" else ""
+        exp_id = f"EXP-{int(time.time()*1000)}-{line.id}"
+        db.add(Expense(
+            exp_id=exp_id, date=date, store_id=store_id, store=store_name,
+            category="Inventory Shrinkage", sub_category="Non-cash",
+            description=f"Shortage{tag} — {line.name} ({variance})", amount=value, pay_method="Non-cash",
+            reference=line.count_id, notes=line.reason or "",
+        ))
+        line.posted_expense_id = exp_id
+        line.posted_advance_id = ""
+
+
 @router.post("/{count_id}/approve")
 def approve_count(
     count_id: str, db: Annotated[Session, Depends(get_db)],
@@ -325,8 +367,9 @@ def approve_count(
         raise HTTPException(400, "Already approved")
     lines = db.query(StockCountLine).filter(StockCountLine.count_id == count_id).all()
 
-    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key == "stock_count_admin_threshold").all()}
+    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key.in_(["stock_count_admin_threshold", "store_staff_liability_percent"])).all()}
     admin_threshold = float(settings_map.get("stock_count_admin_threshold", 500))
+    staff_percent = float(settings_map.get("store_staff_liability_percent", 50))
     products = {p.barcode: p for p in db.query(Product).filter(Product.barcode.in_([l.barcode for l in lines])).all()}
     total_shortage_value = 0.0
     for l in lines:
@@ -366,26 +409,8 @@ def approve_count(
                 reference=count_id, notes=l.reason or "",
             ))
             l.posted_expense_id = exp_id
-        elif l.category == "employee_fault" and l.employee_user_id:
-            emp = db.query(User).filter(User.user_id == l.employee_user_id).first()
-            advance_id = f"ADV-{int(time.time()*1000)}-{l.id}"
-            db.add(EmployeeAdvance(
-                advance_id=advance_id, employee_name=emp.name if emp else l.employee_user_id,
-                store_id=row.store_id, date=row.date, amount=value,
-                reason=f"Stock shortage — {l.name} ({variance})", notes=l.reason or "",
-            ))
-            l.posted_advance_id = advance_id
         else:
-            # Default: shrinkage (or investigation, pending reclassification later) — company absorbs it as a non-cash expense.
-            tag = " — pending investigation" if l.category == "investigation" else ""
-            exp_id = f"EXP-{int(time.time()*1000)}-{l.id}"
-            db.add(Expense(
-                exp_id=exp_id, date=row.date, store_id=row.store_id, store=row.store_name,
-                category="Inventory Shrinkage", sub_category="Non-cash",
-                description=f"Shortage{tag} — {l.name} ({variance})", amount=value, pay_method="Non-cash",
-                reference=count_id, notes=l.reason or "",
-            ))
-            l.posted_expense_id = exp_id
+            _post_shortage(db, l, row.store_id, row.store_name, row.date, value, variance, staff_percent)
 
         log_audit(
             db, user, "update", "stock_adjustment", l.barcode,
