@@ -207,6 +207,45 @@ class AccruedExpense(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
+class SupplierInvoice(Base):
+    """The supplier's actual bill for a Purchase Order — entered
+    independently of what was received, so it can be compared against
+    both the PO (what was ordered) and the GRN (what was actually
+    received) before payment is approved. This is the "Three-Way Match":
+    PO qty/cost vs GRN received qty vs Invoice billed qty/cost — any
+    mismatch (e.g. supplier bills for 100 units, only 95 arrived) gets
+    flagged instead of silently passing through to payment.
+    """
+
+    __tablename__ = "supplier_invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    po_id: Mapped[str] = mapped_column(String(64), index=True)
+    supplier_id: Mapped[str] = mapped_column(String(64), index=True)
+    supplier_name: Mapped[str] = mapped_column(String(128), default="")
+    invoice_number: Mapped[str] = mapped_column(String(128), default="")  # the supplier's own document reference
+    date: Mapped[str] = mapped_column(String(16))
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | approved | disputed
+    approved_by: Mapped[str] = mapped_column(String(128), default="")
+    approved_date: Mapped[str] = mapped_column(String(16), default="")
+    override_reason: Mapped[str] = mapped_column(Text, default="")  # required if approved despite a discrepancy
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class SupplierInvoiceLine(Base):
+    __tablename__ = "supplier_invoice_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(String(64), index=True)
+    barcode: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    qty_billed: Mapped[int] = mapped_column(Integer, default=0)
+    unit_cost_billed: Mapped[float] = mapped_column(Float, default=0.0)
+
+
 class PurchaseOrder(Base):
     """A commitment to buy stock from a supplier, before it's physically
     received. Separate from Supplier GRN (which records actual receipt).

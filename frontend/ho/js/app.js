@@ -102,12 +102,13 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
 if(name==='shifts'){loadShifts();}
 if(name==='stock-counts'){populateSCStoreSelect();loadStockCounts();}
+if(name==='three-way-match'){populateTWMPOSelect();loadSupplierInvoices();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
 if(name==='stock-aging'){loadStockAging();}
@@ -2336,6 +2337,91 @@ async function submitQuickAdjust(){
     ['qa-barcode','qa-qty','qa-reason'].forEach(id=>{if($(id))$(id).value='';});
     await loadAll();
   } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+
+// ---------- Three-Way Matching (PO vs GRN vs Supplier Invoice) ----------
+let __twmPOList=[],__twmList=[],__twmCurrent=null;
+async function populateTWMPOSelect(){
+  const res=await api('/api/ho/purchase-orders?status=all');
+  __twmPOList=(res&&res.data)||[];
+  if($('twm-po'))$('twm-po').innerHTML='<option value="">Select a PO…</option>'+__twmPOList.filter(p=>p.status!=='cancelled').map(p=>`<option value="${p.id}">${p.id} — ${p.supplierName} (${p.status})</option>`).join('');
+  if($('twm-date'))$('twm-date').value=today();
+}
+function loadPOLinesForInvoice(){
+  const poId=$('twm-po')?$('twm-po').value:'';
+  const po=__twmPOList.find(p=>p.id===poId);
+  if(!po){if($('twm-lines'))$('twm-lines').innerHTML='';return;}
+  if($('twm-lines'))$('twm-lines').innerHTML=po.lines.map((l,i)=>`<tr>
+    <td style="font-family:monospace;font-size:10px">${l.barcode}<input type="hidden" id="twm-name-${i}" value="${l.name}"></td>
+    <td>${l.name}</td>
+    <td><input class="form-input" type="number" style="width:75px;padding:4px 7px" id="twm-qty-${i}" value="${l.qtyReceived||l.qtyOrdered}"></td>
+    <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" id="twm-cost-${i}" value="${l.unitCost}"></td>
+  </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:12px">No lines</td></tr>';
+  window.__twmCurrentLines=po.lines;
+}
+async function saveSupplierInvoice(){
+  const poId=$('twm-po')?$('twm-po').value:'';
+  if(!poId||!window.__twmCurrentLines){toast('Select a PO first','error');return;}
+  const lines=window.__twmCurrentLines.map((l,i)=>({
+    barcode:l.barcode,name:l.name,
+    qtyBilled:+(($('twm-qty-'+i)&&$('twm-qty-'+i).value)||0),
+    unitCostBilled:+(($('twm-cost-'+i)&&$('twm-cost-'+i).value)||0),
+  })).filter(l=>l.qtyBilled>0);
+  if(!lines.length){toast('Enter at least one billed line','error');return;}
+  const body={poId,invoiceNumber:($('twm-invnum')&&$('twm-invnum').value)||'',date:($('twm-date')&&$('twm-date').value)||today(),lines};
+  const res=await api('/api/ho/supplier-invoices',{method:'POST',body});
+  if(res&&res.ok){
+    toast('✅ Invoice saved — see match results below');
+    if($('twm-invnum'))$('twm-invnum').value='';
+    await loadSupplierInvoices();
+    openInvoiceMatch(res.id);
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function loadSupplierInvoices(){
+  const status=$('twm-status-filter')?$('twm-status-filter').value:'';
+  const res=await api('/api/ho/supplier-invoices'+(status?('?status='+status):''));
+  if(!res||!res.ok)return;
+  __twmList=res.data||[];
+  const statusBadge=s=>({pending:'badge-amber',approved:'badge-green',disputed:'badge-red'}[s]||'badge-gray');
+  if($('twm-list'))$('twm-list').innerHTML=__twmList.map(i=>`<tr>
+    <td class="fw7" style="font-size:11px">${i.invoiceNumber||i.id}</td><td style="font-size:11px">${i.poId}</td><td>${i.supplierName}</td><td>${fmt(i.totalAmount)}</td>
+    <td>${i.hasDiscrepancy?'<span class="badge badge-red">⚠️ Mismatch</span>':'<span class="badge badge-green">✅ Match</span>'}</td>
+    <td><span class="badge ${statusBadge(i.status)}">${i.status}</span></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openInvoiceMatch('${i.id}')">👁️</button></td>
+  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No supplier invoices yet</td></tr>';
+}
+async function openInvoiceMatch(id){
+  const res=await api(`/api/ho/supplier-invoices/${encodeURIComponent(id)}/match`);
+  if(!res||!res.ok){toast('Failed to load match','error');return;}
+  __twmCurrent=res;
+  if($('twm-detail-title'))$('twm-detail-title').textContent=`🔍 ${res.invoiceNumber||res.id} — ${res.supplierName} (${res.status})`;
+  if($('twm-discrepancy-banner'))$('twm-discrepancy-banner').style.display=res.hasDiscrepancy&&res.status==='pending'?'block':'none';
+  if($('twm-match-table'))$('twm-match-table').innerHTML=(res.lines||[]).map(l=>`<tr style="${l.flagged?'background:var(--red-light)':''}">
+    <td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}</td>
+    <td>${l.orderedQty}</td><td>${l.receivedQty}</td><td class="fw7">${l.billedQty}</td>
+    <td>${l.poCost!=null?fmt(l.poCost):'—'}</td><td class="fw7">${l.billedCost!=null?fmt(l.billedCost):'—'}</td>
+    <td>${l.flagged?'<span class="badge badge-red">⚠️</span>':'<span class="badge badge-green">✅</span>'}</td>
+  </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--gray3);padding:14px">No lines</td></tr>';
+  $('twm-detail-card').style.display='block';
+  $('twm-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function approveInvoiceFlow(){
+  if(!__twmCurrent)return;
+  let overrideReason='';
+  if(__twmCurrent.hasDiscrepancy){
+    overrideReason=prompt('This invoice has a PO/GRN mismatch. Enter a reason to approve it for payment anyway:','')||'';
+    if(!overrideReason.trim()){toast('Approval cancelled — reason required','warn');return;}
+  } else if(!confirm('Approve this invoice for payment?')) return;
+  const res=await api(`/api/ho/supplier-invoices/${encodeURIComponent(__twmCurrent.id)}/approve`,{method:'POST',body:{overrideReason}});
+  if(res&&res.ok){toast('✅ Approved for payment');openInvoiceMatch(__twmCurrent.id);loadSupplierInvoices();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function disputeInvoice(){
+  if(!__twmCurrent)return;
+  if(!confirm('Mark this invoice as disputed? It will be held from payment until resolved.'))return;
+  const res=await api(`/api/ho/supplier-invoices/${encodeURIComponent(__twmCurrent.id)}/dispute`,{method:'POST'});
+  if(res&&res.ok){toast('🚫 Marked as disputed');openInvoiceMatch(__twmCurrent.id);loadSupplierInvoices();}
+  else toast('❌ Failed','error');
 }
 
 function saveCapital(){}
