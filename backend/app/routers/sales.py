@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
-from ..models import Claim, Exchange, InvoiceCounter, Return, Sale
+from ..models import Claim, Exchange, InvoiceCounter, Return, Sale, Setting, User
 from ..models_shifts import Shift
 from ..models_crm import Customer
 from ..schemas import (
@@ -108,6 +108,29 @@ def create_sale(
         subtotal, discount, global_discount, base_total = (
             priced["subtotal"], priced["discount"], priced["globalDiscount"], priced["total"]
         )
+
+    # Manager/admin approval gate: a discount above the configured
+    # threshold can't go through on a cashier's own authority. The
+    # threshold is checked both per-line (item.discount is already a %)
+    # and on the invoice-level discount (globalDiscount is an absolute
+    # amount, so it's converted to an effective % of subtotal here).
+    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key == "discount_approval_threshold").all()}
+    threshold = float(settings_map.get("discount_approval_threshold", 15))
+    max_line_pct = max((float(i.get("discount") or 0) for i in items), default=0)
+    global_pct = (global_discount / subtotal * 100) if subtotal > 0 else 0
+    if max(max_line_pct, global_pct) > threshold:
+        if not body.approvedBy:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Discount exceeds {threshold}% — manager/admin approval required before this sale can complete.",
+            )
+        approver = (
+            db.query(User)
+            .filter(User.name == body.approvedBy, User.active.is_(True), User.role.in_(("manager", "admin")))
+            .first()
+        )
+        if not approver:
+            raise HTTPException(status_code=403, detail="Approval name doesn't match an active manager/admin — re-authorize.")
 
     # The whole save is retried (server-generated invoice ids only) if a
     # unique-constraint conflict is hit anywhere in this block. The row
@@ -227,6 +250,22 @@ def create_return(
     ref = body.ref or f"RET-{int(__import__('time').time() * 1000)}"
     if db.query(Return).filter(Return.ref_id == ref).first():
         return {"ok": True, "status": "duplicate", "ref": ref}
+
+    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key == "return_approval_threshold").all()}
+    return_threshold = float(settings_map.get("return_approval_threshold", 100))
+    if float(body.amount or 0) > return_threshold:
+        if not body.approvedBy:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Return amount exceeds {return_threshold} — manager/admin approval required before this return can complete.",
+            )
+        approver = (
+            db.query(User)
+            .filter(User.name == body.approvedBy, User.active.is_(True), User.role.in_(("manager", "admin")))
+            .first()
+        )
+        if not approver:
+            raise HTTPException(status_code=403, detail="Approval name doesn't match an active manager/admin — re-authorize.")
 
     open_shift = db.query(Shift).filter(Shift.cashier_id == user.user_id, Shift.status == "open").first()
     row = Return(

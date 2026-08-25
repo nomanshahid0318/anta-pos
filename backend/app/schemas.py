@@ -180,6 +180,7 @@ class SaleIn(BaseModel):
     payment: str = "Cash"
     payRef: str = ""
     type: str = "sale"
+    approvedBy: Optional[str] = None  # manager/admin name, verified via /api/auth/authorize-pin
 
 
 class SaleOut(BaseModel):
@@ -216,6 +217,7 @@ class ReturnIn(BaseModel):
     amount: float = 0
     method: str = "Cash"
     reason: str = ""
+    approvedBy: Optional[str] = None  # manager/admin name, verified via /api/auth/authorize-pin
 
 
 class ExchangeIn(BaseModel):

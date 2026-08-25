@@ -23,6 +23,8 @@ class SettingsUpdate(BaseModel):
     policy: Optional[str] = None
     currency: Optional[str] = None
     language: Optional[str] = None
+    discountApprovalThreshold: Optional[float] = None  # % — above this, needs manager PIN
+    returnApprovalThreshold: Optional[float] = None  # amount — above this, needs manager PIN
 
 
 def _get_map(db: Session) -> dict[str, str]:
@@ -67,6 +69,8 @@ def get_settings(
         "policy": m.get("policy", ""),
         "currency": m.get("currency", "LYD"),
         "language": m.get("language", "en"),
+        "discountApprovalThreshold": float(m.get("discount_approval_threshold", 15)),
+        "returnApprovalThreshold": float(m.get("return_approval_threshold", 100)),
         "store_id": user.store_id,
         "store_name": store.name if store else user.store_name,
     }
@@ -90,6 +94,10 @@ def update_settings(
         _put(db, "currency", body.currency)
     if body.language is not None:
         _put(db, "language", body.language)
+    if body.discountApprovalThreshold is not None:
+        _put(db, "discount_approval_threshold", str(body.discountApprovalThreshold))
+    if body.returnApprovalThreshold is not None:
+        _put(db, "return_approval_threshold", str(body.returnApprovalThreshold))
     if body.store_name is not None:
         sid = body.store_id or user.store_id
         store = db.query(Store).filter(Store.store_id == sid).first()

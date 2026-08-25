@@ -2340,12 +2340,23 @@ async function submitQuickAdjust(){
 
 function saveCapital(){}
 async function testConn(){const url=($('api-url')&&$('api-url').value.trim())||CFG.apiUrl;CFG.apiUrl=url.replace(/\/$/,'');localStorage.setItem('anta_ho_api',CFG.apiUrl);const div=$('conn-res');if(div){div.style.display='block';div.innerHTML='⏳ Testing...';}const res=await api('/api/health');if(res&&res.ok){if(div){div.innerHTML='✅ Connected! '+res.app+' v'+res.version;div.style.color='var(--green)';}setSyncStatus('online','Connected');toast('✅ Connected');if($('server-info'))$('server-info').textContent='DB: '+(res.db||'sqlite')+' · modules: '+(res.modules||[]).join(',');}else{if(div){div.innerHTML='❌ Failed';div.style.color='var(--red)';}toast('❌ Failed','error');}}
+async function saveThresholds(){
+  const body={
+    discountApprovalThreshold:+(($('thr-discount')&&$('thr-discount').value)||15),
+    returnApprovalThreshold:+(($('thr-return')&&$('thr-return').value)||100),
+  };
+  const res=await api('/api/settings',{method:'PUT',body});
+  if(res&&res.ok)toast('✅ Thresholds saved');
+  else toast('❌ Failed to save','error');
+}
 async function loadSettingsForm(){
   const res=await api('/api/settings');
   if(!res||!res.ok)return;
   _pendingLogoDataUrl=undefined;
   if($('co-name'))$('co-name').value=res.company_name||'';
   if($('co-currency'))$('co-currency').value=res.currency||'LYD';
+  if($('thr-discount'))$('thr-discount').value=res.discountApprovalThreshold!=null?res.discountApprovalThreshold:15;
+  if($('thr-return'))$('thr-return').value=res.returnApprovalThreshold!=null?res.returnApprovalThreshold:100;
   const img=$('logo-preview-img'),ph=$('logo-preview-placeholder');
   if(res.company_logo){
     if(img){img.src=res.company_logo;img.style.display='block';}

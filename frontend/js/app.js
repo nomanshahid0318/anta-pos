@@ -1126,6 +1126,37 @@ function loadCatalogCache() {
   return false;
 }
 
+async function promptManagerApproval(reasonMsg) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'display:flex;z-index:2000';
+    overlay.innerHTML = `
+      <div class="modal" style="width:340px">
+        <div class="modal-title">🔒 Manager Approval Required</div>
+        <p style="font-size:12px;color:var(--gray4);margin-bottom:12px">${reasonMsg || 'This action needs manager/admin sign-off.'}</p>
+        <div class="form-group"><label class="form-label">Manager / Admin PIN</label><input class="form-input" type="password" id="mgr-approval-pin" placeholder="Enter PIN" autofocus></div>
+        <div id="mgr-approval-err" style="color:var(--red);font-size:11px;display:none;margin-bottom:8px">Invalid PIN or not a manager/admin.</div>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-ghost" style="flex:1" id="mgr-approval-cancel">Cancel</button>
+          <button class="btn btn-primary" style="flex:1" id="mgr-approval-confirm">✅ Authorize</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelector('#mgr-approval-cancel').onclick = () => cleanup(null);
+    overlay.querySelector('#mgr-approval-confirm').onclick = async () => {
+      const pin = overlay.querySelector('#mgr-approval-pin').value;
+      if (!pin) return;
+      const res = await api('/api/auth/authorize-pin', { method: 'POST', body: { pin } });
+      if (res && res.ok) cleanup(res.approverName);
+      else overlay.querySelector('#mgr-approval-err').style.display = 'block';
+    };
+    overlay.querySelector('#mgr-approval-pin').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') overlay.querySelector('#mgr-approval-confirm').click();
+    });
+  });
+}
 async function completeSale() {
   try { await refreshPromoPricing(); } catch(e) {}
   const { sub, da, total, disc } = calcCart();
@@ -1167,7 +1198,16 @@ async function completeSale() {
     changeDue: selPay === 'Cash' ? Math.max(0, (+getVal('cash-rec', 0) || 0) - due) : undefined,
   };
   setOnline('syncing', 'Saving sale...');
-  const res = await api('/api/sales', { method: 'POST', body: payload });
+  let res = await api('/api/sales', { method: 'POST', body: payload });
+  if (res && !res.ok && res._http === 403 && /approval required/i.test(res.msg || '')) {
+    const approverName = await promptManagerApproval(res.msg);
+    if (!approverName) {
+      setOnline('online', 'Cancelled');
+      return;
+    }
+    payload.approvedBy = approverName;
+    res = await api('/api/sales', { method: 'POST', body: payload });
+  }
   let txn;
   if (res && res.ok) {
     // Normal online path.
@@ -1377,7 +1417,13 @@ async function doReturn() {
     method: document.getElementById('r-method').value,
     reason: document.getElementById('r-reason').value,
   };
-  const res = await api('/api/returns', { method: 'POST', body: r });
+  let res = await api('/api/returns', { method: 'POST', body: r });
+  if (res && !res.ok && res._http === 403 && /approval required/i.test(res.msg || '')) {
+    const approverName = await promptManagerApproval(res.msg);
+    if (!approverName) return;
+    r.approvedBy = approverName;
+    res = await api('/api/returns', { method: 'POST', body: r });
+  }
   if (!res || !res.ok) {
     toast('❌ ' + ((res && res.msg) || 'Failed'), 'error');
     return;

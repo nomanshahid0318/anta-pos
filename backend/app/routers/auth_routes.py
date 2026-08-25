@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, get_current_user, verify_pin, CurrentUser, hash_pin
@@ -177,3 +178,34 @@ def save_user(
         role=row.role,
         active=row.active,
     )
+
+
+class AuthorizePinIn(BaseModel):
+    pin: str
+
+
+@router.post("/authorize-pin")
+def authorize_pin(
+    body: AuthorizePinIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+):
+    """Used for the discount/return manager-approval gate at checkout — a
+    cashier is over the self-service threshold and needs a manager (or
+    admin) to enter their own PIN to authorize, without the cashier
+    having to log out and back in. Checks managers/admins at the
+    cashier's own store, plus HO-based admins (in case no manager is on
+    duty in the store right now).
+    """
+    candidates = (
+        db.query(User)
+        .filter(User.active.is_(True))
+        .filter(
+            ((User.store_id == user.store_id) & (User.role.in_(("manager", "admin"))))
+            | ((User.store_id == "HO") & (User.role == "admin"))
+        )
+        .all()
+    )
+    for u in candidates:
+        if verify_pin(body.pin, u.pin_hash):
+            return {"ok": True, "status": "ok", "approverName": u.name, "approverRole": u.role}
+    raise HTTPException(401, "Invalid PIN, or this PIN doesn't belong to a manager/admin")
