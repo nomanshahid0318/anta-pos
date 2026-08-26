@@ -147,7 +147,7 @@ def save_user(
     allowed = {"admin", "manager", "cashier", "accountant", "merchandiser", "warehouse"}
     if body.role not in allowed:
         raise HTTPException(status_code=400, detail=f"Role must be one of {sorted(allowed)}")
-    uid = body.user_id or f"U{int(__import__('time').time())}"
+    uid = body.user_id or f"U{int(__import__('time').time()*1000)}"
     row = db.query(User).filter(User.user_id == uid).first()
     if row:
         row.store_id = body.store_id

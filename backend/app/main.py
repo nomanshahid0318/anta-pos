@@ -26,6 +26,7 @@ from .routers import customers as customers_routes
 from .routers import shifts as shifts_routes
 from .routers import stock_counts as stock_counts_routes
 from .routers import three_way_match as three_way_match_routes
+from .routers import payroll as payroll_routes
 
 settings = get_settings()
 APP_DIR = Path(__file__).resolve().parent
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(shifts_routes.router)
     app.include_router(stock_counts_routes.router)
     app.include_router(three_way_match_routes.router)
+    app.include_router(payroll_routes.router)
 
     @app.on_event("startup")
     def _startup():

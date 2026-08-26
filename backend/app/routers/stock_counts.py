@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
 from ..models import Expense, Inventory, Product, Setting, User
-from ..models_stockcount import StockCount, StockCountLine
+from ..models_stockcount import StockCount, StockCountAllocation, StockCountLine
 from ..models_accounting import EmployeeAdvance
 from ..services.audit import log_audit
 from ..services.inventory import get_or_create_inv
@@ -25,6 +25,16 @@ class StartCountIn(BaseModel):
     storeName: str = ""
     barcodes: Optional[list[str]] = None  # omit = full count of everything with stock
     notes: str = ""
+
+
+class AllocationIn(BaseModel):
+    employeeUserId: str
+    percent: float
+    deductionMonth: str = ""  # YYYY-MM
+
+
+class SetAllocationsIn(BaseModel):
+    allocations: list[AllocationIn] = Field(default_factory=list)
 
 
 class CountLineUpdate(BaseModel):
@@ -58,8 +68,8 @@ def _line_out(l: StockCountLine) -> dict:
 
 
 class ReclassifyIn(BaseModel):
-    category: str  # shrinkage | employee_fault | investigation
-    employeeUserId: Optional[str] = None
+    category: str  # shrinkage | split | investigation
+    allocations: list[AllocationIn] = Field(default_factory=list)  # required when category == split
 
 
 @router.post("/{count_id}/lines/{line_barcode}/reclassify")
@@ -85,19 +95,22 @@ def reclassify_line(
         raise HTTPException(404, "Line not found")
     if line.physical_qty is None or (line.physical_qty - line.system_qty) >= 0:
         raise HTTPException(400, "Only a shortage (negative variance) line can be reclassified")
-    if body.category not in ("shrinkage", "employee_fault", "investigation", "store_staff"):
+    if body.category not in ("shrinkage", "split", "investigation"):
         raise HTTPException(400, "Invalid category")
-    if body.category in ("employee_fault", "store_staff") and not body.employeeUserId:
-        raise HTTPException(400, "An employee must be selected for this category")
+    total_pct = sum(a.percent for a in body.allocations)
+    if body.category == "split":
+        if not body.allocations:
+            raise HTTPException(400, "At least one employee allocation is required for Split")
+        if total_pct > 100.0001:
+            raise HTTPException(400, f"Allocated percentages add up to {total_pct}% — cannot exceed 100%")
 
     variance = line.physical_qty - line.system_qty
     product = db.query(Product).filter(Product.barcode == line_barcode).first()
     cost = float(product.cost or 0) if product else 0
     value = round(abs(variance) * cost, 2)
-    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key == "store_staff_liability_percent").all()}
-    staff_percent = float(settings_map.get("store_staff_liability_percent", 50))
 
-    # Undo whatever was posted before.
+    # Undo whatever was posted before — the line's own expense, its
+    # legacy single advance (old data), and every allocation's advance.
     if line.posted_expense_id:
         old_exp = db.query(Expense).filter(Expense.exp_id == line.posted_expense_id).first()
         if old_exp:
@@ -107,20 +120,34 @@ def reclassify_line(
         old_adv = db.query(EmployeeAdvance).filter(EmployeeAdvance.advance_id == line.posted_advance_id).first()
         if old_adv:
             if (old_adv.repaid_amount or 0) > 0:
-                raise HTTPException(400, "This employee has already made repayments against this advance — settle or reverse those manually before reclassifying")
+                raise HTTPException(400, "An employee has already made repayments against an existing advance for this line — settle or reverse those manually before reclassifying")
             db.delete(old_adv)
         line.posted_advance_id = ""
+    old_allocations = db.query(StockCountAllocation).filter(StockCountAllocation.count_id == count_id, StockCountAllocation.barcode == line_barcode).all()
+    for a in old_allocations:
+        if a.posted_advance_id:
+            old_adv = db.query(EmployeeAdvance).filter(EmployeeAdvance.advance_id == a.posted_advance_id).first()
+            if old_adv:
+                if (old_adv.repaid_amount or 0) > 0:
+                    raise HTTPException(400, "An employee has already made repayments against an existing advance for this line — settle or reverse those manually before reclassifying")
+                db.delete(old_adv)
+        db.delete(a)
 
     old_category = line.category
     line.category = body.category
-    line.employee_user_id = body.employeeUserId or ""
-    _post_shortage(db, line, row.store_id, row.store_name, today_str(), value, variance, staff_percent)
+    line.employee_user_id = ""
+    if body.category == "split":
+        for a in body.allocations:
+            db.add(StockCountAllocation(
+                count_id=count_id, barcode=line_barcode, employee_user_id=a.employeeUserId,
+                percent=a.percent, deduction_month=a.deductionMonth or "",
+            ))
+    _post_shortage(db, line, row.store_id, row.store_name, today_str(), value, variance)
     line.notes = f"Reclassified from {old_category} by {user.name}" + (f" — {line.notes}" if line.notes else "")
-    line.category = body.category
     log_audit(
         db, user, "update", "stock_adjustment", line_barcode,
         f"Reclassified stock shortage: {line.name} — {old_category} → {body.category}",
-        old_value={"category": old_category}, new_value={"category": body.category, "employeeUserId": body.employeeUserId, "value": value},
+        old_value={"category": old_category}, new_value={"category": body.category, "allocations": [a.dict() for a in body.allocations], "value": value},
     )
     db.commit()
     return {"ok": True, "status": "ok"}
@@ -164,10 +191,16 @@ def get_count(count_id: str, db: Annotated[Session, Depends(get_db)], user: Anno
         raise HTTPException(404, "Count not found")
     lines = db.query(StockCountLine).filter(StockCountLine.count_id == count_id).order_by(StockCountLine.id.asc()).all()
     costs = {p.barcode: p.cost or 0 for p in db.query(Product).filter(Product.barcode.in_([l.barcode for l in lines])).all()}
+    allocs_by_barcode: dict = {}
+    for a in db.query(StockCountAllocation).filter(StockCountAllocation.count_id == count_id).all():
+        allocs_by_barcode.setdefault(a.barcode, []).append({
+            "employeeUserId": a.employee_user_id, "percent": a.percent, "deductionMonth": a.deduction_month,
+        })
     out_lines = []
     for l in lines:
         d = _line_out(l)
         d["cost"] = costs.get(l.barcode, 0)
+        d["allocations"] = allocs_by_barcode.get(l.barcode, [])
         out_lines.append(d)
     return {
         "ok": True, "id": row.count_id, "storeId": row.store_id, "storeName": row.store_name,
@@ -276,46 +309,81 @@ def update_count_lines(
     return {"ok": True, "status": "ok", "updated": updated}
 
 
-def _post_shortage(db: Session, line: StockCountLine, store_id: str, store_name: str, date: str, value: float, variance: int, staff_percent: float) -> None:
-    """Posts the financial 'other side' of a shortage line, based on its
-    category. Sets line.posted_expense_id / posted_advance_id so it can
-    be cleanly undone later (reclassify).
+@router.put("/{count_id}/lines/{barcode}/allocations")
+def set_line_allocations(
+    count_id: str, barcode: str, body: SetAllocationsIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "warehouse"))],
+):
+    """Sets who shares a shortage's cost and at what %, before approval.
+    Automatically switches the line's category to "split". Whatever %
+    isn't allocated to named employees stays the company's share — so
+    100% allocated = 0% company (fully staff-responsible), 50% allocated
+    = 50/50, etc. Replaces any previously-set allocations for this line.
     """
-    if line.category == "employee_fault" and line.employee_user_id:
-        emp = db.query(User).filter(User.user_id == line.employee_user_id).first()
-        advance_id = f"ADV-{int(time.time()*1000)}-{line.id}"
-        db.add(EmployeeAdvance(
-            advance_id=advance_id, employee_name=emp.name if emp else line.employee_user_id,
-            store_id=store_id, date=date, amount=value,
-            reason=f"Stock shortage — {line.name} ({variance})", notes=line.reason or "",
+    row = db.query(StockCount).filter(StockCount.count_id == count_id).first()
+    if not row:
+        raise HTTPException(404, "Count not found")
+    if row.status != "draft":
+        raise HTTPException(400, "This count is already approved and locked")
+    line = db.query(StockCountLine).filter(StockCountLine.count_id == count_id, StockCountLine.barcode == barcode).first()
+    if not line:
+        raise HTTPException(404, "Line not found")
+    total_pct = sum(a.percent for a in body.allocations)
+    if total_pct > 100.0001:
+        raise HTTPException(400, f"Allocated percentages add up to {total_pct}% — cannot exceed 100%")
+    for a in body.allocations:
+        if not a.employeeUserId:
+            raise HTTPException(400, "Every allocation row needs an employee selected")
+        if a.percent <= 0:
+            raise HTTPException(400, "Every allocation row needs a percentage greater than 0")
+    db.query(StockCountAllocation).filter(StockCountAllocation.count_id == count_id, StockCountAllocation.barcode == barcode).delete()
+    for a in body.allocations:
+        db.add(StockCountAllocation(
+            count_id=count_id, barcode=barcode, employee_user_id=a.employeeUserId,
+            percent=a.percent, deduction_month=a.deductionMonth or "",
         ))
-        line.posted_advance_id = advance_id
-        line.posted_expense_id = ""
-    elif line.category == "store_staff" and line.employee_user_id:
-        # Company SOP split: a configurable % is charged to the named
-        # store staff member (Employee Advance), the remainder stays a
-        # company Shrinkage Expense — both sides get posted (when
-        # non-zero) so the full value is always accounted for.
-        pct = max(0.0, min(100.0, staff_percent))
-        staff_share = round(value * pct / 100, 2)
-        company_share = round(value - staff_share, 2)
-        emp = db.query(User).filter(User.user_id == line.employee_user_id).first()
-        if staff_share > 0:
-            advance_id = f"ADV-{int(time.time()*1000)}-{line.id}"
+    line.category = "split" if body.allocations else "shrinkage"
+    db.commit()
+    return {"ok": True, "status": "ok", "companyPercent": round(100 - total_pct, 2)}
+
+
+def _post_shortage(db: Session, line: StockCountLine, store_id: str, store_name: str, date: str, value: float, variance: int, staff_percent: float = 0) -> None:
+    """Posts the financial 'other side' of a shortage line, based on its
+    category:
+      - shrinkage / investigation → the whole value is a company
+        Shrinkage Expense.
+      - split → each StockCountAllocation row (one per employee sharing
+        responsibility) gets its own Employee Advance for its % of the
+        value; whatever % is left over (100% - sum of employee %) is the
+        company's own Shrinkage Expense. This covers both "100% one or
+        more employees, 0% company" and "50/50" (or any other ratio) —
+        just different %s on the same mechanism.
+    """
+    if line.category == "split":
+        allocations = db.query(StockCountAllocation).filter(
+            StockCountAllocation.count_id == line.count_id, StockCountAllocation.barcode == line.barcode
+        ).all()
+        allocated_pct = sum(a.percent or 0 for a in allocations)
+        for a in allocations:
+            share = round(value * (a.percent or 0) / 100, 2)
+            if share <= 0:
+                continue
+            emp = db.query(User).filter(User.user_id == a.employee_user_id).first()
+            advance_id = f"ADV-{int(time.time()*1000)}-{line.id}-{a.id}"
+            month_note = f" (deduct from {a.deduction_month} payroll)" if a.deduction_month else ""
             db.add(EmployeeAdvance(
-                advance_id=advance_id, employee_name=emp.name if emp else line.employee_user_id,
-                store_id=store_id, date=date, amount=staff_share,
-                reason=f"Stock shortage — Store Staff share ({pct}%) — {line.name} ({variance})", notes=line.reason or "",
+                advance_id=advance_id, employee_name=emp.name if emp else a.employee_user_id,
+                store_id=store_id, date=date, amount=share,
+                reason=f"Stock shortage — {a.percent}% share — {line.name} ({variance}){month_note}", notes=line.reason or "",
             ))
-            line.posted_advance_id = advance_id
-        else:
-            line.posted_advance_id = ""
+            a.posted_advance_id = advance_id
+        company_share = round(value * max(0.0, 100 - allocated_pct) / 100, 2)
         if company_share > 0:
             exp_id = f"EXP-{int(time.time()*1000)}-{line.id}"
             db.add(Expense(
                 exp_id=exp_id, date=date, store_id=store_id, store=store_name,
                 category="Inventory Shrinkage", sub_category="Non-cash",
-                description=f"Shortage — Company share ({100-pct}%) — {line.name} ({variance})", amount=company_share,
+                description=f"Shortage — Company share ({round(100-allocated_pct,1)}%) — {line.name} ({variance})", amount=company_share,
                 pay_method="Non-cash", reference=line.count_id, notes=line.reason or "",
             ))
             line.posted_expense_id = exp_id
@@ -332,7 +400,6 @@ def _post_shortage(db: Session, line: StockCountLine, store_id: str, store_name:
             reference=line.count_id, notes=line.reason or "",
         ))
         line.posted_expense_id = exp_id
-        line.posted_advance_id = ""
 
 
 @router.post("/{count_id}/approve")

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -45,7 +45,25 @@ class StockCountLine(Base):
     system_qty: Mapped[int] = mapped_column(Integer, default=0)
     physical_qty: Mapped[int] = mapped_column(Integer, nullable=True)
     reason: Mapped[str] = mapped_column(String(255), default="")
-    category: Mapped[str] = mapped_column(String(24), default="shrinkage")  # shrinkage | employee_fault | investigation — only meaningful for a shortage (negative variance)
-    employee_user_id: Mapped[str] = mapped_column(String(32), default="")  # set when category == employee_fault
-    posted_expense_id: Mapped[str] = mapped_column(String(64), default="")  # the Expense row created for this line at approval (if shrinkage/investigation)
-    posted_advance_id: Mapped[str] = mapped_column(String(64), default="")  # the EmployeeAdvance row created for this line at approval (if employee_fault)
+    category: Mapped[str] = mapped_column(String(24), default="shrinkage")  # shrinkage (100% company) | split (custom % across company + one or more employees) | investigation
+    employee_user_id: Mapped[str] = mapped_column(String(32), default="")  # legacy single-employee field, kept for old rows
+    posted_expense_id: Mapped[str] = mapped_column(String(64), default="")  # the Expense row created for this line at approval (if shrinkage/investigation/company share)
+    posted_advance_id: Mapped[str] = mapped_column(String(64), default="")  # legacy single-advance field, kept for old rows
+
+
+class StockCountAllocation(Base):
+    """One employee's share of a 'split' shortage line — lets 2+ people
+    share responsibility for the same missing item, each at their own
+    %, instead of forcing one single employee or a single fixed ratio.
+    Whatever % isn't allocated to employees is the company's share.
+    """
+
+    __tablename__ = "stock_count_allocations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    count_id: Mapped[str] = mapped_column(String(64), index=True)
+    barcode: Mapped[str] = mapped_column(String(64), index=True)
+    employee_user_id: Mapped[str] = mapped_column(String(32))
+    percent: Mapped[float] = mapped_column(Float, default=0.0)
+    deduction_month: Mapped[str] = mapped_column(String(7), default="")  # YYYY-MM — which payroll month this should be deducted from
+    posted_advance_id: Mapped[str] = mapped_column(String(64), default="")
