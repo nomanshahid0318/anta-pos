@@ -262,6 +262,8 @@ async function pinSubmit() {
   pinEntry = '';
   const pd = document.getElementById('pin-display');
   if (pd) pd.textContent = '----';
+  const ec = document.getElementById('login-empcode');
+  if (ec) ec.value = '';
   setOnline('online', 'Wrong PIN');
 }
 function applyProfitVisibility() {
