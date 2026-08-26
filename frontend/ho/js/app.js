@@ -2579,7 +2579,7 @@ async function loadPayrollRuns(){
   const res=await api('/api/payroll/runs');
   if(!res||!res.ok)return;
   __prList=res.data||[];
-  if($('pr-list'))$('pr-list').innerHTML=__prList.map(r=>`<tr><td class="fw7">${r.month}</td><td>${r.storeName}</td><td><span class="badge ${r.status==='finalized'?'badge-green':'badge-amber'}">${r.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="openPayrollRun('${r.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No payroll runs yet</td></tr>';
+  if($('pr-list'))$('pr-list').innerHTML=__prList.map(r=>`<tr><td class="fw7">${r.month}</td><td>${r.storeName}</td><td><span class="badge ${r.status==='finalized'?'badge-green':'badge-amber'}">${r.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="togglePayrollRun('${r.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No payroll runs yet</td></tr>';
 }
 async function startPayrollRun(){
   const storeId=$('pr-store')?$('pr-store').value:'';
@@ -2589,6 +2589,15 @@ async function startPayrollRun(){
   const res=await api('/api/payroll/runs',{method:'POST',body:{storeId,storeName,month}});
   if(res&&res.ok){await loadPayrollRuns();openPayrollRun(res.id);}
   else toast('❌ Failed','error');
+}
+async function togglePayrollRun(id){
+  const card=$('pr-detail-card');
+  if(__prCurrent&&__prCurrent.id===id&&card.style.display==='block'){
+    card.style.display='none';
+    __prCurrent=null;
+    return;
+  }
+  openPayrollRun(id);
 }
 async function openPayrollRun(id){
   const res=await api(`/api/payroll/runs/${encodeURIComponent(id)}`);
