@@ -39,7 +39,7 @@
     <div class="login-sub" data-i18n="login_sub">Select store and enter PIN</div>
     <div style="margin-top:12px;font-size:12px"><a href="/" style="color:var(--accent2)">← Portal</a></div>
     <select class="store-select-login" id="login-store"></select>
-    <input class="form-input" id="login-empcode" placeholder="Employee Code — leave blank if none set" style="text-align:center;letter-spacing:1px;margin-top:8px" maxlength="10">
+    <input class="form-input" id="login-empcode" placeholder="Employee Code — leave blank if none set" style="text-align:center;letter-spacing:1px;margin-top:8px;text-transform:uppercase" maxlength="10" oninput="this.value=this.value.toUpperCase()">
     <div class="pin-display" id="pin-display">----</div>
     <div class="pin-grid">
       <button class="pin-btn" onclick="pinPress('1')">1</button>

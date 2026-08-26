@@ -37,7 +37,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div id="login-title-text" class="login-title">Head Office</div>
     <div class="login-sub">Admin / Manager / Merchandiser / Warehouse / Accountant PIN login</div>
     <select id="login-store" class="store-select-login"><option value="HO">Head Office</option></select>
-    <input class="form-input" id="login-empcode" placeholder="Employee Code — leave blank if none set" style="text-align:center;letter-spacing:1px;margin-top:8px" maxlength="10">
+    <input class="form-input" id="login-empcode" placeholder="Employee Code — leave blank if none set" style="text-align:center;letter-spacing:1px;margin-top:8px;text-transform:uppercase" maxlength="10" oninput="this.value=this.value.toUpperCase()">
     <div id="pin-display" class="pin-display">----</div>
     <div class="pin-grid">
       <button class="pin-btn" onclick="pinPress('1')">1</button>
@@ -1056,7 +1056,7 @@ body{display:flex;height:100vh;overflow:hidden}
             <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="u-store"></select></div>
             <div class="form-group"><label class="form-label">Role</label><select class="form-input" id="u-role"><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="merchandiser">Merchandiser</option><option value="warehouse">Warehouse</option><option value="accountant">Accountant</option><option value="admin">Admin</option></select></div>
             <div class="form-group" id="u-pin-group"><label class="form-label">PIN (4 digits)</label><input class="form-input" type="password" id="u-pin" placeholder="4-digit PIN" maxlength="4"></div>
-            <div class="form-group" style="grid-column:span 2"><label class="form-label">Employee Code (unique login credential — leave blank to auto-generate)</label><input class="form-input" id="u-empcode" placeholder="e.g. EMP1234" style="text-transform:uppercase"></div>
+            <div class="form-group" style="grid-column:span 2"><label class="form-label">Employee Code (unique login credential — leave blank to auto-generate)</label><input class="form-input" id="u-empcode" placeholder="e.g. EMP1234" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
           </div>
           <label style="display:flex;align-items:center;gap:7px;font-size:12px;margin:8px 0"><input type="checkbox" id="u-login-enabled" checked onchange="toggleUserPinField()"> Enable POS/HO Login (uncheck for a payroll/records-only employee with no system access)</label>
           <div style="display:flex;gap:7px;margin-top:8px">
