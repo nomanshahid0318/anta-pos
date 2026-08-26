@@ -103,6 +103,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
     <div class="nav-item" onclick="show('stock-counts')" data-role="admin,manager,warehouse"><span class="ico">📋</span>Stock Take</div>
+    <div class="nav-item" onclick="show('payroll')" data-role="admin,manager,accountant"><span class="ico">💵</span>Payroll</div>
     <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
     <div class="nav-sec">Admin</div>
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
@@ -868,6 +869,19 @@ body{display:flex;height:100vh;overflow:hidden}
       </tr></thead>
       <tbody id="sc-lines-table"></tbody></table>
     </div>
+    <div id="sc-alloc-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAllocModal()">
+      <div class="modal" style="width:520px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div class="modal-title" id="sc-alloc-title" style="margin-bottom:0">👥 Split Responsibility</div>
+          <button onclick="closeAllocModal()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray4)">✕</button>
+        </div>
+        <p style="font-size:11px;color:var(--gray4);margin-bottom:10px">Add one row per employee sharing responsibility, with their own %. Whatever % is left over automatically stays the company's own Shrinkage Expense — 100% allocated = fully staff-responsible, less than 100% = a company/staff split, per your own SOP.</p>
+        <div id="sc-alloc-rows"></div>
+        <button class="btn btn-ghost btn-sm mt" onclick="addAllocRow()">➕ Add Employee</button>
+        <div id="sc-alloc-total" style="margin-top:10px;font-weight:700;font-size:12px"></div>
+        <button class="btn btn-primary btn-full mt" onclick="saveAllocations()">💾 Save Split</button>
+      </div>
+    </div>
     <div id="sc-approve-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeApproveModal()">
       <div class="modal" style="width:640px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
@@ -894,6 +908,37 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="form-group" style="grid-column:span 3"><label class="form-label">Reason</label><input class="form-input" id="qa-reason" placeholder="e.g. Found damaged during shelving"></div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="submitQuickAdjust()">✅ Apply Adjustment</button>
+    </div>
+  </div>
+
+  <!-- PAYROLL -->
+  <div id="screen-payroll" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">💵 Start Payroll Run</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="pr-store"></select></div>
+          <div class="form-group"><label class="form-label">Month</label><input class="form-input" type="month" id="pr-month"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="startPayrollRun()">▶️ Start / Open Run</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📂 Recent Payroll Runs</div>
+        <table><thead><tr><th>Month</th><th>Store</th><th>Status</th><th></th></tr></thead>
+        <tbody id="pr-list"></tbody></table>
+      </div>
+    </div>
+    <div class="card" id="pr-detail-card" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title" style="margin:0" id="pr-detail-title">💵 Payroll</div>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-ghost btn-sm" onclick="savePayrollEntries()">💾 Save</button>
+          <button class="btn btn-green btn-sm" onclick="finalizePayrollRun()">✅ Finalize &amp; Deduct</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">"Outstanding" shows what each employee still owes across all their Employee Advances. "Suggested" is pre-filled from any stock-shortage advance specifically tagged for this month. Finalizing actually deducts each Deduction Amount as a real Salary Deduction repayment.</p>
+      <table><thead><tr><th>Employee</th><th>Role</th><th>Outstanding</th><th>Suggested</th><th>Base Salary</th><th>Deduction Amount</th><th>Net Pay</th></tr></thead>
+      <tbody id="pr-entries-table"></tbody></table>
     </div>
   </div>
 

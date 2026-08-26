@@ -102,12 +102,13 @@ async function pinSubmit(){
   if(e){e.style.display='block';e.textContent=typeof msg==='string'?msg:JSON.stringify(msg);}
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
 if(name==='shifts'){loadShifts();}
 if(name==='stock-counts'){populateSCStoreSelect();loadStockCounts();}
+if(name==='payroll'){populatePRStoreSelect();loadPayrollRuns();}
 if(name==='three-way-match'){populateTWMPOSelect();loadSupplierInvoices();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
@@ -2359,17 +2360,16 @@ function renderVarianceTable(lines){
     const isShortage=l.variance!=null&&l.variance<0;
     if(isShortage)totalShortageValue+=l.absShortageValue;
     let categoryCell='—';
+    const allocSummary=(l.allocations&&l.allocations.length)?l.allocations.map(a=>`${(emps.find(e=>e.user_id===a.employeeUserId)?.name)||a.employeeUserId} ${a.percent}%`).join(', '):'';
     if(isShortage&&!locked){
-      const empOptions=emps.map(e=>`<option value="${e.user_id}" ${l.employeeUserId===e.user_id?'selected':''}>${e.name}</option>`).join('');
-      categoryCell=`<select class="form-input" style="padding:3px 6px;font-size:10.5px" id="sc-cat-${i}" data-barcode="${l.barcode}" onchange="toggleEmpSelect(${i});__scCategoriesDirty=true">
+      categoryCell=`<select class="form-input" style="padding:3px 6px;font-size:10.5px" id="sc-cat-${i}" data-barcode="${l.barcode}" onchange="__scCategoriesDirty=true">
         <option value="shrinkage" ${l.category==='shrinkage'?'selected':''}>Shrinkage (company loss)</option>
-        <option value="employee_fault" ${l.category==='employee_fault'?'selected':''}>Employee Fault</option>
+        <option value="split" ${l.category==='split'?'selected':''}>Split (multi-employee %)</option>
         <option value="investigation" ${l.category==='investigation'?'selected':''}>Under Investigation</option>
-        <option value="store_staff" ${l.category==='store_staff'?'selected':''}>Store Staff (% split per SOP)</option>
       </select>
-      <select class="form-input" style="padding:3px 6px;font-size:10.5px;margin-top:3px;display:${(l.category==='employee_fault'||l.category==='store_staff')?'block':'none'}" id="sc-emp-${i}" onchange="__scCategoriesDirty=true"><option value="">Select employee…</option>${empOptions}</select>`;
+      <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:10px;margin-top:3px" onclick="openAllocModal('${l.barcode}')">👥 ${allocSummary?'Edit Split: '+allocSummary:'Configure Split'}</button>`;
     } else if(isShortage){
-      categoryCell=`${l.category}${l.employeeUserId?' ('+(emps.find(e=>e.user_id===l.employeeUserId)?.name||l.employeeUserId)+')':''} <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:10px" onclick="openReclassify('${l.barcode}')">🔄 Reclassify</button>`;
+      categoryCell=`${l.category==='split'?('Split — '+allocSummary):l.category} <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:10px" onclick="openReclassify('${l.barcode}')">🔄 Reclassify</button>`;
     }
     return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}${isNew?' <span class="badge badge-blue">New</span>':''}</td><td>${l.systemQty}</td><td>${l.physicalQty!=null?l.physicalQty:'<span style="color:var(--gray3)">not scanned</span>'}</td><td class="fw7" style="color:${vColor}">${l.variance!=null?(l.variance>0?'+':'')+l.variance:'—'}</td><td>${fmt(l.cost||0)}</td><td class="fw7" style="color:${vColor}">${l.variance?fmt(Math.abs(l.value)):'—'}</td><td>${categoryCell}</td></tr>`;
   }).join('');
@@ -2382,22 +2382,32 @@ async function openReclassify(barcode){
   if(!__scCurrent)return;
   const emps=__scEmployees[__scCurrent.storeId]||[];
   const empList=emps.map((e,i)=>`${i+1}. ${e.name}`).join('\n');
-  const choice=prompt(`Reclassify this shortage to:\n1 = Shrinkage (company loss)\n2 = Employee Fault\n3 = Under Investigation\n4 = Store Staff (% split per SOP)\n\nType 1, 2, 3, or 4:`);
+  const choice=prompt(`Reclassify this shortage to:\n1 = Shrinkage (company loss)\n2 = Split (one or more employees, custom %)\n3 = Under Investigation\n\nType 1, 2, or 3:`);
   if(!choice)return;
-  let category=null,employeeUserId=null;
+  let category=null;
+  const allocations=[];
   if(choice.trim()==='1')category='shrinkage';
-  else if(choice.trim()==='2')category='employee_fault';
+  else if(choice.trim()==='2')category='split';
   else if(choice.trim()==='3')category='investigation';
-  else if(choice.trim()==='4')category='store_staff';
   else{toast('Invalid choice','error');return;}
-  if(category==='employee_fault'||category==='store_staff'){
+  if(category==='split'){
     if(!emps.length){toast('No employees found for this store','error');return;}
-    const empChoice=prompt(`Select employee:\n${empList}\n\nType the number:`);
-    const idx=parseInt(empChoice,10)-1;
-    if(isNaN(idx)||!emps[idx]){toast('Invalid employee selection','error');return;}
-    employeeUserId=emps[idx].user_id;
+    let addMore=true;
+    while(addMore){
+      const empChoice=prompt(`Select employee (${allocations.length} added so far):\n${empList}\n\nType the number:`);
+      if(!empChoice)break;
+      const idx=parseInt(empChoice,10)-1;
+      if(isNaN(idx)||!emps[idx]){toast('Invalid employee selection','error');return;}
+      const pct=prompt(`What % of the shortage value is ${emps[idx].name} responsible for?`);
+      const p=+pct;
+      if(!p||p<=0){toast('Invalid percentage','error');return;}
+      const month=prompt('Deduct from which payroll month? (YYYY-MM, optional)','')||'';
+      allocations.push({employeeUserId:emps[idx].user_id,percent:p,deductionMonth:month});
+      addMore=confirm('Add another employee to this split?');
+    }
+    if(!allocations.length){toast('At least one employee is required for Split','error');return;}
   }
-  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines/${encodeURIComponent(barcode)}/reclassify`,{method:'POST',body:{category,employeeUserId}});
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines/${encodeURIComponent(barcode)}/reclassify`,{method:'POST',body:{category,allocations}});
   if(res&&res.ok){toast('✅ Reclassified');await loadAll();openStockCount(__scCurrent.id);}
   else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
@@ -2406,21 +2416,72 @@ function toggleEmpSelect(i){
   const empSel=$('sc-emp-'+i);
   if(empSel)empSel.style.display=(cat==='employee_fault'||cat==='store_staff')?'block':'none';
 }
+let __allocBarcode=null,__allocRows=[];
+function openAllocModal(barcode){
+  if(!__scCurrent)return;
+  const line=(__scCurrent.lines||[]).find(l=>l.barcode===barcode);
+  if(!line)return;
+  __allocBarcode=barcode;
+  __allocRows=(line.allocations&&line.allocations.length)?line.allocations.map(a=>({...a})):[{employeeUserId:'',percent:'',deductionMonth:''}];
+  if($('sc-alloc-title'))$('sc-alloc-title').textContent=`👥 Split — ${line.name} (${line.barcode})`;
+  renderAllocRows();
+  $('sc-alloc-modal').style.display='flex';
+}
+function closeAllocModal(){$('sc-alloc-modal').style.display='none';__allocBarcode=null;}
+function renderAllocRows(){
+  const emps=(__scCurrent&&__scEmployees[__scCurrent.storeId])||[];
+  const empOptions=e=>emps.map(emp=>`<option value="${emp.user_id}" ${e.employeeUserId===emp.user_id?'selected':''}>${emp.name}</option>`).join('');
+  if($('sc-alloc-rows'))$('sc-alloc-rows').innerHTML=__allocRows.map((r,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <select class="form-input" style="flex:2;padding:5px 7px" onchange="__allocRows[${i}].employeeUserId=this.value"><option value="">Select employee…</option>${empOptions(r)}</select>
+      <input class="form-input" type="number" style="width:70px;padding:5px 7px" placeholder="%" value="${r.percent}" oninput="__allocRows[${i}].percent=+this.value;renderAllocTotal()">
+      <input class="form-input" type="month" style="width:130px;padding:5px 7px" value="${r.deductionMonth||''}" onchange="__allocRows[${i}].deductionMonth=this.value" title="Which payroll month to deduct from">
+      <button class="btn btn-ghost btn-sm" onclick="removeAllocRow(${i})">✕</button>
+    </div>`).join('');
+  renderAllocTotal();
+}
+function renderAllocTotal(){
+  const total=__allocRows.reduce((a,r)=>a+(+r.percent||0),0);
+  const companyPct=Math.max(0,100-total);
+  if($('sc-alloc-total')){
+    $('sc-alloc-total').style.color=total>100?'var(--red)':'var(--navy)';
+    $('sc-alloc-total').textContent=total>100?`⚠️ ${total}% allocated — exceeds 100%, reduce a row`:`Employees: ${total}% · Company share: ${companyPct}%`;
+  }
+}
+function addAllocRow(){__allocRows.push({employeeUserId:'',percent:'',deductionMonth:''});renderAllocRows();}
+function removeAllocRow(i){__allocRows.splice(i,1);if(!__allocRows.length)__allocRows.push({employeeUserId:'',percent:'',deductionMonth:''});renderAllocRows();}
+async function saveAllocations(){
+  if(!__scCurrent||!__allocBarcode)return;
+  const valid=__allocRows.filter(r=>r.employeeUserId&&+r.percent>0).map(r=>({employeeUserId:r.employeeUserId,percent:+r.percent,deductionMonth:r.deductionMonth||''}));
+  const total=valid.reduce((a,r)=>a+r.percent,0);
+  if(total>100.001){toast('❌ Percentages exceed 100% — reduce a row','error');return;}
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines/${encodeURIComponent(__allocBarcode)}/allocations`,{method:'PUT',body:{allocations:valid}});
+  if(res&&res.ok){
+    toast(`✅ Split saved — company share ${res.companyPercent}%`);
+    closeAllocModal();
+    __scCategoriesDirty=false;
+    openStockCount(__scCurrent.id);
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
 async function saveLineCategories(){
   if(!__scCurrent)return;
   const selects=document.querySelectorAll('[id^="sc-cat-"]');
-  const lines=[...selects].map(sel=>{
-    const i=sel.id.split('-')[2];
-    const empSel=$('sc-emp-'+i);
+  const lines=[];
+  for(const sel of selects){
     const category=sel.value;
-    if((category==='employee_fault'||category==='store_staff')&&(!empSel||!empSel.value)){throw new Error('missing-employee');}
-    return {barcode:sel.dataset.barcode,category,employeeUserId:(category==='employee_fault'||category==='store_staff')?empSel.value:''};
-  });
-  try{
-    const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
-    if(res&&res.ok){toast(`✅ ${res.updated} categories saved`);openStockCount(__scCurrent.id);}
-    else toast('❌ Failed to save categories','error');
-  }catch(e){toast('❌ Select an employee for every "Employee Fault" line','error');}
+    if(category==='split'){
+      const line=(__scCurrent.lines||[]).find(l=>l.barcode===sel.dataset.barcode);
+      if(!line||!line.allocations||!line.allocations.length){
+        toast(`❌ "${sel.dataset.barcode}" is set to Split but has no employees configured — click "Configure Split" first`,'error');
+        return;
+      }
+      continue; // already saved via its own allocations endpoint
+    }
+    lines.push({barcode:sel.dataset.barcode,category});
+  }
+  const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
+  if(res&&res.ok){toast(`✅ ${res.updated} categories saved`);__scCategoriesDirty=false;openStockCount(__scCurrent.id);}
+  else toast('❌ Failed to save categories','error');
 }
 function downloadCountTemplate(){
   const a=document.createElement('a');
@@ -2452,42 +2513,16 @@ function approveStockCount(){
   const shortageLines=(__scCurrent.lines||[]).filter(l=>l.variance!=null&&l.variance<0);
   const totalValue=shortageLines.reduce((a,l)=>a+Math.abs(l.variance)*(l.cost||0),0);
   if($('sc-approve-total'))$('sc-approve-total').textContent=shortageLines.length?`⚠️ ${shortageLines.length} shortage line(s) — total value ${fmt(totalValue)}`:'✅ No shortages on this count.';
-  if($('sc-approve-table'))$('sc-approve-table').innerHTML=shortageLines.map((l,i)=>{
-    const empOptions=emps.map(e=>`<option value="${e.user_id}" ${l.employeeUserId===e.user_id?'selected':''}>${e.name}</option>`).join('');
-    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}<input type="hidden" id="sca-bc-${i}" value="${l.barcode}"></td><td>${l.name}</td><td class="fw7" style="color:var(--red)">${l.variance}</td><td>${fmt(Math.abs(l.variance)*(l.cost||0))}</td><td>
-      <select class="form-input" style="padding:3px 6px;font-size:10.5px" id="sca-cat-${i}" onchange="toggleApproveEmp(${i})">
-        <option value="shrinkage" ${l.category==='shrinkage'?'selected':''}>Shrinkage</option>
-        <option value="employee_fault" ${l.category==='employee_fault'?'selected':''}>Employee Fault</option>
-        <option value="investigation" ${l.category==='investigation'?'selected':''}>Investigation</option>
-        <option value="store_staff" ${l.category==='store_staff'?'selected':''}>Store Staff (% split)</option>
-      </select>
-      <select class="form-input" style="padding:3px 6px;font-size:10.5px;margin-top:3px;display:${l.category==='employee_fault'?'block':'none'}" id="sca-emp-${i}"><option value="">Select employee…</option>${empOptions}</select>
-    </td></tr>`;
+  if($('sc-approve-table'))$('sc-approve-table').innerHTML=shortageLines.map(l=>{
+    const allocSummary=(l.allocations&&l.allocations.length)?l.allocations.map(a=>`${(emps.find(e=>e.user_id===a.employeeUserId)?.name)||a.employeeUserId} ${a.percent}%`).join(', '):'';
+    const catLabel=l.category==='split'?`Split — ${allocSummary}`:l.category;
+    return `<tr><td style="font-family:monospace;font-size:10px">${l.barcode}</td><td>${l.name}</td><td class="fw7" style="color:var(--red)">${l.variance}</td><td>${fmt(Math.abs(l.variance)*(l.cost||0))}</td><td>${catLabel}</td></tr>`;
   }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:14px">No shortages — nothing to classify</td></tr>';
   $('sc-approve-modal').style.display='flex';
 }
 function closeApproveModal(){$('sc-approve-modal').style.display='none';}
-function toggleApproveEmp(i){
-  const cat=$('sca-cat-'+i)?.value;
-  const sel=$('sca-emp-'+i);
-  if(sel)sel.style.display=(cat==='employee_fault'||cat==='store_staff')?'block':'none';
-}
 async function confirmApproveFlow(){
   if(!__scCurrent)return;
-  const bcInputs=document.querySelectorAll('[id^="sca-bc-"]');
-  const lines=[...bcInputs].map(inp=>{
-    const i=inp.id.split('-')[2];
-    const category=$('sca-cat-'+i)?.value||'shrinkage';
-    const employeeUserId=(category==='employee_fault'||category==='store_staff')?($('sca-emp-'+i)?.value||''):'';
-    if((category==='employee_fault'||category==='store_staff')&&!employeeUserId)throw new Error('missing-employee');
-    return {barcode:inp.value,category,employeeUserId};
-  });
-  try{
-    if(lines.length){
-      const saveRes=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/lines`,{method:'PUT',body:{lines}});
-      if(!saveRes||!saveRes.ok){toast('❌ Failed to save categories','error');return;}
-    }
-  }catch(e){toast('❌ Select an employee for every "Employee Fault" line','error');return;}
   const res=await api(`/api/stock-counts/${encodeURIComponent(__scCurrent.id)}/approve`,{method:'POST'});
   if(res&&res.ok){
     toast(`✅ Approved — ${res.linesAdjusted} item(s) adjusted`);
@@ -2508,6 +2543,66 @@ async function submitQuickAdjust(){
     ['qa-barcode','qa-qty','qa-reason'].forEach(id=>{if($(id))$(id).value='';});
     await loadAll();
   } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+
+// ---------- Payroll ----------
+let __prList=[],__prCurrent=null;
+function populatePRStoreSelect(){
+  if($('pr-store'))$('pr-store').innerHTML='<option value="HO">Head Office</option>'+(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+  if($('pr-month')&&!$('pr-month').value)$('pr-month').value=today().slice(0,7);
+}
+async function loadPayrollRuns(){
+  const res=await api('/api/payroll/runs');
+  if(!res||!res.ok)return;
+  __prList=res.data||[];
+  if($('pr-list'))$('pr-list').innerHTML=__prList.map(r=>`<tr><td class="fw7">${r.month}</td><td>${r.storeName}</td><td><span class="badge ${r.status==='finalized'?'badge-green':'badge-amber'}">${r.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="openPayrollRun('${r.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No payroll runs yet</td></tr>';
+}
+async function startPayrollRun(){
+  const storeId=$('pr-store')?$('pr-store').value:'';
+  const storeName=$('pr-store')?$('pr-store').options[$('pr-store').selectedIndex]?.text:'';
+  const month=$('pr-month')?$('pr-month').value:'';
+  if(!storeId||!month){toast('Select a store and month','error');return;}
+  const res=await api('/api/payroll/runs',{method:'POST',body:{storeId,storeName,month}});
+  if(res&&res.ok){await loadPayrollRuns();openPayrollRun(res.id);}
+  else toast('❌ Failed','error');
+}
+async function openPayrollRun(id){
+  const res=await api(`/api/payroll/runs/${encodeURIComponent(id)}`);
+  if(!res||!res.ok){toast('Failed to load','error');return;}
+  __prCurrent=res;
+  if($('pr-detail-title'))$('pr-detail-title').textContent=`💵 ${res.storeName} — ${res.month} (${res.status})`;
+  const locked=res.status!=='draft';
+  if($('pr-entries-table'))$('pr-entries-table').innerHTML=(res.entries||[]).map((e,i)=>`<tr>
+    <td class="fw7">${e.employeeName}</td><td>${e.role}</td>
+    <td style="color:${e.outstandingAdvances>0?'var(--red)':'var(--gray4)'}">${fmt(e.outstandingAdvances)}</td>
+    <td>${e.suggestedDeduction>0?fmt(e.suggestedDeduction):'—'}</td>
+    <td><input class="form-input" type="number" style="width:90px;padding:4px 7px" id="pr-base-${i}" value="${e.baseSalary}" ${locked?'disabled':''}></td>
+    <td><input class="form-input" type="number" style="width:90px;padding:4px 7px" id="pr-ded-${i}" data-emp="${e.employeeUserId}" value="${e.deductionAmount||e.suggestedDeduction||0}" ${locked?'disabled':''}></td>
+    <td class="fw7" id="pr-net-${i}">${fmt(e.netPay||(e.baseSalary-(e.deductionAmount||0)))}</td>
+  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
+  $('pr-detail-card').style.display='block';
+  $('pr-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function savePayrollEntries(){
+  if(!__prCurrent)return;
+  const dedInputs=document.querySelectorAll('[id^="pr-ded-"]');
+  const entries=[...dedInputs].map(inp=>{
+    const i=inp.id.split('-')[2];
+    const base=+(($('pr-base-'+i)&&$('pr-base-'+i).value)||0);
+    const ded=+inp.value||0;
+    return {employeeUserId:inp.dataset.emp,baseSalary:base,deductionAmount:ded};
+  });
+  const res=await api(`/api/payroll/runs/${encodeURIComponent(__prCurrent.id)}/entries`,{method:'PUT',body:{entries}});
+  if(res&&res.ok){toast('✅ Saved');openPayrollRun(__prCurrent.id);}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function finalizePayrollRun(){
+  if(!__prCurrent)return;
+  if(!confirm('Finalize this payroll run? This will actually deduct each Deduction Amount from the employee\'s Employee Advance balance as a Salary Deduction. This cannot be undone.'))return;
+  await savePayrollEntries();
+  const res=await api(`/api/payroll/runs/${encodeURIComponent(__prCurrent.id)}/finalize`,{method:'POST'});
+  if(res&&res.ok){toast('✅ Payroll finalized — deductions applied');await loadAll();openPayrollRun(__prCurrent.id);loadPayrollRuns();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 
 // ---------- Three-Way Matching (PO vs GRN vs Supplier Invoice) ----------
