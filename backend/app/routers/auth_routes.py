@@ -62,13 +62,28 @@ def login(body: LoginRequest, db: Annotated[Session, Depends(get_db)]):
         .filter(User.store_id == body.store_id, User.active.is_(True), User.pos_login_enabled.is_(True))
         .all()
     )
+    code = (body.employeeCode or "").strip().upper()
     matched: User | None = None
-    for u in users:
-        if verify_pin(body.pin, u.pin_hash):
-            matched = u
-            break
+    if code:
+        # A specific employee is being claimed — resolve to exactly them
+        # first, then check the PIN only against that one account. This
+        # is what actually fixes the ambiguity of two people at the same
+        # store sharing a PIN: the code picks the person, the PIN just
+        # confirms it's really them.
+        candidate = next((u for u in users if u.employee_code == code), None)
+        if candidate and verify_pin(body.pin, candidate.pin_hash):
+            matched = candidate
+    else:
+        # No code given — only match users who haven't been assigned one
+        # yet (keeps existing PIN-only logins working during rollout).
+        # Anyone with a code set now requires it; they can't be logged
+        # into by PIN alone anymore.
+        for u in users:
+            if not u.employee_code and verify_pin(body.pin, u.pin_hash):
+                matched = u
+                break
     if not matched:
-        raise HTTPException(status_code=401, detail="Wrong PIN")
+        raise HTTPException(status_code=401, detail="Wrong PIN or Employee Code" if code else "Wrong PIN")
 
     try:
         locked, reason = lic.is_locked(db)
@@ -132,6 +147,7 @@ def list_users(
             role=u.role,
             active=u.active,
             posLoginEnabled=u.pos_login_enabled,
+            employeeCode=u.employee_code,
         )
         for u in q.all()
     ]
@@ -150,6 +166,23 @@ def save_user(
         raise HTTPException(status_code=400, detail=f"Role must be one of {sorted(allowed)}")
     uid = body.user_id or f"U{int(__import__('time').time()*1000)}"
     row = db.query(User).filter(User.user_id == uid).first()
+
+    def _gen_code() -> str:
+        import random
+        for _ in range(20):
+            code = f"EMP{random.randint(1000, 9999)}"
+            if not db.query(User).filter(User.employee_code == code).first():
+                return code
+        return f"EMP{int(__import__('time').time())}"
+
+    employee_code = (body.employeeCode or "").strip().upper()
+    if employee_code:
+        clash = db.query(User).filter(User.employee_code == employee_code, User.user_id != uid).first()
+        if clash:
+            raise HTTPException(status_code=400, detail=f"Employee Code '{employee_code}' is already used by {clash.name}")
+    elif not row:
+        employee_code = _gen_code()
+
     if row:
         row.store_id = body.store_id
         row.store_name = body.store_name
@@ -157,6 +190,8 @@ def save_user(
         row.role = body.role
         row.active = body.active
         row.pos_login_enabled = body.posLoginEnabled
+        if employee_code:
+            row.employee_code = employee_code
         if body.pin:
             row.pin_hash = hash_pin(body.pin)
     else:
@@ -175,6 +210,7 @@ def save_user(
             pin_hash=hash_pin(pin),
             active=body.active,
             pos_login_enabled=body.posLoginEnabled,
+            employee_code=employee_code,
         )
         db.add(row)
     db.commit()
@@ -187,6 +223,7 @@ def save_user(
         role=row.role,
         active=row.active,
         posLoginEnabled=row.pos_login_enabled,
+        employeeCode=row.employee_code,
     )
 
 
@@ -219,3 +256,20 @@ def authorize_pin(
         if verify_pin(body.pin, u.pin_hash):
             return {"ok": True, "status": "ok", "approverName": u.name, "approverRole": u.role}
     raise HTTPException(401, "Invalid PIN, or this PIN doesn't belong to a manager/admin")
+
+
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: str, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    if user_id == user.user_id:
+        raise HTTPException(status_code=400, detail="You can't delete your own account while logged in as it")
+    row = db.query(User).filter(User.user_id == user_id).first()
+    if not row:
+        raise HTTPException(404, "User not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "status": "ok"}

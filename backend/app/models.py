@@ -47,6 +47,7 @@ class User(Base):
     store_id: Mapped[str] = mapped_column(String(32), ForeignKey("stores.store_id"), index=True)
     store_name: Mapped[str] = mapped_column(String(128), default="")
     name: Mapped[str] = mapped_column(String(128))
+    employee_code: Mapped[str] = mapped_column(String(16), index=True, default="")  # a second, unique-per-employee credential required alongside the PIN at login — uniqueness enforced in the API layer (not a DB constraint, since blank/legacy rows can share the default "")
     role: Mapped[str] = mapped_column(String(32), default="cashier")  # admin|manager|cashier|accountant
     pin_hash: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)

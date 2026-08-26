@@ -13,6 +13,7 @@ class Ok(BaseModel):
 class LoginRequest(BaseModel):
     store_id: str
     pin: str
+    employeeCode: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -53,6 +54,7 @@ class UserOut(BaseModel):
     role: str
     active: bool = True
     posLoginEnabled: bool = True
+    employeeCode: str = ""
 
     class Config:
         from_attributes = True
@@ -67,6 +69,7 @@ class UserIn(BaseModel):
     pin: Optional[str] = None
     active: bool = True
     posLoginEnabled: bool = True
+    employeeCode: Optional[str] = None
 
 
 class BankOut(BaseModel):

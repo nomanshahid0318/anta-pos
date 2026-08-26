@@ -246,7 +246,8 @@ async function pinSubmit() {
     || (STORES.find((s) => (s.store_id || s.StoreID) === storeId) || {}).Name
     || storeId);
   setOnline('syncing', 'Authenticating...');
-  const res = await api('/api/auth/login', { method: 'POST', body: { store_id: storeId, pin: pinEntry } });
+  const empCode = (document.getElementById('login-empcode') && document.getElementById('login-empcode').value.trim()) || undefined;
+  const res = await api('/api/auth/login', { method: 'POST', body: { store_id: storeId, pin: pinEntry, employeeCode: empCode } });
   const token = res && (res.access_token || res.accessToken);
   if (token && res.user) {
     CFG.token = token;

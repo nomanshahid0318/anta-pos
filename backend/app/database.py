@@ -136,6 +136,7 @@ def _auto_migrate() -> None:
         },
         "users": {
             "pos_login_enabled": "BOOLEAN DEFAULT TRUE",
+            "employee_code": "VARCHAR(16) DEFAULT ''",
         },
         "inventory": {
             "adjustments": "INTEGER DEFAULT 0",
