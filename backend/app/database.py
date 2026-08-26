@@ -134,6 +134,9 @@ def _auto_migrate() -> None:
         "returns": {
             "shift_id": "VARCHAR(64) DEFAULT ''",
         },
+        "users": {
+            "pos_login_enabled": "BOOLEAN DEFAULT TRUE",
+        },
         "inventory": {
             "adjustments": "INTEGER DEFAULT 0",
         },

@@ -52,6 +52,7 @@ class UserOut(BaseModel):
     name: str
     role: str
     active: bool = True
+    posLoginEnabled: bool = True
 
     class Config:
         from_attributes = True
@@ -63,8 +64,9 @@ class UserIn(BaseModel):
     store_name: str = ""
     name: str
     role: str = "cashier"
-    pin: str
+    pin: Optional[str] = None
     active: bool = True
+    posLoginEnabled: bool = True
 
 
 class BankOut(BaseModel):

@@ -59,7 +59,7 @@ def list_stores(db: Annotated[Session, Depends(get_db)]):
 def login(body: LoginRequest, db: Annotated[Session, Depends(get_db)]):
     users = (
         db.query(User)
-        .filter(User.store_id == body.store_id, User.active.is_(True))
+        .filter(User.store_id == body.store_id, User.active.is_(True), User.pos_login_enabled.is_(True))
         .all()
     )
     matched: User | None = None
@@ -131,6 +131,7 @@ def list_users(
             name=u.name,
             role=u.role,
             active=u.active,
+            posLoginEnabled=u.pos_login_enabled,
         )
         for u in q.all()
     ]
@@ -155,17 +156,25 @@ def save_user(
         row.name = body.name
         row.role = body.role
         row.active = body.active
+        row.pos_login_enabled = body.posLoginEnabled
         if body.pin:
             row.pin_hash = hash_pin(body.pin)
     else:
+        # A payroll/records-only employee (posLoginEnabled=False) doesn't
+        # need a real PIN — pin_hash still can't be empty (login logic
+        # depends on it), so a random one they'll never be told is used.
+        pin = body.pin or (str(__import__("random").randint(1000, 9999)) if not body.posLoginEnabled else None)
+        if not pin:
+            raise HTTPException(status_code=400, detail="A PIN is required when POS/HO login is enabled")
         row = User(
             user_id=uid,
             store_id=body.store_id,
             store_name=body.store_name,
             name=body.name,
             role=body.role,
-            pin_hash=hash_pin(body.pin),
+            pin_hash=hash_pin(pin),
             active=body.active,
+            pos_login_enabled=body.posLoginEnabled,
         )
         db.add(row)
     db.commit()
@@ -177,6 +186,7 @@ def save_user(
         name=row.name,
         role=row.role,
         active=row.active,
+        posLoginEnabled=row.pos_login_enabled,
     )
 
 

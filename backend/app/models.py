@@ -50,6 +50,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), default="cashier")  # admin|manager|cashier|accountant
     pin_hash: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    pos_login_enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # False = payroll/records-only staff, no POS/HO login
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     store: Mapped["Store"] = relationship(back_populates="users")
