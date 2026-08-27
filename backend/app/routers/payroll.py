@@ -94,7 +94,7 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
             (a.amount or 0) - (a.repaid_amount or 0) for a in advances if f"deduct from {row.month} payroll" in (a.reason or "")
         ), 2)
         e = entries_by_emp.get(emp.user_id)
-        base = e.base_salary if e else 0
+        base = e.base_salary if e else (emp.standard_salary or 0)
         allow = e.allowances if e else 0
         gross = e.gross_pay if e else round(base + allow, 2)
         adv_ded = e.advance_deduction if e else 0

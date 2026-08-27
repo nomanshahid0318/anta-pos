@@ -137,6 +137,7 @@ def _auto_migrate() -> None:
         "users": {
             "pos_login_enabled": "BOOLEAN DEFAULT TRUE",
             "employee_code": "VARCHAR(16) DEFAULT ''",
+            "standard_salary": "FLOAT DEFAULT 0",
         },
         "payroll_entries": {
             "employee_code": "VARCHAR(16) DEFAULT ''",

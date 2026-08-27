@@ -52,6 +52,7 @@ class User(Base):
     pin_hash: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     pos_login_enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # False = payroll/records-only staff, no POS/HO login
+    standard_salary: Mapped[float] = mapped_column(Float, default=0.0)  # default monthly base salary, auto-filled into new Payroll entries
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     store: Mapped["Store"] = relationship(back_populates="users")

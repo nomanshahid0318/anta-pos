@@ -55,6 +55,7 @@ class UserOut(BaseModel):
     active: bool = True
     posLoginEnabled: bool = True
     employeeCode: str = ""
+    standardSalary: float = 0.0
 
     class Config:
         from_attributes = True
@@ -70,6 +71,7 @@ class UserIn(BaseModel):
     active: bool = True
     posLoginEnabled: bool = True
     employeeCode: Optional[str] = None
+    standardSalary: float = 0.0
 
 
 class BankOut(BaseModel):

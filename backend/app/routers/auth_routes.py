@@ -148,6 +148,7 @@ def list_users(
             active=u.active,
             posLoginEnabled=u.pos_login_enabled,
             employeeCode=u.employee_code,
+            standardSalary=u.standard_salary,
         )
         for u in q.all()
     ]
@@ -190,6 +191,7 @@ def save_user(
         row.role = body.role
         row.active = body.active
         row.pos_login_enabled = body.posLoginEnabled
+        row.standard_salary = body.standardSalary
         if employee_code:
             row.employee_code = employee_code
         if body.pin:
@@ -211,6 +213,7 @@ def save_user(
             active=body.active,
             pos_login_enabled=body.posLoginEnabled,
             employee_code=employee_code,
+            standard_salary=body.standardSalary,
         )
         db.add(row)
     db.commit()
@@ -224,6 +227,7 @@ def save_user(
         active=row.active,
         posLoginEnabled=row.pos_login_enabled,
         employeeCode=row.employee_code,
+        standardSalary=row.standard_salary,
     )
 
 

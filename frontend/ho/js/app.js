@@ -149,7 +149,7 @@ if(dash&&dash.ok){DATA.dashboard=dash;generateNotifications(dash);}
 if(sales&&sales.data)DATA.sales=sales.data.map(s=>({...s,Date:s.date,Total:s.total,Payment:s.payment,Store:s.store,StoreID:s.storeId}));
 if(Array.isArray(banks))DATA.banks=banks.map(b=>({BankID:b.bank_id,Name:b.name,Device:b.device,Active:b.active?'Y':'N'}));
 const storeRows=Array.isArray(stores)?stores:(stores&&Array.isArray(stores.data)?stores.data:[]);if(storeRows.length||Array.isArray(stores)||(stores&&stores.data))DATA.stores=storeRows.map(s=>({StoreID:s.store_id||s.StoreID,Name:s.name||s.Name,City:s.city||s.City||'',Address:s.address||s.Address||'',Manager:s.manager||s.Manager||'',Phone:s.phone||s.Phone||'',Active:(s.active===false||s.Active==='N')?'N':'Y'}));
-if(Array.isArray(users))DATA.users=users.map(u=>({UserID:u.user_id,StoreID:u.store_id,StoreName:u.store_name,Name:u.name,Role:u.role,Active:u.active?'Y':'N',PosLoginEnabled:u.posLoginEnabled!==false,EmployeeCode:u.employeeCode||''}));
+if(Array.isArray(users))DATA.users=users.map(u=>({UserID:u.user_id,StoreID:u.store_id,StoreName:u.store_name,Name:u.name,Role:u.role,Active:u.active?'Y':'N',PosLoginEnabled:u.posLoginEnabled!==false,EmployeeCode:u.employeeCode||'',StandardSalary:u.standardSalary||0}));
 if(exps&&exps.data)DATA.expenses=exps.data.map(e=>({...e,Date:e.date,Amount:e.amount,Store:e.store,StoreID:e.storeId,Category:e.category,Description:e.description,PayMethod:e.payMethod}));
 if(wh&&wh.data)DATA.warehouse=wh.data;if(sgrns&&sgrns.data)DATA.supplierGRNs=sgrns.data;if(stgrns&&stgrns.data)DATA.storeGRNs=stgrns.data;if(trs&&trs.data)DATA.transfers=trs.data;
 if(sups&&sups.data)suppliers=sups.data;if(suptx&&suptx.data)supplierTxns=suptx.data;if(caps&&caps.data)capitalEntries=caps.data;
@@ -1221,7 +1221,7 @@ function showAddStore(){const f=$('store-form')||$('add-store-form');if(f)f.styl
 function editStore(id){const s=(DATA.stores||[]).find(x=>(x.StoreID||x.store_id)===id);const f=$('store-form')||$('add-store-form');if(!s||!f)return;f.style.display='flex';if($('st-id')){$('st-id').value=s.StoreID||s.store_id||'';$('st-id').disabled=true;}if($('st-nm'))$('st-nm').value=s.Name||s.name||'';if($('st-city'))$('st-city').value=s.City||s.city||'';if($('st-addr'))$('st-addr').value=s.Address||s.address||'';if($('st-mgr'))$('st-mgr').value=s.Manager||s.manager||'';if($('st-ph'))$('st-ph').value=s.Phone||s.phone||'';}
 function closeStoreForm(){const f=$('store-form')||$('add-store-form');if(f)f.style.display='none';if($('st-id'))$('st-id').disabled=false;}
 async function saveStore(){const idEl=$('st-id'),nmEl=$('st-nm');const body={store_id:(idEl&&idEl.value||'').trim(),name:(nmEl&&nmEl.value||'').trim(),city:($('st-city')&&$('st-city').value)||'',address:($('st-addr')&&$('st-addr').value)||'',manager:($('st-mgr')&&$('st-mgr').value)||'',phone:($('st-ph')&&$('st-ph').value)||'',active:true};if(!body.store_id||!body.name){toast('Store ID + Name required','error');return;}const res=await api('/api/stores',{method:'POST',body});if(res&&(res.store_id||res.ok!==false)&&!res.detail){toast('✅ Store saved');closeStoreForm();await loadAll();renderStoresAdmin();renderDash&&renderDash();}else{const msg=(res&&(res.detail||res.msg))||'Failed';toast(typeof msg==='string'?msg:'Failed','error');}}
-function renderUsers(){const el=$('users-table')||$('u-table');if(el)el.innerHTML=DATA.users.map(u=>`<tr><td class="fw7">${u.UserID}</td><td class="fw7" style="font-family:monospace;color:var(--accent2)">${u.EmployeeCode||'—'}</td><td>${u.Name}</td><td>${u.StoreName||u.StoreID}</td><td><span class="badge badge-blue">${u.Role}</span></td><td><span class="badge ${u.PosLoginEnabled?'badge-green':'badge-gray'}">${u.PosLoginEnabled?'Enabled':'Off — payroll only'}</span></td><td><span class="badge ${u.Active==='N'?'badge-red':'badge-green'}">${u.Active==='N'?'Inactive':'Active'}</span></td><td><button class="btn btn-ghost btn-sm" onclick="editUser('${u.UserID}')">✏️</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="toggleUserActive('${u.UserID}')">${u.Active==='N'?'✅ Activate':'🚫 Deactivate'}</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUserRow('${u.UserID}')">🗑️ Delete</button></td></tr>`).join('');}
+function renderUsers(){const el=$('users-table')||$('u-table');if(el)el.innerHTML=DATA.users.map(u=>`<tr><td class="fw7">${u.UserID}</td><td class="fw7" style="font-family:monospace;color:var(--accent2)">${u.EmployeeCode||'—'}</td><td>${u.Name}</td><td>${u.StoreName||u.StoreID}</td><td><span class="badge badge-blue">${u.Role}</span></td><td>${u.StandardSalary>0?fmt(u.StandardSalary):'—'}</td><td><span class="badge ${u.PosLoginEnabled?'badge-green':'badge-gray'}">${u.PosLoginEnabled?'Enabled':'Off — payroll only'}</span></td><td><span class="badge ${u.Active==='N'?'badge-red':'badge-green'}">${u.Active==='N'?'Inactive':'Active'}</span></td><td><button class="btn btn-ghost btn-sm" onclick="editUser('${u.UserID}')">✏️</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="toggleUserActive('${u.UserID}')">${u.Active==='N'?'✅ Activate':'🚫 Deactivate'}</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteUserRow('${u.UserID}')">🗑️ Delete</button></td></tr>`).join('');}
 async function deleteUserRow(userId){
   const u=DATA.users.find(x=>x.UserID===userId);
   if(!u)return;
@@ -1231,7 +1231,7 @@ async function deleteUserRow(userId){
   else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 let editingUserId=null;
-function showAddUser(){editingUserId=null;if($('user-form')){$('user-form').style.display='flex';['u-nm','u-pin','u-empcode'].forEach(id=>{if($(id))$(id).value='';});if($('u-role'))$('u-role').value='cashier';if($('u-pin'))$('u-pin').placeholder='4-digit PIN';if($('u-empcode'))$('u-empcode').placeholder='e.g. EMP1234 (leave blank to auto-generate)';if($('u-login-enabled'))$('u-login-enabled').checked=true;toggleUserPinField();const t=document.querySelector('#user-form .modal-title');if(t)t.textContent='➕ Add User';}}
+function showAddUser(){editingUserId=null;if($('user-form')){$('user-form').style.display='flex';['u-nm','u-pin','u-empcode','u-salary'].forEach(id=>{if($(id))$(id).value='';});if($('u-role'))$('u-role').value='cashier';if($('u-pin'))$('u-pin').placeholder='4-digit PIN';if($('u-empcode'))$('u-empcode').placeholder='e.g. EMP1234 (leave blank to auto-generate)';if($('u-login-enabled'))$('u-login-enabled').checked=true;toggleUserPinField();const t=document.querySelector('#user-form .modal-title');if(t)t.textContent='➕ Add User';}}
 function toggleUserPinField(){
   const enabled=$('u-login-enabled')?$('u-login-enabled').checked:true;
   if($('u-pin-group'))$('u-pin-group').style.display=enabled?'block':'none';
@@ -1246,6 +1246,7 @@ function editUser(userId){
   if($('u-store'))$('u-store').value=u.StoreID||'';
   if($('u-pin')){$('u-pin').value='';$('u-pin').placeholder='Leave blank to keep current PIN';}
   if($('u-empcode'))$('u-empcode').value=u.EmployeeCode||'';
+  if($('u-salary'))$('u-salary').value=u.StandardSalary||0;
   if($('u-login-enabled'))$('u-login-enabled').checked=u.PosLoginEnabled!==false;
   toggleUserPinField();
   const t=document.querySelector('#user-form .modal-title');if(t)t.textContent='✏️ Edit User — '+u.Name;
@@ -1274,6 +1275,7 @@ async function saveUser(){
     active:true,
     posLoginEnabled:loginEnabled,
     employeeCode:($('u-empcode')&&$('u-empcode').value.trim())||undefined,
+    standardSalary:+(($('u-salary')&&$('u-salary').value)||0),
   };
   if(editingUserId)body.user_id=editingUserId;
   const pin=$('u-pin').value.trim();
