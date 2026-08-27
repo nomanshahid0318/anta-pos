@@ -105,6 +105,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
     <div class="nav-item" onclick="show('stock-counts')" data-role="admin,manager,warehouse"><span class="ico">📋</span>Stock Take</div>
     <div class="nav-item" onclick="show('payroll')" data-role="admin,manager,accountant"><span class="ico">💵</span>Payroll</div>
+    <div class="nav-item" onclick="show('attendance')" data-role="admin,manager,warehouse"><span class="ico">🗓️</span>Attendance</div>
     <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
     <div class="nav-sec">Admin</div>
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
@@ -939,10 +940,47 @@ body{display:flex;height:100vh;overflow:hidden}
         </div>
       </div>
       <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Gross Pay = Base Salary + Allowances. Total Deductions = Advance Deduction (from Employee Advances, e.g. stock shortages) + Other Deduction (manual, needs a note). Net Pay = Gross − Total Deductions. Finalizing actually deducts each Advance Deduction as a real Salary Deduction repayment.</p>
-      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Code</th><th>Employee</th><th>Role</th><th>Base Salary</th><th>Allowances</th><th>Gross Pay</th><th>Outstanding</th><th>Advance Deduction</th><th>Other Deduction</th><th>Total Deductions</th><th>Net Pay</th><th>Payment Method</th><th></th></tr></thead>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Code</th><th>Employee</th><th>Role</th><th>Attendance</th><th>Base Salary</th><th>Allowances</th><th>Gross Pay</th><th>Outstanding</th><th>Advance Deduction</th><th>Other Deduction</th><th>Total Deductions</th><th>Net Pay</th><th>Payment Method</th><th></th></tr></thead>
       <tbody id="pr-entries-table"></tbody>
       <tfoot id="pr-totals-row"></tfoot>
       </table></div>
+    </div>
+  </div>
+
+  <!-- ATTENDANCE -->
+  <div id="screen-attendance" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">🗓️ Mark Daily Attendance</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="att-store" onchange="loadAttendanceDay()"></select></div>
+          <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="att-date" onchange="loadAttendanceDay()"></div>
+        </div>
+        <table><thead><tr><th>Employee</th><th>Status</th></tr></thead>
+        <tbody id="att-day-table"></tbody></table>
+        <button class="btn btn-primary btn-sm mt" onclick="saveAttendanceDay()">💾 Save Attendance</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📤 Bulk Upload (Excel/CSV)</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">Columns: <b>Employee Code</b>, <b>Date</b> (YYYY-MM-DD), <b>Status</b> (present / absent / half_day / leave / late). One row per employee per day.</p>
+        <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="att-upload-store"></select></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="downloadAttendanceTemplate()">⬇️ Download Template</button>
+          <input type="file" id="att-file" style="display:none" accept=".xlsx,.csv" onchange="uploadAttendanceFile(this.files[0])">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('att-file').click()">📂 Upload File</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title" style="margin:0">📊 Monthly Summary</div>
+        <div style="display:flex;gap:8px">
+          <select class="form-input" style="width:170px;padding:5px 9px" id="att-sum-store" onchange="loadAttendanceSummary()"></select>
+          <input class="form-input" type="month" style="width:150px;padding:5px 9px" id="att-sum-month" onchange="loadAttendanceSummary()">
+        </div>
+      </div>
+      <table><thead><tr><th>Code</th><th>Employee</th><th>Present</th><th>Late</th><th>Half-Day</th><th>Absent</th><th>Leave</th><th>Marked Days</th><th>Ratio</th></tr></thead>
+      <tbody id="att-summary-table"></tbody></table>
     </div>
   </div>
 

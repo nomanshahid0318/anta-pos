@@ -70,6 +70,7 @@ def init_db() -> None:
     from . import models_shifts  # noqa: F401
     from . import models_stockcount  # noqa: F401
     from . import models_payroll  # noqa: F401
+    from . import models_attendance  # noqa: F401
     from .seed import seed_if_empty
 
     # Ensure parent dir exists for sqlite

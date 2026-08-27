@@ -19,6 +19,7 @@ from ..auth import CurrentUser, require_role
 from ..database import get_db
 from ..models import User
 from ..models_accounting import EmployeeAdvance, EmployeeAdvanceRepayment
+from ..models_attendance import AttendanceRecord
 from ..models_payroll import PayrollEntry, PayrollRun
 
 router = APIRouter(prefix="/api/payroll", tags=["payroll"])
@@ -85,6 +86,16 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
         raise HTTPException(404, "Payroll run not found")
     employees = db.query(User).filter(User.store_id == row.store_id, User.active.is_(True)).all()
     entries_by_emp = {e.employee_user_id: e for e in db.query(PayrollEntry).filter(PayrollEntry.run_id == run_id).all()}
+
+    # Attendance → earned-salary ratio per employee for this store+month.
+    # If nobody's attendance was marked at all, everyone falls back to
+    # their full Standard Salary (so stores that haven't started using
+    # Attendance yet see no change in behavior).
+    att_records = db.query(AttendanceRecord).filter(AttendanceRecord.store_id == row.store_id, AttendanceRecord.date.like(f"{row.month}%")).all()
+    att_by_emp: dict = {}
+    for a in att_records:
+        att_by_emp.setdefault(a.employee_user_id, []).append(a)
+
     out_entries = []
     totals = {"baseSalary": 0.0, "allowances": 0.0, "grossPay": 0.0, "advanceDeduction": 0.0, "otherDeduction": 0.0, "totalDeductions": 0.0, "netPay": 0.0}
     for emp in employees:
@@ -94,7 +105,19 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
             (a.amount or 0) - (a.repaid_amount or 0) for a in advances if f"deduct from {row.month} payroll" in (a.reason or "")
         ), 2)
         e = entries_by_emp.get(emp.user_id)
-        base = e.base_salary if e else (emp.standard_salary or 0)
+
+        emp_att = att_by_emp.get(emp.user_id, [])
+        marked = len(emp_att)
+        present = sum(1 for a in emp_att if a.status in ("present", "late"))
+        half = sum(0.5 for a in emp_att if a.status == "half_day")
+        attendance_ratio = round((present + half) / marked, 4) if marked > 0 else None
+
+        if e:
+            base = e.base_salary
+        elif attendance_ratio is not None:
+            base = round((emp.standard_salary or 0) * attendance_ratio, 2)
+        else:
+            base = emp.standard_salary or 0
         allow = e.allowances if e else 0
         gross = e.gross_pay if e else round(base + allow, 2)
         adv_ded = e.advance_deduction if e else 0
@@ -104,6 +127,7 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
         out_entries.append({
             "employeeUserId": emp.user_id, "employeeCode": emp.employee_code, "employeeName": emp.name, "role": emp.role,
             "outstandingAdvances": outstanding,
+            "attendanceMarkedDays": marked, "attendancePresent": present, "attendanceRatio": attendance_ratio,
             "suggestedDeduction": month_tagged if month_tagged > 0 else 0,
             "baseSalary": base, "allowances": allow, "grossPay": gross,
             "advanceDeduction": adv_ded, "otherDeduction": other_ded, "otherDeductionNote": e.other_deduction_note if e else "",

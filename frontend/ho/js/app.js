@@ -104,13 +104,14 @@ async function pinSubmit(){
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
   if($('login-empcode'))$('login-empcode').value='';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
 if(name==='shifts'){loadShifts();}
 if(name==='stock-counts'){populateSCStoreSelect();loadStockCounts();}
 if(name==='payroll'){populatePRStoreSelect();loadPayrollRuns();}
+if(name==='attendance'){populateAttStoreSelects();loadAttendanceDay();loadAttendanceSummary();}
 if(name==='three-way-match'){populateTWMPOSelect();loadSupplierInvoices();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
@@ -2612,6 +2613,7 @@ async function openPayrollRun(id){
     return `<tr>
     <td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td>
     <td class="fw7">${e.employeeName}</td><td>${e.role}</td>
+    <td style="font-size:10.5px">${e.attendanceRatio!=null?`${e.attendancePresent}/${e.attendanceMarkedDays} (${(e.attendanceRatio*100).toFixed(0)}%)`:'<span style="color:var(--gray3)">not marked</span>'}</td>
     <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" id="pr-base-${i}" data-emp="${e.employeeUserId}" value="${e.baseSalary}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
     <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="pr-allow-${i}" value="${e.allowances}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
     <td class="fw7" id="pr-gross-${i}">${fmt(e.grossPay)}</td>
@@ -2623,7 +2625,7 @@ async function openPayrollRun(id){
     <td><select class="form-input" style="padding:4px 7px" id="pr-method-${i}" ${locked?'disabled':''}><option ${e.paymentMethod==='Cash'?'selected':''}>Cash</option><option ${e.paymentMethod==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></td>
     <td>${e.saved?`<button class="btn btn-ghost btn-sm" onclick="printPayslip(${i})">🖨️</button>`:''}</td>
   </tr>`;
-  }).join('')||'<tr><td colspan="13" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
+  }).join('')||'<tr><td colspan="14" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
   renderPayrollTotals(res.totals);
   $('pr-detail-card').style.display='block';
   $('pr-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
@@ -2641,7 +2643,7 @@ function recalcPayrollRow(i){
 function renderPayrollTotals(t){
   if(!t)return;
   if($('pr-totals-row'))$('pr-totals-row').innerHTML=`<tr style="font-weight:800;background:var(--gray0)">
-    <td colspan="3">TOTAL</td><td>${fmt(t.baseSalary)}</td><td>${fmt(t.allowances)}</td><td>${fmt(t.grossPay)}</td><td></td>
+    <td colspan="4">TOTAL</td><td>${fmt(t.baseSalary)}</td><td>${fmt(t.allowances)}</td><td>${fmt(t.grossPay)}</td><td></td>
     <td>${fmt(t.advanceDeduction)}</td><td>${fmt(t.otherDeduction)}</td><td>${fmt(t.totalDeductions)}</td><td style="color:var(--green)">${fmt(t.netPay)}</td><td colspan="2"></td>
   </tr>`;
 }
@@ -2712,7 +2714,57 @@ function printPayslip(i){
   setTimeout(()=>window.print(),80);
 }
 
-// ---------- Three-Way Matching (PO vs GRN vs Supplier Invoice) ----------
+// ---------- Attendance ----------
+let __attDayList=[];
+function populateAttStoreSelects(){
+  const opts=(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+  ['att-store','att-upload-store','att-sum-store'].forEach(id=>{if($(id))$(id).innerHTML=opts;});
+  const todayStr=today();
+  if($('att-date')&&!$('att-date').value)$('att-date').value=todayStr;
+  if($('att-sum-month')&&!$('att-sum-month').value)$('att-sum-month').value=todayStr.slice(0,7);
+}
+async function loadAttendanceDay(){
+  const storeId=$('att-store')?$('att-store').value:'';
+  const date=$('att-date')?$('att-date').value:'';
+  if(!storeId||!date)return;
+  const res=await api(`/api/attendance/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`);
+  if(!res||!res.ok)return;
+  __attDayList=res.data||[];
+  const statusOpts=s=>['present','late','half_day','leave','absent'].map(v=>`<option value="${v}" ${s===v?'selected':''}>${v.replace('_',' ')}</option>`).join('');
+  if($('att-day-table'))$('att-day-table').innerHTML=__attDayList.map((e,i)=>`<tr><td class="fw7">${e.employeeName} <span style="color:var(--gray4);font-size:10px">(${e.employeeCode||'—'})</span><input type="hidden" id="att-emp-${i}" value="${e.employeeUserId}"></td><td><select class="form-input" style="padding:4px 7px" id="att-status-${i}">${statusOpts(e.status)}</select></td></tr>`).join('')||'<tr><td colspan="2" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
+}
+async function saveAttendanceDay(){
+  const storeId=$('att-store')?$('att-store').value:'';
+  const date=$('att-date')?$('att-date').value:'';
+  const records=__attDayList.map((e,i)=>({employeeUserId:$('att-emp-'+i).value,status:$('att-status-'+i).value}));
+  const res=await api('/api/attendance/mark',{method:'POST',body:{storeId,date,records}});
+  if(res&&res.ok){toast(`✅ Attendance saved for ${res.saved} employee(s)`);loadAttendanceSummary();}
+  else toast('❌ Failed','error');
+}
+function downloadAttendanceTemplate(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['Employee Code,Date,Status\nEMP1234,2026-09-01,present\nEMP1234,2026-09-02,absent\n'],{type:'text/csv'}));
+  a.download='attendance_template.csv';a.click();
+}
+async function uploadAttendanceFile(file){
+  if(!file)return;
+  const storeId=$('att-upload-store')?$('att-upload-store').value:'';
+  if(!storeId){toast('Select a store first','error');return;}
+  const rowsRaw=await readExcel(file);
+  const rows=rowsRaw.map(r=>({employeeCode:cleanId(r['Employee Code']||r.employeeCode||''),date:String(r.Date||r.date||'').slice(0,10),status:String(r.Status||r.status||'present').trim()})).filter(r=>r.employeeCode&&r.date);
+  if(!rows.length){toast('No valid rows found in file','error');return;}
+  const res=await api('/api/attendance/upload',{method:'POST',body:{storeId,rows}});
+  if(res&&res.ok){toast(`✅ ${res.saved} saved, ${res.skipped} skipped`);loadAttendanceSummary();}
+  else toast('❌ Upload failed','error');
+}
+async function loadAttendanceSummary(){
+  const storeId=$('att-sum-store')?$('att-sum-store').value:'';
+  const month=$('att-sum-month')?$('att-sum-month').value:'';
+  if(!storeId||!month)return;
+  const res=await api(`/api/attendance/summary?storeId=${encodeURIComponent(storeId)}&month=${encodeURIComponent(month)}`);
+  if(!res||!res.ok)return;
+  if($('att-summary-table'))$('att-summary-table').innerHTML=(res.data||[]).map(e=>`<tr><td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td><td class="fw7">${e.employeeName}</td><td>${e.present}</td><td>${e.late}</td><td>${e.halfDay}</td><td style="color:${e.absent>0?'var(--red)':'var(--gray4)'}">${e.absent}</td><td>${e.leave}</td><td>${e.markedDays}/${e.totalWorkingDays}</td><td class="fw7">${e.attendanceRatio!=null?(e.attendanceRatio*100).toFixed(0)+'%':'—'}</td></tr>`).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:14px">No employees</td></tr>';
+}
 let __twmPOList=[],__twmList=[],__twmCurrent=null;
 async function populateTWMPOSelect(){
   const res=await api('/api/ho/purchase-orders?status=all');
