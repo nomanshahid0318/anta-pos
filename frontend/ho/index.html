@@ -778,6 +778,15 @@ body{display:flex;height:100vh;overflow:hidden}
 
   <!-- REPORTS -->
   <div id="screen-reports" class="screen">
+    <div class="card" data-role="admin,manager,accountant">
+      <div class="card-title">🆘 Upload Backup Sales (from Excel, after an outage)</div>
+      <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">If the system was down and sales were recorded on the Excel Backup POS, upload the "Sales Log" tab (as CSV/Excel) here. It creates real sales with correct stock deduction — already-imported invoices are skipped automatically, so it's safe to re-upload.</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="backup-sales-file" style="display:none" accept=".xlsx,.csv" onchange="uploadBackupSales(this.files[0])">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('backup-sales-file').click()">📂 Upload Sales Log File</button>
+      </div>
+      <div id="backup-sales-result" style="margin-top:8px;font-size:12px"></div>
+    </div>
     <div class="date-filter">
       <select class="form-input" style="width:130px;padding:6px 9px" id="rpt-preset" onchange="rptPreset()">
         <option value="today">Today</option><option value="yesterday">Yesterday</option>

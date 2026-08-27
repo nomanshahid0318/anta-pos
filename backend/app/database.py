@@ -131,6 +131,7 @@ def _auto_migrate() -> None:
             "loyalty_discount": "FLOAT DEFAULT 0",
             "loyalty_points_earned": "FLOAT DEFAULT 0",
             "shift_id": "VARCHAR(64) DEFAULT ''",
+            "source": "VARCHAR(24) DEFAULT 'pos'",
         },
         "returns": {
             "shift_id": "VARCHAR(64) DEFAULT ''",

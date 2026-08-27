@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user, require_role
 from ..database import get_db
-from ..models import Claim, Exchange, InvoiceCounter, Return, Sale, Setting, User
+from ..models import Claim, Exchange, InvoiceCounter, Product, Return, Sale, Setting, User
 from ..models_shifts import Shift
 from ..models_crm import Customer
 from ..schemas import (
+    BulkSalesImportIn,
     ClaimIn,
     ExchangeIn,
     ReturnIn,
@@ -449,5 +450,69 @@ def list_claims(
         for r in rows
     ]
     return {"ok": True, "data": data}
+
+
+@router.post("/sales/bulk-import")
+def bulk_import_sales(
+    body: BulkSalesImportIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "manager", "accountant"))],
+):
+    """Imports sales recorded on the offline Excel backup POS (Sales Log
+    tab, one row per item) after an outage — creates a proper Sale per
+    invoice, with real stock deduction and COGS, same as a normal
+    checkout. Marked source='excel_import' so they're identifiable later
+    (e.g. in reports or if something needs correcting). Invoices already
+    imported are skipped, not duplicated — safe to re-upload the same
+    file if some rows were already brought in.
+    """
+    groups: dict = {}
+    for line in body.lines:
+        key = (line.invoiceNo, line.storeId or user.store_id)
+        groups.setdefault(key, []).append(line)
+
+    imported, skipped_duplicate, skipped_unknown_barcode = 0, 0, []
+    for (invoice_no, store_id), lines in groups.items():
+        existing = db.query(Sale).filter(Sale.invoice_id == invoice_no, Sale.store_id == store_id).first()
+        if existing:
+            skipped_duplicate += 1
+            continue
+        items = []
+        subtotal = 0.0
+        store_name = lines[0].store or store_id
+        for l in lines:
+            product = db.query(Product).filter(Product.barcode == l.barcode).first()
+            if not product:
+                skipped_unknown_barcode.append(l.barcode)
+                continue
+            line_total = round(l.qty * l.unitPrice, 2)
+            subtotal += line_total
+            items.append({
+                "barcode": l.barcode, "name": product.name, "qty": l.qty,
+                "price": l.unitPrice, "cost": product.cost or 0, "discount": 0, "lineTotal": line_total,
+            })
+            update_inv(db, l.barcode, store_name, store_id, product.name, "sale", l.qty)
+        if not items:
+            continue
+        first = lines[0]
+        sale = Sale(
+            invoice_id=invoice_no, date=first.date, time="", store=store_name, store_id=store_id,
+            customer=first.cashier or "Walk-in", items_json=json.dumps(items),
+            subtotal=round(subtotal, 2), discount=0, global_discount=0, total=round(subtotal, 2),
+            payment=first.paymentMethod, pay_ref="", type="sale", source="excel_import",
+        )
+        db.add(sale)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            skipped_duplicate += 1
+            continue
+        post_sale_journal(db, sale)
+        imported += 1
+    db.commit()
+    return {
+        "ok": True, "status": "ok", "imported": imported,
+        "skippedDuplicate": skipped_duplicate, "skippedUnknownBarcodes": list(set(skipped_unknown_barcode)),
+    }
 
 

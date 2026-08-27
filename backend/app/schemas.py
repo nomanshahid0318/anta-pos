@@ -170,6 +170,24 @@ class CartItem(BaseModel):
     lineTotal: Optional[float] = None
 
 
+class BulkSaleLineIn(BaseModel):
+    invoiceNo: str
+    date: str
+    storeId: Optional[str] = None
+    store: Optional[str] = None
+    cashier: str = ""
+    barcode: str
+    qty: float = 1
+    unitPrice: float = 0
+    paymentMethod: str = "Cash"
+    amountReceived: float = 0
+    notes: str = ""
+
+
+class BulkSalesImportIn(BaseModel):
+    lines: list[BulkSaleLineIn] = Field(default_factory=list)
+
+
 class SaleIn(BaseModel):
     id: Optional[str] = None  # invoice id; server may generate
     date: Optional[str] = None

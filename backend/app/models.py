@@ -166,6 +166,7 @@ class Sale(Base):
     payment: Mapped[str] = mapped_column(String(64), default="Cash")
     pay_ref: Mapped[str] = mapped_column(String(128), default="")
     type: Mapped[str] = mapped_column(String(16), default="sale")
+    source: Mapped[str] = mapped_column(String(24), default="pos")  # pos | excel_import — for audit/reporting
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
