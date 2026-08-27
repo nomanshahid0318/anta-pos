@@ -1237,6 +1237,14 @@ function toggleUserPinField(){
   const enabled=$('u-login-enabled')?$('u-login-enabled').checked:true;
   if($('u-pin-group'))$('u-pin-group').style.display=enabled?'block':'none';
 }
+function onRoleChange(){
+  const role=$('u-role')?$('u-role').value:'';
+  if(role==='cleaner'&&$('u-login-enabled')&&$('u-login-enabled').checked&&!editingUserId){
+    $('u-login-enabled').checked=false;
+    toggleUserPinField();
+    toast('ℹ️ POS/HO Login turned off by default for Cleaner — this role usually doesn\'t need system access. Check the box above if this one does.','info');
+  }
+}
 function editUser(userId){
   const u=DATA.users.find(x=>x.UserID===userId);
   if(!u){toast('User not found','error');return;}
