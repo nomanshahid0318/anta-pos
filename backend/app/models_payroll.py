@@ -38,7 +38,16 @@ class PayrollEntry(Base):
     run_id: Mapped[str] = mapped_column(String(64), index=True)
     employee_user_id: Mapped[str] = mapped_column(String(32), index=True)
     employee_name: Mapped[str] = mapped_column(String(128), default="")
+    employee_code: Mapped[str] = mapped_column(String(16), default="")
+    role: Mapped[str] = mapped_column(String(32), default="")
     base_salary: Mapped[float] = mapped_column(Float, default=0.0)
-    deduction_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    allowances: Mapped[float] = mapped_column(Float, default=0.0)
+    gross_pay: Mapped[float] = mapped_column(Float, default=0.0)
+    advance_deduction: Mapped[float] = mapped_column(Float, default=0.0)  # from Employee Advance repayment (stock shortages etc.)
+    deduction_amount: Mapped[float] = mapped_column(Float, default=0.0)  # legacy field name, kept for any already-saved draft rows
+    other_deduction: Mapped[float] = mapped_column(Float, default=0.0)  # manual — uniform cost, lateness, etc.
+    other_deduction_note: Mapped[str] = mapped_column(String(255), default="")
+    total_deductions: Mapped[float] = mapped_column(Float, default=0.0)
     net_pay: Mapped[float] = mapped_column(Float, default=0.0)
+    payment_method: Mapped[str] = mapped_column(String(32), default="Cash")  # Cash | Bank Transfer
     notes: Mapped[str] = mapped_column(String(255), default="")

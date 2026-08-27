@@ -2579,7 +2579,7 @@ async function loadPayrollRuns(){
   const res=await api('/api/payroll/runs');
   if(!res||!res.ok)return;
   __prList=res.data||[];
-  if($('pr-list'))$('pr-list').innerHTML=__prList.map(r=>`<tr><td class="fw7">${r.month}</td><td>${r.storeName}</td><td><span class="badge ${r.status==='finalized'?'badge-green':'badge-amber'}">${r.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="togglePayrollRun('${r.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No payroll runs yet</td></tr>';
+  if($('pr-list'))$('pr-list').innerHTML=__prList.map(r=>`<tr><td class="fw7">${r.month}</td><td>${r.storeName}</td><td>${r.employeeCount||0} · ${fmt(r.totalNetPay||0)}</td><td><span class="badge ${r.status==='finalized'?'badge-green':'badge-amber'}">${r.status}</span></td><td><button class="btn btn-ghost btn-sm" onclick="togglePayrollRun('${r.id}')">👁️</button></td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--gray3);padding:14px">No payroll runs yet</td></tr>';
 }
 async function startPayrollRun(){
   const storeId=$('pr-store')?$('pr-store').value:'';
@@ -2605,37 +2605,109 @@ async function openPayrollRun(id){
   __prCurrent=res;
   if($('pr-detail-title'))$('pr-detail-title').textContent=`💵 ${res.storeName} — ${res.month} (${res.status})`;
   const locked=res.status!=='draft';
-  if($('pr-entries-table'))$('pr-entries-table').innerHTML=(res.entries||[]).map((e,i)=>`<tr>
+  if($('pr-entries-table'))$('pr-entries-table').innerHTML=(res.entries||[]).map((e,i)=>{
+    const advDed=e.advanceDeduction||e.suggestedDeduction||0;
+    return `<tr>
+    <td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td>
     <td class="fw7">${e.employeeName}</td><td>${e.role}</td>
+    <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" id="pr-base-${i}" data-emp="${e.employeeUserId}" value="${e.baseSalary}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
+    <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="pr-allow-${i}" value="${e.allowances}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
+    <td class="fw7" id="pr-gross-${i}">${fmt(e.grossPay)}</td>
     <td style="color:${e.outstandingAdvances>0?'var(--red)':'var(--gray4)'}">${fmt(e.outstandingAdvances)}</td>
-    <td>${e.suggestedDeduction>0?fmt(e.suggestedDeduction):'—'}</td>
-    <td><input class="form-input" type="number" style="width:90px;padding:4px 7px" id="pr-base-${i}" value="${e.baseSalary}" ${locked?'disabled':''}></td>
-    <td><input class="form-input" type="number" style="width:90px;padding:4px 7px" id="pr-ded-${i}" data-emp="${e.employeeUserId}" value="${e.deductionAmount||e.suggestedDeduction||0}" ${locked?'disabled':''}></td>
-    <td class="fw7" id="pr-net-${i}">${fmt(e.netPay||(e.baseSalary-(e.deductionAmount||0)))}</td>
-  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
+    <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" id="pr-adv-${i}" value="${advDed}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
+    <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="pr-other-${i}" value="${e.otherDeduction}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}> <input class="form-input" style="width:120px;padding:4px 7px;margin-top:3px" id="pr-othernote-${i}" placeholder="reason (required if >0)" value="${e.otherDeductionNote||''}" ${locked?'disabled':''}></td>
+    <td class="fw7" id="pr-totded-${i}">${fmt(e.totalDeductions)}</td>
+    <td class="fw7" id="pr-net-${i}" style="color:var(--green)">${fmt(e.netPay)}</td>
+    <td><select class="form-input" style="padding:4px 7px" id="pr-method-${i}" ${locked?'disabled':''}><option ${e.paymentMethod==='Cash'?'selected':''}>Cash</option><option ${e.paymentMethod==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></td>
+    <td>${e.saved?`<button class="btn btn-ghost btn-sm" onclick="printPayslip(${i})">🖨️</button>`:''}</td>
+  </tr>`;
+  }).join('')||'<tr><td colspan="13" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
+  renderPayrollTotals(res.totals);
   $('pr-detail-card').style.display='block';
   $('pr-detail-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
+function recalcPayrollRow(i){
+  const base=+(($('pr-base-'+i)&&$('pr-base-'+i).value)||0);
+  const allow=+(($('pr-allow-'+i)&&$('pr-allow-'+i).value)||0);
+  const adv=+(($('pr-adv-'+i)&&$('pr-adv-'+i).value)||0);
+  const other=+(($('pr-other-'+i)&&$('pr-other-'+i).value)||0);
+  const gross=base+allow, totDed=adv+other, net=gross-totDed;
+  if($('pr-gross-'+i))$('pr-gross-'+i).textContent=fmt(gross);
+  if($('pr-totded-'+i))$('pr-totded-'+i).textContent=fmt(totDed);
+  if($('pr-net-'+i))$('pr-net-'+i).textContent=fmt(net);
+}
+function renderPayrollTotals(t){
+  if(!t)return;
+  if($('pr-totals-row'))$('pr-totals-row').innerHTML=`<tr style="font-weight:800;background:var(--gray0)">
+    <td colspan="3">TOTAL</td><td>${fmt(t.baseSalary)}</td><td>${fmt(t.allowances)}</td><td>${fmt(t.grossPay)}</td><td></td>
+    <td>${fmt(t.advanceDeduction)}</td><td>${fmt(t.otherDeduction)}</td><td>${fmt(t.totalDeductions)}</td><td style="color:var(--green)">${fmt(t.netPay)}</td><td colspan="2"></td>
+  </tr>`;
+}
 async function savePayrollEntries(){
   if(!__prCurrent)return;
-  const dedInputs=document.querySelectorAll('[id^="pr-ded-"]');
-  const entries=[...dedInputs].map(inp=>{
+  const baseInputs=document.querySelectorAll('[id^="pr-base-"]');
+  const entries=[];
+  for(const inp of baseInputs){
     const i=inp.id.split('-')[2];
-    const base=+(($('pr-base-'+i)&&$('pr-base-'+i).value)||0);
-    const ded=+inp.value||0;
-    return {employeeUserId:inp.dataset.emp,baseSalary:base,deductionAmount:ded};
-  });
+    const otherDed=+(($('pr-other-'+i)&&$('pr-other-'+i).value)||0);
+    const otherNote=($('pr-othernote-'+i)&&$('pr-othernote-'+i).value.trim())||'';
+    if(otherDed>0&&!otherNote){toast(`❌ A note is required for ${__prCurrent.entries[i].employeeName}'s Other Deduction`,'error');return;}
+    entries.push({
+      employeeUserId:inp.dataset.emp,
+      baseSalary:+inp.value||0,
+      allowances:+(($('pr-allow-'+i)&&$('pr-allow-'+i).value)||0),
+      advanceDeduction:+(($('pr-adv-'+i)&&$('pr-adv-'+i).value)||0),
+      otherDeduction:otherDed,
+      otherDeductionNote:otherNote,
+      paymentMethod:($('pr-method-'+i)&&$('pr-method-'+i).value)||'Cash',
+    });
+  }
   const res=await api(`/api/payroll/runs/${encodeURIComponent(__prCurrent.id)}/entries`,{method:'PUT',body:{entries}});
   if(res&&res.ok){toast('✅ Saved');openPayrollRun(__prCurrent.id);}
   else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 async function finalizePayrollRun(){
   if(!__prCurrent)return;
-  if(!confirm('Finalize this payroll run? This will actually deduct each Deduction Amount from the employee\'s Employee Advance balance as a Salary Deduction. This cannot be undone.'))return;
+  if(!confirm('Finalize this payroll run? This will actually deduct each Advance Deduction from the employee\'s Employee Advance balance as a Salary Deduction. This cannot be undone.'))return;
   await savePayrollEntries();
   const res=await api(`/api/payroll/runs/${encodeURIComponent(__prCurrent.id)}/finalize`,{method:'POST'});
   if(res&&res.ok){toast('✅ Payroll finalized — deductions applied');await loadAll();openPayrollRun(__prCurrent.id);loadPayrollRuns();}
   else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+function exportPayrollSheet(){
+  if(!__prCurrent)return;
+  _csvDownload(__prCurrent.entries||[],[['Code','employeeCode'],['Employee','employeeName'],['Role','role'],['Base Salary','baseSalary'],['Allowances','allowances'],['Gross Pay','grossPay'],['Advance Deduction','advanceDeduction'],['Other Deduction','otherDeduction'],['Other Deduction Note','otherDeductionNote'],['Total Deductions','totalDeductions'],['Net Pay','netPay'],['Payment Method','paymentMethod']],`payroll_${__prCurrent.storeName}_${__prCurrent.month}.csv`);
+}
+function printPayslip(i){
+  const e=__prCurrent.entries[i];
+  const brand=window.__brandName||'ANTA Shoes';
+  const html=`<div style="max-width:480px;margin:0 auto;padding:30px;font-family:Arial,sans-serif;color:#111">
+    <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1a2540;padding-bottom:12px">
+      <div style="font-size:20px;font-weight:900;color:#1a2540">${brand}</div>
+      <div style="font-size:13px;margin-top:3px">Payslip — ${__prCurrent.month}</div>
+    </div>
+    <table style="width:100%;font-size:12px;margin-bottom:14px"><tbody>
+      <tr><td style="padding:3px 0;color:#666">Employee</td><td style="text-align:right;font-weight:700">${e.employeeName} (${e.employeeCode||'—'})</td></tr>
+      <tr><td style="padding:3px 0;color:#666">Role</td><td style="text-align:right">${e.role}</td></tr>
+      <tr><td style="padding:3px 0;color:#666">Store</td><td style="text-align:right">${__prCurrent.storeName}</td></tr>
+    </tbody></table>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>
+      <tr><td style="padding:5px 0">Base Salary</td><td style="text-align:right">${fmt(e.baseSalary)}</td></tr>
+      <tr><td style="padding:5px 0">Allowances</td><td style="text-align:right">${fmt(e.allowances)}</td></tr>
+      <tr style="border-top:1px solid #ccc;font-weight:700"><td style="padding:5px 0">Gross Pay</td><td style="text-align:right">${fmt(e.grossPay)}</td></tr>
+      <tr><td style="padding:5px 0;color:#a33">Advance Deduction (stock shortage/loan)</td><td style="text-align:right;color:#a33">-${fmt(e.advanceDeduction)}</td></tr>
+      <tr><td style="padding:5px 0;color:#a33">Other Deduction${e.otherDeductionNote?' — '+e.otherDeductionNote:''}</td><td style="text-align:right;color:#a33">-${fmt(e.otherDeduction)}</td></tr>
+      <tr style="border-top:1px solid #ccc;font-weight:700"><td style="padding:5px 0">Total Deductions</td><td style="text-align:right">-${fmt(e.totalDeductions)}</td></tr>
+    </tbody></table>
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#1a2540;color:#fff;border-radius:8px;padding:12px 16px;margin-top:14px">
+      <span style="font-weight:700">NET PAY</span><span style="font-size:19px;font-weight:900">${fmt(e.netPay)}</span>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:#666">Payment Method: ${e.paymentMethod}</div>
+  </div>`;
+  const modal=document.getElementById('report-print-modal');
+  if(!modal){toast('Print container missing','error');return;}
+  modal.innerHTML=html;
+  setTimeout(()=>window.print(),80);
 }
 
 // ---------- Three-Way Matching (PO vs GRN vs Supplier Invoice) ----------

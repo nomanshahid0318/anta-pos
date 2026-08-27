@@ -138,6 +138,17 @@ def _auto_migrate() -> None:
             "pos_login_enabled": "BOOLEAN DEFAULT TRUE",
             "employee_code": "VARCHAR(16) DEFAULT ''",
         },
+        "payroll_entries": {
+            "employee_code": "VARCHAR(16) DEFAULT ''",
+            "role": "VARCHAR(32) DEFAULT ''",
+            "allowances": "FLOAT DEFAULT 0",
+            "gross_pay": "FLOAT DEFAULT 0",
+            "advance_deduction": "FLOAT DEFAULT 0",
+            "other_deduction": "FLOAT DEFAULT 0",
+            "other_deduction_note": "VARCHAR(255) DEFAULT ''",
+            "total_deductions": "FLOAT DEFAULT 0",
+            "payment_method": "VARCHAR(32) DEFAULT 'Cash'",
+        },
         "inventory": {
             "adjustments": "INTEGER DEFAULT 0",
         },

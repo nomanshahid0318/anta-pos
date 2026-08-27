@@ -925,7 +925,7 @@ body{display:flex;height:100vh;overflow:hidden}
       </div>
       <div class="card">
         <div class="card-title">📂 Recent Payroll Runs</div>
-        <table><thead><tr><th>Month</th><th>Store</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Month</th><th>Store</th><th>Employees · Net Pay</th><th>Status</th><th></th></tr></thead>
         <tbody id="pr-list"></tbody></table>
       </div>
     </div>
@@ -935,11 +935,14 @@ body{display:flex;height:100vh;overflow:hidden}
         <div style="display:flex;gap:7px">
           <button class="btn btn-ghost btn-sm" onclick="savePayrollEntries()">💾 Save</button>
           <button class="btn btn-green btn-sm" onclick="finalizePayrollRun()">✅ Finalize &amp; Deduct</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportPayrollSheet()">⬇️ Export</button>
         </div>
       </div>
-      <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">"Outstanding" shows what each employee still owes across all their Employee Advances. "Suggested" is pre-filled from any stock-shortage advance specifically tagged for this month. Finalizing actually deducts each Deduction Amount as a real Salary Deduction repayment.</p>
-      <table><thead><tr><th>Employee</th><th>Role</th><th>Outstanding</th><th>Suggested</th><th>Base Salary</th><th>Deduction Amount</th><th>Net Pay</th></tr></thead>
-      <tbody id="pr-entries-table"></tbody></table>
+      <p style="font-size:11px;color:var(--gray4);margin:6px 0 10px">Gross Pay = Base Salary + Allowances. Total Deductions = Advance Deduction (from Employee Advances, e.g. stock shortages) + Other Deduction (manual, needs a note). Net Pay = Gross − Total Deductions. Finalizing actually deducts each Advance Deduction as a real Salary Deduction repayment.</p>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Code</th><th>Employee</th><th>Role</th><th>Base Salary</th><th>Allowances</th><th>Gross Pay</th><th>Outstanding</th><th>Advance Deduction</th><th>Other Deduction</th><th>Total Deductions</th><th>Net Pay</th><th>Payment Method</th><th></th></tr></thead>
+      <tbody id="pr-entries-table"></tbody>
+      <tfoot id="pr-totals-row"></tfoot>
+      </table></div>
     </div>
   </div>
 
