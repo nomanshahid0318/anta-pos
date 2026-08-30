@@ -84,6 +84,9 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
     row = db.query(PayrollRun).filter(PayrollRun.run_id == run_id).first()
     if not row:
         raise HTTPException(404, "Payroll run not found")
+    from ..models import Setting
+    late_fine_row = db.query(Setting).filter(Setting.key == "late_fine_amount").first()
+    late_fine = float(late_fine_row.value) if late_fine_row else 10.0
     employees = db.query(User).filter(User.store_id == row.store_id, User.active.is_(True)).all()
     entries_by_emp = {e.employee_user_id: e for e in db.query(PayrollEntry).filter(PayrollEntry.run_id == run_id).all()}
 
@@ -108,9 +111,11 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
 
         emp_att = att_by_emp.get(emp.user_id, [])
         marked = len(emp_att)
-        present = sum(1 for a in emp_att if a.status in ("present", "late"))
+        present = sum(1 for a in emp_att if a.status in ("present", "late", "day_off"))
         half = sum(0.5 for a in emp_att if a.status == "half_day")
+        late_count = sum(1 for a in emp_att if a.status == "late")
         attendance_ratio = round((present + half) / marked, 4) if marked > 0 else None
+        late_fine_total = round(late_count * late_fine, 2)
 
         if e:
             base = e.base_salary
@@ -121,16 +126,21 @@ def get_run(run_id: str, db: Annotated[Session, Depends(get_db)], user: Annotate
         allow = e.allowances if e else 0
         gross = e.gross_pay if e else round(base + allow, 2)
         adv_ded = e.advance_deduction if e else 0
-        other_ded = e.other_deduction if e else 0
+        # Suggest the late fine as a starting point for Other Deduction —
+        # still editable/overridable, matching how Advance Deduction is
+        # only ever a suggestion until Save is clicked.
+        other_ded = e.other_deduction if e else late_fine_total
+        other_note = e.other_deduction_note if e else (f"{late_count} late day(s) × {late_fine} fine" if late_fine_total > 0 else "")
         total_ded = e.total_deductions if e else round(adv_ded + other_ded, 2)
         net = e.net_pay if e else round(gross - total_ded, 2)
         out_entries.append({
             "employeeUserId": emp.user_id, "employeeCode": emp.employee_code, "employeeName": emp.name, "role": emp.role,
             "outstandingAdvances": outstanding,
             "attendanceMarkedDays": marked, "attendancePresent": present, "attendanceRatio": attendance_ratio,
+            "lateCount": late_count, "lateFineTotal": late_fine_total,
             "suggestedDeduction": month_tagged if month_tagged > 0 else 0,
             "baseSalary": base, "allowances": allow, "grossPay": gross,
-            "advanceDeduction": adv_ded, "otherDeduction": other_ded, "otherDeductionNote": e.other_deduction_note if e else "",
+            "advanceDeduction": adv_ded, "otherDeduction": other_ded, "otherDeductionNote": other_note,
             "totalDeductions": total_ded, "netPay": net,
             "paymentMethod": e.payment_method if e else "Cash", "notes": e.notes if e else "",
             "saved": e is not None,

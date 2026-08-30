@@ -988,7 +988,7 @@ body{display:flex;height:100vh;overflow:hidden}
           <input class="form-input" type="month" style="width:150px;padding:5px 9px" id="att-sum-month" onchange="loadAttendanceSummary()">
         </div>
       </div>
-      <table><thead><tr><th>Code</th><th>Employee</th><th>Present</th><th>Late</th><th>Half-Day</th><th>Absent</th><th>Leave</th><th>Marked Days</th><th>Ratio</th></tr></thead>
+      <table><thead><tr><th>Code</th><th>Employee</th><th>Present</th><th>Late</th><th>Half-Day</th><th>Day Off</th><th>Absent</th><th>Leave</th><th>Marked Days</th><th>Ratio</th><th>Late Fine</th></tr></thead>
       <tbody id="att-summary-table"></tbody></table>
     </div>
   </div>
@@ -1192,6 +1192,8 @@ body{display:flex;height:100vh;overflow:hidden}
           <div class="form-group"><label class="form-label">Max Return Amount (no approval)</label><input class="form-input" type="number" id="thr-return" placeholder="100"></div>
           <div class="form-group"><label class="form-label">Max Stock Shortage Value (manager can approve)</label><input class="form-input" type="number" id="thr-shortage" placeholder="500"></div>
           <div class="form-group"><label class="form-label">Store Staff Liability % (of shortage value)</label><input class="form-input" type="number" id="thr-staffpct" placeholder="50"></div>
+          <div class="form-group"><label class="form-label">Monthly Day-Off Entitlement (paid rest days/employee)</label><input class="form-input" type="number" id="thr-dayoff" placeholder="4"></div>
+          <div class="form-group"><label class="form-label">Late Fine (per late attendance mark)</label><input class="form-input" type="number" id="thr-latefine" placeholder="10"></div>
         </div>
         <p style="font-size:10.5px;color:var(--gray4);margin:4px 0 0">When a shortage is categorized "Store Staff", this % of its value becomes an Employee Advance against the selected employee — the rest stays a company Shrinkage Expense. Set per your own SOP.</p>
         <button class="btn btn-primary btn-sm" onclick="saveThresholds()">💾 Save Thresholds</button>

@@ -17,7 +17,11 @@ from ..models_attendance import AttendanceRecord
 
 router = APIRouter(prefix="/api/attendance", tags=["attendance"])
 
-VALID_STATUSES = ("present", "absent", "half_day", "leave", "late")
+VALID_STATUSES = ("present", "absent", "half_day", "leave", "late", "day_off")
+# present/late/day_off = full pay. half_day = half pay. absent/leave = unpaid.
+# day_off is the entitled rotating rest day (e.g. 4/month) — NOT the same
+# as "leave", which is unpaid time beyond that entitlement.
+PAID_STATUSES = ("present", "late", "day_off")
 
 
 class MarkOne(BaseModel):
@@ -147,6 +151,11 @@ def attendance_summary(
     employee, their entry just isn't in the result (Payroll then falls
     back to their full Standard Salary).
     """
+    from ..models import Setting
+    settings_map = {s.key: s.value for s in db.query(Setting).filter(Setting.key.in_(["monthly_dayoff_entitlement", "late_fine_amount"])).all()}
+    dayoff_entitlement = float(settings_map.get("monthly_dayoff_entitlement", 4))
+    late_fine = float(settings_map.get("late_fine_amount", 10))
+
     employees = db.query(User).filter(User.store_id == storeId, User.active.is_(True)).all()
     records = db.query(AttendanceRecord).filter(AttendanceRecord.store_id == storeId, AttendanceRecord.date.like(f"{month}%")).all()
     by_emp: dict = {}
@@ -163,12 +172,19 @@ def attendance_summary(
         half = sum(1 for r in recs if r.status == "half_day")
         absent = sum(1 for r in recs if r.status == "absent")
         leave = sum(1 for r in recs if r.status == "leave")
+        day_off = sum(1 for r in recs if r.status == "day_off")
         marked = len(recs)
-        effective_present = present + late + (half * 0.5)  # late still counts as a full present day for pay purposes
+        # present/late/day_off are all full-paid days; half_day is half;
+        # absent/leave are unpaid — this is the earned-salary ratio.
+        effective_present = present + late + day_off + (half * 0.5)
         ratio = round(effective_present / marked, 4) if marked > 0 else None
+        over_entitlement = max(0, day_off - dayoff_entitlement)
+        late_fine_total = round(late * late_fine, 2)
         out.append({
             "employeeUserId": emp.user_id, "employeeName": emp.name, "employeeCode": emp.employee_code,
-            "present": present, "late": late, "halfDay": half, "absent": absent, "leave": leave,
+            "present": present, "late": late, "halfDay": half, "absent": absent, "leave": leave, "dayOff": day_off,
+            "dayOffEntitlement": dayoff_entitlement, "dayOffOverEntitlement": over_entitlement,
+            "lateFineAmount": late_fine, "lateFineTotal": late_fine_total,
             "markedDays": marked, "totalWorkingDays": total_working_days, "attendanceRatio": ratio,
         })
-    return {"ok": True, "storeId": storeId, "month": month, "totalWorkingDays": total_working_days, "data": out}
+    return {"ok": True, "storeId": storeId, "month": month, "totalWorkingDays": total_working_days, "dayoffEntitlement": dayoff_entitlement, "lateFineAmount": late_fine, "data": out}

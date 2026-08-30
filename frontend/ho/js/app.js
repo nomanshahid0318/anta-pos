@@ -2647,7 +2647,7 @@ async function openPayrollRun(id){
     return `<tr>
     <td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td>
     <td class="fw7">${e.employeeName}</td><td>${e.role}</td>
-    <td style="font-size:10.5px">${e.attendanceRatio!=null?`${e.attendancePresent}/${e.attendanceMarkedDays} (${(e.attendanceRatio*100).toFixed(0)}%)`:'<span style="color:var(--gray3)">not marked</span>'}</td>
+    <td style="font-size:10.5px">${e.attendanceRatio!=null?`${e.attendancePresent}/${e.attendanceMarkedDays} (${(e.attendanceRatio*100).toFixed(0)}%)${e.lateCount>0?`<br><span style="color:var(--amber)">${e.lateCount} late</span>`:''}`:'<span style="color:var(--gray3)">not marked</span>'}</td>
     <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" id="pr-base-${i}" data-emp="${e.employeeUserId}" value="${e.baseSalary}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
     <td><input class="form-input" type="number" style="width:80px;padding:4px 7px" id="pr-allow-${i}" value="${e.allowances}" oninput="recalcPayrollRow(${i})" ${locked?'disabled':''}></td>
     <td class="fw7" id="pr-gross-${i}">${fmt(e.grossPay)}</td>
@@ -2764,7 +2764,7 @@ async function loadAttendanceDay(){
   const res=await api(`/api/attendance/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`);
   if(!res||!res.ok)return;
   __attDayList=res.data||[];
-  const statusOpts=s=>['present','late','half_day','leave','absent'].map(v=>`<option value="${v}" ${s===v?'selected':''}>${v.replace('_',' ')}</option>`).join('');
+  const statusOpts=s=>['present','late','half_day','day_off','leave','absent'].map(v=>`<option value="${v}" ${s===v?'selected':''}>${v==='day_off'?'Day Off (paid)':v.replace('_',' ')}</option>`).join('');
   if($('att-day-table'))$('att-day-table').innerHTML=__attDayList.map((e,i)=>`<tr><td class="fw7">${e.employeeName} <span style="color:var(--gray4);font-size:10px">(${e.employeeCode||'—'})</span><input type="hidden" id="att-emp-${i}" value="${e.employeeUserId}"></td><td><select class="form-input" style="padding:4px 7px" id="att-status-${i}">${statusOpts(e.status)}</select></td></tr>`).join('')||'<tr><td colspan="2" style="text-align:center;color:var(--gray3);padding:14px">No employees at this store</td></tr>';
 }
 async function saveAttendanceDay(){
@@ -2797,7 +2797,7 @@ async function loadAttendanceSummary(){
   if(!storeId||!month)return;
   const res=await api(`/api/attendance/summary?storeId=${encodeURIComponent(storeId)}&month=${encodeURIComponent(month)}`);
   if(!res||!res.ok)return;
-  if($('att-summary-table'))$('att-summary-table').innerHTML=(res.data||[]).map(e=>`<tr><td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td><td class="fw7">${e.employeeName}</td><td>${e.present}</td><td>${e.late}</td><td>${e.halfDay}</td><td style="color:${e.absent>0?'var(--red)':'var(--gray4)'}">${e.absent}</td><td>${e.leave}</td><td>${e.markedDays}/${e.totalWorkingDays}</td><td class="fw7">${e.attendanceRatio!=null?(e.attendanceRatio*100).toFixed(0)+'%':'—'}</td></tr>`).join('')||'<tr><td colspan="9" style="text-align:center;color:var(--gray3);padding:14px">No employees</td></tr>';
+  if($('att-summary-table'))$('att-summary-table').innerHTML=(res.data||[]).map(e=>`<tr><td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td><td class="fw7">${e.employeeName}</td><td>${e.present}</td><td>${e.late}</td><td>${e.halfDay}</td><td style="color:${e.dayOffOverEntitlement>0?'var(--amber)':'var(--gray4)'}">${e.dayOff}/${e.dayOffEntitlement}${e.dayOffOverEntitlement>0?' ⚠️':''}</td><td style="color:${e.absent>0?'var(--red)':'var(--gray4)'}">${e.absent}</td><td>${e.leave}</td><td>${e.markedDays}/${e.totalWorkingDays}</td><td class="fw7">${e.attendanceRatio!=null?(e.attendanceRatio*100).toFixed(0)+'%':'—'}</td><td style="color:${e.lateFineTotal>0?'var(--red)':'var(--gray4)'}">${e.lateFineTotal>0?fmt(e.lateFineTotal):'—'}</td></tr>`).join('')||'<tr><td colspan="11" style="text-align:center;color:var(--gray3);padding:14px">No employees</td></tr>';
 }
 let __twmPOList=[],__twmList=[],__twmCurrent=null;
 async function populateTWMPOSelect(){
@@ -2891,6 +2891,8 @@ async function saveThresholds(){
     returnApprovalThreshold:+(($('thr-return')&&$('thr-return').value)||100),
     stockCountAdminThreshold:+(($('thr-shortage')&&$('thr-shortage').value)||500),
     storeStaffLiabilityPercent:+(($('thr-staffpct')&&$('thr-staffpct').value)||50),
+    monthlyDayoffEntitlement:+(($('thr-dayoff')&&$('thr-dayoff').value)||4),
+    lateFineAmount:+(($('thr-latefine')&&$('thr-latefine').value)||10),
   };
   const res=await api('/api/settings',{method:'PUT',body});
   if(res&&res.ok)toast('✅ Thresholds saved');
@@ -2906,6 +2908,8 @@ async function loadSettingsForm(){
   if($('thr-return'))$('thr-return').value=res.returnApprovalThreshold!=null?res.returnApprovalThreshold:100;
   if($('thr-shortage'))$('thr-shortage').value=res.stockCountAdminThreshold!=null?res.stockCountAdminThreshold:500;
   if($('thr-staffpct'))$('thr-staffpct').value=res.storeStaffLiabilityPercent!=null?res.storeStaffLiabilityPercent:50;
+  if($('thr-dayoff'))$('thr-dayoff').value=res.monthlyDayoffEntitlement!=null?res.monthlyDayoffEntitlement:4;
+  if($('thr-latefine'))$('thr-latefine').value=res.lateFineAmount!=null?res.lateFineAmount:10;
   const img=$('logo-preview-img'),ph=$('logo-preview-placeholder');
   if(res.company_logo){
     if(img){img.src=res.company_logo;img.style.display='block';}
