@@ -42,12 +42,24 @@ class SGRNLine(BaseModel):
     cost: float = 0
 
 
+class PaySupplierIn(BaseModel):
+    supplierId: str
+    amount: float  # amount paid, in `currency`
+    currency: str = "LYD"
+    exchangeRate: float = 1.0  # rate AT PAYMENT time — may differ from the invoice's booking rate
+    date: Optional[str] = None
+    reference: str = ""
+    notes: str = ""
+
+
 class SGRNIn(BaseModel):
     grnId: Optional[str] = None
     date: Optional[str] = None
     supplier: str = ""
     invoiceNo: str = ""
     notes: str = ""
+    currency: str = "LYD"
+    exchangeRate: float = 1.0  # 1 [currency] = this many LYD
     lines: list[SGRNLine]
 
 
@@ -620,11 +632,16 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
     when the same product is bought again later at a different price,
     instead of freezing at whatever the first-ever purchase cost was.
     """
-    tc = (line.qty or 0) * (line.cost or 0)
+    currency = (getattr(body, "currency", "LYD") or "LYD").upper()
+    rate = float(getattr(body, "exchangeRate", 1.0) or 1.0)
+    cost_original = float(line.cost or 0)
+    cost_lyd = round(cost_original * rate, 4) if currency != "LYD" else cost_original
+    tc = (line.qty or 0) * cost_lyd
     db.add(SupplierGRN(
         grn_id=grn_id, date=date, supplier=body.supplier or "", invoice_no=body.invoiceNo or "",
-        barcode=line.barcode, name=line.name or "", qty=line.qty or 0, unit_cost=line.cost or 0,
-        total_cost=tc, notes=body.notes or "",
+        barcode=line.barcode, name=line.name or "", qty=line.qty or 0, unit_cost=cost_lyd,
+        total_cost=tc, currency=currency, exchange_rate=rate,
+        unit_cost_original=cost_original if currency != "LYD" else 0, notes=body.notes or "",
     ))
     wh = existing_wh.get(line.barcode)
     old_wh_qty = int(wh.on_hand or 0) if wh else 0
@@ -642,7 +659,7 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
         db.add(wh)
         existing_wh[line.barcode] = wh
     new_qty = int(line.qty or 0)
-    new_cost = float(line.cost or 0)
+    new_cost = cost_lyd
     prod = existing_products.get(line.barcode)
     if not prod and line.barcode not in seen_new_barcodes:
         prod = Product(barcode=line.barcode, name=line.name or line.barcode, cost=new_cost, retail=0, active=True)
@@ -660,6 +677,57 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
             # the cost.
             prod.cost = new_cost
     return tc
+
+
+@router.post("/suppliers/{supplier_id}/pay")
+def pay_supplier(
+    supplier_id: str, body: PaySupplierIn, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[CurrentUser, Depends(require_role("admin", "accountant"))],
+):
+    """Records a payment to a supplier — in any currency. If the invoice
+    being settled was booked at a different exchange rate than today's
+    payment rate, the difference is automatically posted as an
+    'Exchange Rate Gain/Loss' Expense (negative = a gain, i.e. it cost
+    less than expected) so the P&L reflects the real cost, not just
+    whatever was budgeted at invoice time.
+    """
+    sup = db.query(Supplier).filter(Supplier.supplier_id == supplier_id).first()
+    if not sup:
+        raise HTTPException(404, "Supplier not found")
+    if body.amount <= 0:
+        raise HTTPException(400, "Amount must be greater than 0")
+    currency = (body.currency or "LYD").upper()
+    pay_rate = float(body.exchangeRate or 1.0)
+    date = body.date or today_str()
+    amount_lyd = round(body.amount * pay_rate, 2) if currency != "LYD" else body.amount
+
+    exchange_diff = 0.0
+    if currency != "LYD":
+        ref_invoice = (
+            db.query(SupplierTxn)
+            .filter(SupplierTxn.supplier_id == supplier_id, SupplierTxn.type == "invoice", SupplierTxn.currency == currency)
+            .order_by(SupplierTxn.id.asc())
+            .first()
+        )
+        if ref_invoice and ref_invoice.exchange_rate:
+            amount_at_invoice_rate = round(body.amount * ref_invoice.exchange_rate, 2)
+            exchange_diff = round(amount_lyd - amount_at_invoice_rate, 2)
+
+    db.add(SupplierTxn(
+        txn_id=f"STXN-{int(time.time()*1000)}", supplier_id=supplier_id, supplier_name=sup.name,
+        date=date, type="payment", amount=amount_lyd, reference=body.reference,
+        notes=body.notes, currency=currency, exchange_rate=pay_rate, amount_original=body.amount if currency != "LYD" else 0,
+    ))
+    if abs(exchange_diff) >= 0.01:
+        db.add(Expense(
+            exp_id=f"EXP-{int(time.time()*1000)}", date=date, store_id="HO", store="Head Office",
+            category="Exchange Rate Gain/Loss", sub_category=currency,
+            description=f"Rate moved from {ref_invoice.exchange_rate} to {pay_rate} on payment to {sup.name}",
+            amount=exchange_diff, pay_method="Non-cash", reference=supplier_id,
+            notes=f"Payment {body.amount} {currency} at rate {pay_rate}",
+        ))
+    db.commit()
+    return {"ok": True, "status": "ok", "amountLYD": amount_lyd, "exchangeDifference": exchange_diff}
 
 
 @router.post("/supplier-grn")
@@ -732,10 +800,13 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
             sup = Supplier(supplier_id=sid, name=body.supplier, terms="Net 30")
             db.add(sup)
             db.flush()
+        currency = (body.currency or "LYD").upper()
+        rate = float(body.exchangeRate or 1.0)
+        amount_original = round(total_cost / rate, 2) if currency != "LYD" and rate else 0
         db.add(SupplierTxn(
             txn_id=f"STXN-{int(time.time()*1000)}", supplier_id=sup.supplier_id, supplier_name=sup.name,
             date=date, type="invoice", amount=total_cost, reference=body.invoiceNo or grn_id,
-            notes=f"Auto from supplier GRN {grn_id}",
+            notes=f"Auto from supplier GRN {grn_id}", currency=currency, exchange_rate=rate, amount_original=amount_original,
         ))
         db.commit()
 

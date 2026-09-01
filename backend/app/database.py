@@ -152,6 +152,20 @@ def _auto_migrate() -> None:
             "total_deductions": "FLOAT DEFAULT 0",
             "payment_method": "VARCHAR(32) DEFAULT 'Cash'",
         },
+        "expenses": {
+            "cost_center_id": "VARCHAR(32) DEFAULT ''",
+            "project_id": "VARCHAR(64) DEFAULT ''",
+        },
+        "supplier_grn": {
+            "currency": "VARCHAR(8) DEFAULT 'LYD'",
+            "exchange_rate": "FLOAT DEFAULT 1",
+            "unit_cost_original": "FLOAT DEFAULT 0",
+        },
+        "supplier_txns": {
+            "currency": "VARCHAR(8) DEFAULT 'LYD'",
+            "exchange_rate": "FLOAT DEFAULT 1",
+            "amount_original": "FLOAT DEFAULT 0",
+        },
         "inventory": {
             "adjustments": "INTEGER DEFAULT 0",
         },

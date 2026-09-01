@@ -289,6 +289,8 @@ class ExpenseIn(BaseModel):
     payMethod: str = "Cash"
     reference: str = ""
     notes: str = ""
+    costCenterId: str = ""
+    projectId: str = ""
 
 
 class GRNReceiveIn(BaseModel):

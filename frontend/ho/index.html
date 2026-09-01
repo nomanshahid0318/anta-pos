@@ -114,6 +114,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('users')" data-role="admin"><span class="ico">👥</span>Users & PINs</div>
     <div class="nav-item" onclick="show('audit-log')" data-role="admin"><span class="ico">🕵️</span>Audit Log</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
+    <div class="nav-item" onclick="show('costcenters')" data-role="admin,manager,accountant"><span class="ico">🏷️</span>Cost Centers</div>
     <div class="nav-item" onclick="show('settings')" data-role="admin"><span class="ico">⚙️</span>Settings</div>
   </nav>
 </div>
@@ -369,6 +370,11 @@ body{display:flex;height:100vh;overflow:hidden}
             <div class="form-group"><label class="form-label">Supplier</label><input class="form-input" id="sgrn-supplier" placeholder="Supplier name"></div>
             <div class="form-group"><label class="form-label">Invoice #</label><input class="form-input" id="sgrn-inv" placeholder="INV-2026-001"></div>
           </div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Currency</label><select class="form-input" id="sgrn-currency" onchange="toggleSGRNRate()"><option value="LYD">LYD</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div>
+            <div class="form-group" id="sgrn-rate-group" style="display:none"><label class="form-label">Exchange Rate (1 unit = ? LYD)</label><input class="form-input" type="number" id="sgrn-rate" placeholder="5.30" step="0.01"></div>
+          </div>
+          <p id="sgrn-currency-note" style="font-size:10.5px;color:var(--gray4);margin:-4px 0 8px;display:none">Enter each item's Cost below in the currency selected above — the system converts to LYD automatically for stock value, COGS, and everything else.</p>
           <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="sgrn-notes" placeholder="Season, batch, etc."></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
             <div style="font-size:12px;font-weight:700;color:var(--navy)">Line Items</div>
@@ -719,6 +725,8 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="ho-exp-amt"></div>
         <div class="form-group"><label class="form-label">Payment</label><select class="form-input" id="ho-exp-pay"><option>Cash</option><option>Bank</option></select></div>
         <div class="form-group"><label class="form-label">Reference</label><input class="form-input" id="ho-exp-ref"></div>
+        <div class="form-group"><label class="form-label">Cost Center (optional)</label><select class="form-input" id="ho-exp-cc"><option value="">—</option></select></div>
+        <div class="form-group"><label class="form-label">Project (optional)</label><select class="form-input" id="ho-exp-prj"><option value="">—</option></select></div>
       </div>
       <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="ho-exp-desc"></div>
       <button class="btn btn-primary" onclick="saveHoExpense()">💾 Save Expense</button>
@@ -1167,6 +1175,47 @@ body{display:flex;height:100vh;overflow:hidden}
   </div>
 
   <!-- SETTINGS -->
+  <!-- COST CENTERS & PROJECTS -->
+  <div id="screen-costcenters" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">🏷️ Cost Centers</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">Tag expenses by department/function (e.g. Marketing, Store Operations) to see P&amp;L broken down beyond just store.</p>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <input class="form-input" style="width:90px;padding:5px 7px" id="cc-code" placeholder="Code">
+          <input class="form-input" style="flex:1;padding:5px 7px" id="cc-name" placeholder="Name">
+          <button class="btn btn-primary btn-sm" onclick="addCostCenter()">➕ Add</button>
+        </div>
+        <table><thead><tr><th>Code</th><th>Name</th><th></th></tr></thead><tbody id="cc-table"></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-title">📁 Projects</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">Tag expenses by a specific initiative (e.g. a campaign or store fit-out) to see if it turned a profit.</p>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <input class="form-input" style="flex:1;padding:5px 7px" id="prj-name" placeholder="Project name">
+          <select class="form-input" style="width:120px;padding:5px 7px" id="prj-store"></select>
+          <button class="btn btn-primary btn-sm" onclick="addProject()">➕ Add</button>
+        </div>
+        <table><thead><tr><th>Name</th><th>Store</th><th>Status</th><th></th></tr></thead><tbody id="prj-table"></tbody></table>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="card-title">📊 P&amp;L by Cost Center</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <input class="form-input" type="date" style="padding:5px 7px" id="ccrpt-from">
+          <input class="form-input" type="date" style="padding:5px 7px" id="ccrpt-to">
+          <button class="btn btn-blue btn-sm" onclick="loadCCReport()">🔍 Run</button>
+        </div>
+        <table><thead><tr><th>Cost Center</th><th>Total Expense</th></tr></thead><tbody id="ccrpt-table"></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 P&amp;L by Project</div>
+        <table><thead><tr><th>Project</th><th>Total Expense</th></tr></thead><tbody id="prjrpt-table"></tbody></table>
+      </div>
+    </div>
+  </div>
+
   <div id="screen-settings" class="screen">
     <div style="max-width:600px">
       <div class="card" style="border:2px solid var(--accent2)">
@@ -1413,6 +1462,20 @@ body{display:flex;height:100vh;overflow:hidden}
           </div>
           <div class="form-group"><label class="form-label">Reference / Notes</label><input class="form-input" id="sup-txn-ref" placeholder="Invoice #, notes..."></div>
           <button class="btn btn-primary btn-sm" onclick="saveSupplierTxn()">💾 Record</button>
+        </div>
+        <div class="card">
+          <div class="card-title">💱 Pay Supplier (Multi-Currency)</div>
+          <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">If the exchange rate moved since the invoice was booked, the difference is automatically posted to the P&amp;L as an Exchange Rate Gain/Loss.</p>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Supplier</label><select class="form-input" id="pay-sup-supplier"></select></div>
+            <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="pay-sup-date"></div>
+            <div class="form-group"><label class="form-label">Currency</label><select class="form-input" id="pay-sup-currency"><option value="LYD">LYD</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div>
+            <div class="form-group"><label class="form-label">Exchange Rate (today)</label><input class="form-input" type="number" id="pay-sup-rate" placeholder="1.00" step="0.01" value="1"></div>
+            <div class="form-group"><label class="form-label">Amount (in currency above)</label><input class="form-input" type="number" id="pay-sup-amt" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">Reference</label><input class="form-input" id="pay-sup-ref" placeholder="Payment ref"></div>
+          </div>
+          <button class="btn btn-green btn-sm" onclick="paySupplierFX()">💸 Pay Supplier</button>
+          <div id="pay-sup-result" style="margin-top:8px;font-size:12px"></div>
         </div>
       </div>
       <div>

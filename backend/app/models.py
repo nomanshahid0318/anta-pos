@@ -230,6 +230,42 @@ class Claim(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
+class CostCenter(Base):
+    """A tag for grouping expenses by department/function (e.g. 'Store
+    Operations', 'Marketing', 'Admin') so P&L can be sliced by more than
+    just store — answers 'where is our overhead actually going', not
+    just 'which store spent it'.
+    """
+
+    __tablename__ = "cost_centers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Project(Base):
+    """A tag for grouping expenses (and optionally revenue) by a
+    specific initiative — e.g. 'New Store Fit-out — Store 4', 'Ramadan
+    Campaign 2026' — with its own start/end so you can see whether that
+    specific initiative actually turned a profit.
+    """
+
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    store_id: Mapped[str] = mapped_column(String(32), default="")
+    status: Mapped[str] = mapped_column(String(16), default="active")  # active | closed
+    start_date: Mapped[str] = mapped_column(String(16), default="")
+    end_date: Mapped[str] = mapped_column(String(16), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class Expense(Base):
     __tablename__ = "expenses"
 
@@ -245,6 +281,8 @@ class Expense(Base):
     pay_method: Mapped[str] = mapped_column(String(64), default="Cash")
     reference: Mapped[str] = mapped_column(String(128), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
+    cost_center_id: Mapped[str] = mapped_column(String(32), default="")
+    project_id: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
@@ -259,8 +297,11 @@ class SupplierGRN(Base):
     barcode: Mapped[str] = mapped_column(String(64), index=True)
     name: Mapped[str] = mapped_column(String(255), default="")
     qty: Mapped[int] = mapped_column(Integer, default=0)
-    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)  # always LYD-equivalent — used by every downstream stock/COGS calculation, unchanged behavior
     total_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), default="LYD")
+    exchange_rate: Mapped[float] = mapped_column(Float, default=1.0)  # 1 [currency] = this many LYD, at GRN time
+    unit_cost_original: Mapped[float] = mapped_column(Float, default=0.0)  # unit_cost in `currency`, before conversion — 0/unused when currency=LYD
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 

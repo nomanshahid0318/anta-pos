@@ -46,6 +46,8 @@ def create_expense(
         pay_method=body.payMethod or "Cash",
         reference=body.reference or "",
         notes=body.notes or "",
+        cost_center_id=body.costCenterId or "",
+        project_id=body.projectId or "",
     )
     db.add(row)
     post_expense_journal(db, row)
@@ -75,6 +77,8 @@ def update_expense(
     row.pay_method = body.payMethod or "Cash"
     row.reference = body.reference or ""
     row.notes = body.notes or ""
+    row.cost_center_id = body.costCenterId or row.cost_center_id
+    row.project_id = body.projectId or row.project_id
     # post_journal() is a no-op if a journal already exists for this
     # source_id, so a straight re-post would keep the OLD amount — delete
     # the old journal entry first so the corrected figures actually post.
@@ -127,6 +131,8 @@ def list_expenses(
             "payMethod": r.pay_method,
             "reference": r.reference,
             "notes": r.notes,
+            "costCenterId": r.cost_center_id,
+            "projectId": r.project_id,
             "synced": True,
         }
         for r in rows

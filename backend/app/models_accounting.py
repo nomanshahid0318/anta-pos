@@ -39,6 +39,9 @@ class SupplierTxn(Base):
     reference: Mapped[str] = mapped_column(String(128), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     po_id: Mapped[str] = mapped_column(String(64), default="")
+    currency: Mapped[str] = mapped_column(String(8), default="LYD")
+    exchange_rate: Mapped[float] = mapped_column(Float, default=1.0)
+    amount_original: Mapped[float] = mapped_column(Float, default=0.0)  # amount in `currency`, before conversion
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 

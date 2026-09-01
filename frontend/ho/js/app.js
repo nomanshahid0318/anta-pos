@@ -104,7 +104,7 @@ async function pinSubmit(){
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
   if($('login-empcode'))$('login-empcode').value='';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
@@ -112,6 +112,7 @@ if(name==='shifts'){loadShifts();}
 if(name==='stock-counts'){populateSCStoreSelect();loadStockCounts();}
 if(name==='payroll'){populatePRStoreSelect();loadPayrollRuns();}
 if(name==='attendance'){populateAttStoreSelects();loadAttendanceDay();loadAttendanceSummary();}
+if(name==='costcenters'){populateCCStoreSelect();loadCostCenters();loadProjects();loadCCReport();loadProjectReport();}
 if(name==='three-way-match'){populateTWMPOSelect();loadSupplierInvoices();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
@@ -121,7 +122,7 @@ if(name==='purchase-orders'){if($('po-date'))$('po-date').value=today();poLines=
 if(name==='supplier-grn'){sgrnHistCurrentPage=1;fetchAndRenderSGRNHist();if($('sgrn-date'))$('sgrn-date').value=today();if($('sgrn-id'))$('sgrn-id').value='SGRN-'+Date.now().toString().slice(-6);}
 if(name==='store-grn'){stgrnPendingCurrentPage=1;stgrnDoneCurrentPage=1;fetchAndRenderStGRNPending();fetchAndRenderStGRNDone();populateStoreSelects();if($('stgrn-date'))$('stgrn-date').value=today();if($('stgrn-id'))$('stgrn-id').value='GRN-'+Date.now().toString().slice(-6);}
 if(name==='transfer'){renderTrHist();populateStoreSelects();}if(name==='products'){prodCurrentPage=1;fetchAndRenderProductsPage();}
-if(name==='pl'){plPreset();populateStoreSelects('pl-store');loadPL();}if(name==='expenses-ho'){populateStoreSelects('exp-store-filter');populateStoreSelects('ho-exp-store');if($('ho-exp-date'))$('ho-exp-date').value=today();loadExpenses();}if(name==='promotions')loadPromosHO();if(name==='accounts'){loadTrialBalance();loadCOA();loadJournals();}if(name==='license')loadLicense();
+if(name==='pl'){plPreset();populateStoreSelects('pl-store');loadPL();}if(name==='expenses-ho'){populateStoreSelects('exp-store-filter');populateStoreSelects('ho-exp-store');if($('ho-exp-date'))$('ho-exp-date').value=today();loadExpenses();populateExpenseCCDropdowns();}if(name==='promotions')loadPromosHO();if(name==='accounts'){loadTrialBalance();loadCOA();loadJournals();}if(name==='license')loadLicense();
 if(name==='reports'){rptPreset();populateStoreSelects('rpt-store');}if(name==='inventory-ho'){invAllCurrentPage=1;fetchAndRenderInvAll();}
 if(name==='stores-admin')renderStoresAdmin();if(name==='users'){renderUsers();populateStoreSelects('u-store');}if(name==='banks')renderBanks();
 if(name==='settings'){if($('api-url'))$('api-url').value=CFG.apiUrl;loadSettingsForm();}
@@ -347,10 +348,16 @@ function sgrnBC(i,bc){
 }
 function calcSGRN(){const tot=sgrnLines.reduce((s,l)=>s+l.qty*l.cost,0);if($('sgrn-n'))$('sgrn-n').textContent=sgrnLines.length;if($('sgrn-total'))$('sgrn-total').textContent=fmt(tot);}
 function clearSGRN(){sgrnLines=[];renderSGRNLines();}
+function toggleSGRNRate(){
+  const currency=$('sgrn-currency')?$('sgrn-currency').value:'LYD';
+  const isForeign=currency!=='LYD';
+  if($('sgrn-rate-group'))$('sgrn-rate-group').style.display=isForeign?'block':'none';
+  if($('sgrn-currency-note'))$('sgrn-currency-note').style.display=isForeign?'block':'none';
+}
 async function saveSGRN(){
   if(!sgrnLines.length){toast('Add lines','error');return;}
   const grnId=$('sgrn-id').value||('SGRN-'+Date.now().toString().slice(-6));
-  const meta={grnId,date:$('sgrn-date').value,supplier:$('sgrn-supplier').value,invoiceNo:$('sgrn-inv').value,notes:$('sgrn-notes').value};
+  const meta={grnId,date:$('sgrn-date').value,supplier:$('sgrn-supplier').value,invoiceNo:$('sgrn-inv').value,notes:$('sgrn-notes').value,currency:($('sgrn-currency')&&$('sgrn-currency').value)||'LYD',exchangeRate:+(($('sgrn-rate')&&$('sgrn-rate').value)||1)};
   const startTime=Date.now();
   const logRows=[];
   const CHUNK=300;
@@ -1499,7 +1506,27 @@ function printCF(){
 }
 async function saveSupplier(){const name=$('sup-name').value.trim();if(!name){toast('Enter name','error');return;}const res=await api('/api/ho/suppliers',{method:'POST',body:{name,contact:$('sup-contact').value,limit:parseFloat($('sup-limit').value)||0,terms:$('sup-terms').value}});if(res&&res.ok){toast('✅ Supplier saved');['sup-name','sup-contact','sup-limit'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
 async function saveSupplierTxn(){const supId=$('sup-txn-supplier').value,amt=parseFloat($('sup-txn-amt').value)||0;if(!supId||!amt){toast('Select supplier + amount','error');return;}const res=await api('/api/ho/supplier-txns',{method:'POST',body:{supplierId:supId,date:$('sup-txn-date').value,type:$('sup-txn-type').value,amount:amt,ref:$('sup-txn-ref').value}});if(res&&res.ok){toast('✅ Recorded');['sup-txn-amt','sup-txn-ref'].forEach(id=>{if($(id))$(id).value='';});await loadAll();renderSupplierAccounts();}else toast('❌ Failed','error');}
-function populateSupplierSelect(){const opts=suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');if($('sup-txn-supplier'))$('sup-txn-supplier').innerHTML=opts;if($('po-supplier'))$('po-supplier').innerHTML=opts;}
+async function paySupplierFX(){
+  const supId=$('pay-sup-supplier')?$('pay-sup-supplier').value:'';
+  const amt=parseFloat($('pay-sup-amt')&&$('pay-sup-amt').value)||0;
+  const currency=($('pay-sup-currency')&&$('pay-sup-currency').value)||'LYD';
+  const rate=+(($('pay-sup-rate')&&$('pay-sup-rate').value)||1);
+  if(!supId||!amt){toast('Select supplier + amount','error');return;}
+  const res=await api(`/api/ho/suppliers/${encodeURIComponent(supId)}/pay`,{method:'POST',body:{
+    supplierId:supId,amount:amt,currency,exchangeRate:rate,
+    date:($('pay-sup-date')&&$('pay-sup-date').value)||undefined,
+    reference:($('pay-sup-ref')&&$('pay-sup-ref').value)||'',
+  }});
+  if(res&&res.ok){
+    let msg=`✅ Paid — ${fmt(res.amountLYD)} LYD`;
+    if(Math.abs(res.exchangeDifference)>=0.01)msg+=` · Exchange ${res.exchangeDifference>0?'Loss':'Gain'}: ${fmt(Math.abs(res.exchangeDifference))} LYD (posted to P&L)`;
+    if($('pay-sup-result'))$('pay-sup-result').innerHTML=msg;
+    toast('✅ Payment recorded');
+    ['pay-sup-amt','pay-sup-ref'].forEach(id=>{if($(id))$(id).value='';});
+    await loadAll();renderSupplierAccounts();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+function populateSupplierSelect(){const opts=suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');if($('sup-txn-supplier'))$('sup-txn-supplier').innerHTML=opts;if($('po-supplier'))$('po-supplier').innerHTML=opts;if($('pay-sup-supplier'))$('pay-sup-supplier').innerHTML=opts;}
 function renderSupplierAccounts(){
   const totalPayable=suppliers.reduce((a,s)=>a+Math.max(s.balance||0,0),0);
   const totalCredit=suppliers.reduce((a,s)=>a+Math.max(-(s.balance||0),0),0);
@@ -2811,6 +2838,66 @@ async function loadAttendanceSummary(){
   if(!res||!res.ok)return;
   if($('att-summary-table'))$('att-summary-table').innerHTML=(res.data||[]).map(e=>`<tr><td style="font-family:monospace;font-size:10px">${e.employeeCode||'—'}</td><td class="fw7">${e.employeeName}</td><td>${e.present}</td><td>${e.late}</td><td>${e.halfDay}</td><td style="color:${e.dayOffOverEntitlement>0?'var(--amber)':'var(--gray4)'}">${e.dayOff}/${e.dayOffEntitlement}${e.dayOffOverEntitlement>0?' ⚠️':''}</td><td style="color:${e.absent>0?'var(--red)':'var(--gray4)'}">${e.absent}</td><td>${e.leave}</td><td>${e.markedDays}/${e.totalWorkingDays}</td><td class="fw7">${e.attendanceRatio!=null?(e.attendanceRatio*100).toFixed(0)+'%':'—'}</td><td style="color:${e.lateFineTotal>0?'var(--red)':'var(--gray4)'}">${e.lateFineTotal>0?fmt(e.lateFineTotal):'—'}</td></tr>`).join('')||'<tr><td colspan="11" style="text-align:center;color:var(--gray3);padding:14px">No employees</td></tr>';
 }
+
+// ---------- Cost Centers & Projects ----------
+let __ccList=[],__prjList=[];
+function populateCCStoreSelect(){
+  if($('prj-store'))$('prj-store').innerHTML='<option value="">Company-wide</option>'+(DATA.stores||[]).map(s=>`<option value="${s.StoreID||s.store_id}">${s.Name||s.name}</option>`).join('');
+  if($('ccrpt-from')&&!$('ccrpt-from').value)$('ccrpt-from').value=today().slice(0,8)+'01';
+  if($('ccrpt-to')&&!$('ccrpt-to').value)$('ccrpt-to').value=today();
+}
+async function loadCostCenters(){
+  const res=await api('/api/ho/cost-centers');
+  if(!res||!res.ok)return;
+  __ccList=res.data||[];
+  if($('cc-table'))$('cc-table').innerHTML=__ccList.map(c=>`<tr><td class="fw7">${c.code}</td><td>${c.name}</td><td><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteCostCenter(${c.id})">🗑️</button></td></tr>`).join('')||'<tr><td colspan="3" style="text-align:center;color:var(--gray3);padding:10px">None yet</td></tr>';
+}
+async function addCostCenter(){
+  const code=($('cc-code')&&$('cc-code').value.trim().toUpperCase())||'';
+  const name=($('cc-name')&&$('cc-name').value.trim())||'';
+  if(!code||!name){toast('Code and Name required','error');return;}
+  const res=await api('/api/ho/cost-centers',{method:'POST',body:{code,name}});
+  if(res&&res.ok){toast('✅ Added');$('cc-code').value='';$('cc-name').value='';loadCostCenters();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
+async function deleteCostCenter(id){
+  if(!confirm('Delete this Cost Center?'))return;
+  const res=await api('/api/ho/cost-centers/'+id,{method:'DELETE'});
+  if(res&&res.ok){toast('🗑️ Deleted');loadCostCenters();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed — maybe still in use'),'error');
+}
+async function loadProjects(){
+  const res=await api('/api/ho/projects');
+  if(!res||!res.ok)return;
+  __prjList=res.data||[];
+  if($('prj-table'))$('prj-table').innerHTML=__prjList.map(p=>`<tr><td class="fw7">${p.name}</td><td>${p.storeId||'Company-wide'}</td><td><span class="badge ${p.status==='active'?'badge-green':'badge-gray'}">${p.status}</span></td><td><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteProject('${p.id}')">🗑️</button></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:10px">None yet</td></tr>';
+}
+async function addProject(){
+  const name=($('prj-name')&&$('prj-name').value.trim())||'';
+  const storeId=$('prj-store')?$('prj-store').value:'';
+  if(!name){toast('Project name required','error');return;}
+  const res=await api('/api/ho/projects',{method:'POST',body:{name,storeId}});
+  if(res&&res.ok){toast('✅ Added');$('prj-name').value='';loadProjects();}
+  else toast('❌ Failed','error');
+}
+async function deleteProject(id){
+  if(!confirm('Delete this Project?'))return;
+  const res=await api('/api/ho/projects/'+encodeURIComponent(id),{method:'DELETE'});
+  if(res&&res.ok){toast('🗑️ Deleted');loadProjects();}
+  else toast('❌ '+((res&&(res.detail||res.msg))||'Failed — maybe still in use'),'error');
+}
+async function loadCCReport(){
+  const from=$('ccrpt-from')?$('ccrpt-from').value:'';
+  const to=$('ccrpt-to')?$('ccrpt-to').value:'';
+  const res=await api(`/api/ho/pl-by-costcenter?dateFrom=${from}&dateTo=${to}`);
+  if(!res||!res.ok)return;
+  if($('ccrpt-table'))$('ccrpt-table').innerHTML=(res.data||[]).map(d=>`<tr><td>${d.costCenterName}</td><td class="fw7">${fmt(d.totalExpense)}</td></tr>`).join('')+`<tr style="font-weight:800;background:var(--gray0)"><td>TOTAL</td><td>${fmt(res.grandTotal)}</td></tr>`;
+}
+async function loadProjectReport(){
+  const res=await api('/api/ho/pl-by-project');
+  if(!res||!res.ok)return;
+  if($('prjrpt-table'))$('prjrpt-table').innerHTML=(res.data||[]).map(d=>`<tr><td>${d.projectName}</td><td class="fw7">${fmt(d.totalExpense)}</td></tr>`).join('')||'<tr><td colspan="2" style="text-align:center;color:var(--gray3);padding:10px">No project-tagged expenses yet</td></tr>';
+}
 let __twmPOList=[],__twmList=[],__twmCurrent=null;
 async function populateTWMPOSelect(){
   const res=await api('/api/ho/purchase-orders?status=all');
@@ -3181,6 +3268,12 @@ function toggleLang(){
   toast(next === 'ar' ? hoT('switch_ar') : hoT('switch_en'));
 }
 
+async function populateExpenseCCDropdowns(){
+  const ccRes=await api('/api/ho/cost-centers');
+  if(ccRes&&ccRes.ok&&$('ho-exp-cc'))$('ho-exp-cc').innerHTML='<option value="">—</option>'+(ccRes.data||[]).map(c=>`<option value="${c.code}">${c.name}</option>`).join('');
+  const prjRes=await api('/api/ho/projects');
+  if(prjRes&&prjRes.ok&&$('ho-exp-prj'))$('ho-exp-prj').innerHTML='<option value="">—</option>'+(prjRes.data||[]).filter(p=>p.status==='active').map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
 async function saveHoExpense(){
   const amount=parseFloat($('ho-exp-amt')&&$('ho-exp-amt').value)||0;
   if(!amount){toast('Amount required','error');return;}
@@ -3194,7 +3287,9 @@ async function saveHoExpense(){
     description:($('ho-exp-desc')&&$('ho-exp-desc').value)||'',
     amount:amount,
     payMethod:($('ho-exp-pay')&&$('ho-exp-pay').value)||'Cash',
-    reference:($('ho-exp-ref')&&$('ho-exp-ref').value)||''
+    reference:($('ho-exp-ref')&&$('ho-exp-ref').value)||'',
+    costCenterId:($('ho-exp-cc')&&$('ho-exp-cc').value)||'',
+    projectId:($('ho-exp-prj')&&$('ho-exp-prj').value)||'',
   };
   const res=editId
     ? await api(`/api/expenses/${encodeURIComponent(editId)}`,{method:'PUT',body:body})
