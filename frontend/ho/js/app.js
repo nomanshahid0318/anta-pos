@@ -3348,7 +3348,19 @@ document.addEventListener('keydown',e=>{
     sel.value='HO';
   }
   try{applyLang();}catch(e){}
+  try{
+    if(localStorage.getItem('anta_sidebar_collapsed')==='1'){
+      const sb=document.getElementById('sidebar');
+      if(sb)sb.classList.add('collapsed');
+    }
+  }catch(e){}
 })();
+function toggleSidebarCollapse(){
+  const sb=document.getElementById('sidebar');
+  if(!sb)return;
+  const collapsed=sb.classList.toggle('collapsed');
+  try{localStorage.setItem('anta_sidebar_collapsed',collapsed?'1':'0');}catch(e){}
+}
 
 
 /* ===== v5 HO extensions: expenses form, promos, COA, license, i18n, roles ===== */
@@ -3411,6 +3423,9 @@ const HO_I18N = {
     'stores-admin':'Manage Stores', users:'Users & PINs', banks:'Banks & Payments', settings:'Settings',
     customers:'Customers', 'stock-aging':'Stock Aging', 'audit-log':'Audit Log', 'barcode-labels':'Barcode Labels',
     'purchase-orders':'Purchase Orders', handovers:'Cash Handovers',
+    payroll:'Payroll', attendance:'Attendance', costcenters:'Cost Centers & Projects', addons:'Cheques',
+    budget:'Budget vs Actual', 'three-way-match':'Invoice Matching', 'stock-counts':'Stock Take / Physical Count',
+    shifts:'Cashier Shifts', 'employee-advances':'Employee Advances', 'accrued-expenses':'Accrued Expenses',
     overview:'Overview', stock:'Stock Management', finance:'Finance', admin:'Admin', products_sec:'Products',
     reports_sec:'Reports', lang_btn:'العربية / EN', switch_ar:'تم التبديل إلى العربية', switch_en:'Switched to English',
     logout:'Logout', refresh:'Refresh'
@@ -3420,10 +3435,13 @@ const HO_I18N = {
     'store-grn':'إرسال للمتاجر', transfer:'تحويل بين المتاجر', products:'كتالوج المنتجات', pl:'الأرباح والخسائر',
     'balance-sheet':'الميزانية العمومية', cashflow:'التدفق النقدي', 'supplier-accounts':'حسابات الموردين',
     'expenses-ho':'المصروفات', accounts:'دليل الحسابات', promotions:'العروض', license:'الترخيص',
-    capital:'رأس المال', 'fixed-assets':'الأصول الثابتة', reports:'تقارير المبيعات', 'inventory-ho':'المخزون — الكل',
+    capital:'رأس المال', 'fixed-assets':'الأصول الثابتة', 'prepaid-expenses':'المصروفات المدفوعة مقدماً', reports:'تقارير المبيعات', 'inventory-ho':'المخزون — الكل',
     'stores-admin':'إدارة المتاجر', users:'المستخدمون والرمز', banks:'البنوك والمدفوعات', settings:'الإعدادات',
     customers:'العملاء', 'stock-aging':'تقادم المخزون', 'audit-log':'سجل التدقيق', 'barcode-labels':'ملصقات الباركود',
     'purchase-orders':'أوامر الشراء', handovers:'تسليم النقدية',
+    payroll:'الرواتب', attendance:'الحضور والانصراف', costcenters:'مراكز التكلفة والمشاريع', addons:'الشيكات',
+    budget:'الموازنة مقابل الفعلي', 'three-way-match':'مطابقة الفواتير', 'stock-counts':'الجرد الفعلي للمخزون',
+    shifts:'ورديات الكاشير', 'employee-advances':'سلف الموظفين', 'accrued-expenses':'المصروفات المستحقة',
     overview:'نظرة عامة', stock:'إدارة المخزون', finance:'المالية', admin:'الإدارة', products_sec:'المنتجات',
     reports_sec:'التقارير', lang_btn:'EN / العربية', switch_ar:'تم التبديل إلى العربية', switch_en:'تم التبديل إلى الإنجليزية',
     logout:'تسجيل الخروج', refresh:'تحديث'
@@ -3451,7 +3469,11 @@ function applyLang(){
       const ico = el.querySelector('.ico');
       el.innerHTML = '';
       if (ico) el.appendChild(ico);
-      el.appendChild(document.createTextNode(' ' + label));
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'nav-label-text';
+      labelSpan.textContent = ' ' + label;
+      el.appendChild(labelSpan);
+      el.setAttribute('title', label);
     });
     document.querySelectorAll('.nav-sec').forEach(el => {
       const raw = (el.getAttribute('data-sec') || el.textContent || '').trim().toLowerCase();

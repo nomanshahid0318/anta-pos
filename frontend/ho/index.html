@@ -62,13 +62,14 @@ body{display:flex;height:100vh;overflow:hidden}
 
 <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 <div id="sidebar">
+  <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Collapse/Expand sidebar">◀</button>
   <div class="brand">
     <div class="brand-logo" id="brand-logo">A</div>
     <div><div class="brand-text" id="brand-text">Head Office</div><div class="brand-sub">Head Office</div><div class="ho-tag" id="ho-role-tag">HO ADMIN</div></div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;padding:0 14px 10px">
     <div id="ho-user-name" style="flex:1;font-size:11px;color:var(--gray4);font-weight:700">—</div>
-    <button class="btn btn-ghost btn-sm" onclick="hoLogout()" title="Logout">🚪 Logout</button>
+    <button class="btn btn-ghost btn-sm" onclick="hoLogout()" title="Logout">🚪 <span class="btn-label-text">Logout</span></button>
   </div>
   <div class="sync-bar"><div class="dot offline" id="sync-dot"></div><div><div id="sync-lbl" style="font-size:10px">Offline</div><div id="sync-last" style="font-size:9px;opacity:.6">—</div></div></div>
   <nav>

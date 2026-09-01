@@ -2050,7 +2050,7 @@ document.addEventListener('keydown', (e) => {
 const I18N = {
   en: {
     dashboard:'Dashboard', sale:'New Sale', returns:'Returns', exchange:'Exchange', claims:'Claims',
-    grn:'Receive Stock (GRN)', inventory:'Inventory', reports:'Reports', settings:'Settings',
+    grn:'Receive Stock (GRN)', inventory:'Inventory', reports:'Reports', settings:'Settings', handover:'Day End / Cash Handover',
     complete:'Complete Sale', store_name:'Store Name', pos_name:'POS / Receipt Name', policy:'Return Policy',
     language:'Language', locked:'System locked', main:'Main', transactions:'Transactions', stock:'Stock',
     finance:'Finance', logout:'Logout', search:'Search product / barcode...', customer:'Customer',
@@ -2107,7 +2107,7 @@ const I18N = {
   },
   ar: {
     dashboard:'لوحة التحكم', sale:'مبيعات جديدة', returns:'مرتجعات', exchange:'استبدال', claims:'شكاوى',
-    grn:'استلام مخزون', inventory:'المخزون', reports:'التقارير', settings:'الإعدادات',
+    grn:'استلام مخزون', inventory:'المخزون', reports:'التقارير', settings:'الإعدادات', handover:'إغلاق اليوم / تسليم النقدية',
     complete:'إتمام البيع', store_name:'اسم المتجر', pos_name:'اسم نقطة البيع', policy:'سياسة الإرجاع',
     language:'اللغة', locked:'النظام مقفل', main:'الرئيسية', transactions:'المعاملات', stock:'المخزون',
     finance:'المالية', logout:'تسجيل الخروج', search:'بحث منتج / باركود...', customer:'العميل',
