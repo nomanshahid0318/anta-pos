@@ -136,12 +136,14 @@ def auto_heal_store_inventory(db: Session, store_id: str) -> None:
     A store's Inventory row can end up with a stale/incorrect grn_in (e.g.
     an old placeholder row from "Init Store Stock", or historical data from
     a fixed bug). This recomputes grn_in strictly from real, received
-    Send-to-Store GRN history (StoreGRN rows with status='received') and
-    fixes any row that has drifted — before any read of the data. Sales,
-    returns, exchanges, and claims are left untouched (real transaction
-    history). Cheap and idempotent: does nothing once a store is correct.
+    stock movements INTO the store — Send-to-Store GRN history (StoreGRN
+    rows with status='received') AND Stock Transfers where this store was
+    the receiving side — and fixes any row that has drifted before any
+    read of the data. Sales, returns, exchanges, and claims are left
+    untouched (real transaction history). Cheap and idempotent: does
+    nothing once a store is correct.
     """
-    from ..models import StoreGRN  # local import to avoid a circular import at module load
+    from ..models import StoreGRN, Transfer  # local import to avoid a circular import at module load
 
     if not store_id or store_id == "HO":
         return
@@ -152,6 +154,14 @@ def auto_heal_store_inventory(db: Session, store_id: str) -> None:
         .all()
     )
     received_by_barcode = {barcode: int(total or 0) for barcode, total in received_rows}
+    transfer_in_rows = (
+        db.query(Transfer.barcode, func.sum(Transfer.qty))
+        .filter(Transfer.to_store_id == str(store_id), Transfer.status == "done")
+        .group_by(Transfer.barcode)
+        .all()
+    )
+    for barcode, total in transfer_in_rows:
+        received_by_barcode[barcode] = received_by_barcode.get(barcode, 0) + int(total or 0)
     inv_rows = db.query(Inventory).filter(Inventory.store_id == str(store_id)).all()
     dirty = False
     for row in inv_rows:

@@ -94,6 +94,22 @@ class TransferIn(BaseModel):
     lines: list[TransferLine]
 
 
+class TransferBulkRow(BaseModel):
+    fromStoreId: str
+    fromStore: str = ""
+    toStoreId: str
+    toStore: str = ""
+    barcode: str
+    name: str = ""
+    qty: int = 1
+    notes: str = ""
+
+
+class TransferBulkIn(BaseModel):
+    date: Optional[str] = None
+    rows: list[TransferBulkRow]
+
+
 class SupplierIn(BaseModel):
     supplierId: Optional[str] = None
     name: str
@@ -1058,8 +1074,36 @@ def stock_transfer(body: TransferIn, db: Annotated[Session, Depends(get_db)], us
         if not line.barcode or not line.qty:
             continue
         ref = f"TR-{int(time.time()*1000)}-{count}"
-        update_inv(db, line.barcode, body.fromStore, body.fromStoreId, line.name or "", "claim", line.qty)
-        update_inv(db, line.barcode, body.toStore, body.toStoreId, line.name or "", "grn", line.qty)
+
+        # The HO Warehouse keeps its stock in a separate ledger (HOWarehouse)
+        # from every store's Inventory row — a transfer touching "HO" on
+        # either side has to update THAT ledger, not create a phantom
+        # per-store Inventory row for "HO" that nothing else reads from.
+        if body.fromStoreId == "HO":
+            wh = db.query(HOWarehouse).filter(HOWarehouse.barcode == line.barcode).first()
+            if not wh or (wh.on_hand or 0) < line.qty:
+                raise HTTPException(400, f"Insufficient HO Warehouse stock for {line.barcode} ({(wh.on_hand if wh else 0)} available, {line.qty} requested)")
+            wh.store_out = (wh.store_out or 0) + line.qty
+            wh.recalc()
+            wh.updated_at = datetime.utcnow()
+        else:
+            update_inv(db, line.barcode, body.fromStore, body.fromStoreId, line.name or "", "claim", line.qty)
+
+        if body.toStoreId == "HO":
+            wh = db.query(HOWarehouse).filter(HOWarehouse.barcode == line.barcode).first()
+            if wh:
+                wh.store_in = (wh.store_in or 0) + line.qty
+                wh.recalc()
+                wh.updated_at = datetime.utcnow()
+                if line.name:
+                    wh.name = line.name
+            else:
+                wh = HOWarehouse(barcode=line.barcode, name=line.name or "", supplier_in=0, store_out=0, store_in=line.qty)
+                wh.recalc()
+                db.add(wh)
+        else:
+            update_inv(db, line.barcode, body.toStore, body.toStoreId, line.name or "", "grn", line.qty)
+
         db.add(Transfer(
             ref_id=ref, date=date, from_store_id=body.fromStoreId, from_store=body.fromStore,
             to_store_id=body.toStoreId, to_store=body.toStore, barcode=line.barcode, name=line.name or "",
@@ -1068,6 +1112,34 @@ def stock_transfer(body: TransferIn, db: Annotated[Session, Depends(get_db)], us
         count += 1
     db.commit()
     return {"ok": True, "status": "ok", "count": count}
+
+
+@router.post("/transfers/bulk")
+def stock_transfer_bulk(body: TransferBulkIn, db: Annotated[Session, Depends(get_db)], user: Annotated[CurrentUser, Depends(_stock_admin)]):
+    """Bulk transfer from an uploaded Excel/CSV — one row per (from, to,
+    barcode, qty) — groups rows sharing the same From/To pair into a
+    single transfer batch, reusing the exact same logic as a normal
+    transfer (including the HO Warehouse routing above).
+    """
+    groups: dict = {}
+    for row in body.rows:
+        if not row.barcode or not row.qty or not row.fromStoreId or not row.toStoreId:
+            continue
+        key = (row.fromStoreId, row.toStoreId)
+        groups.setdefault(key, []).append(row)
+    total_count, errors = 0, []
+    for (from_id, to_id), rows in groups.items():
+        if from_id == to_id:
+            errors.append(f"{from_id} → {to_id}: From and To cannot be the same, skipped {len(rows)} row(s)")
+            continue
+        lines = [TransferLine(barcode=r.barcode, name=r.name, qty=r.qty, notes=r.notes) for r in rows]
+        sub_body = TransferIn(date=body.date, fromStoreId=from_id, fromStore=rows[0].fromStore, toStoreId=to_id, toStore=rows[0].toStore, lines=lines)
+        try:
+            result = stock_transfer(sub_body, db, user)
+            total_count += result["count"]
+        except HTTPException as e:
+            errors.append(f"{from_id} → {to_id}: {e.detail}")
+    return {"ok": True, "status": "ok", "count": total_count, "errors": errors}
 
 
 @router.get("/pl")

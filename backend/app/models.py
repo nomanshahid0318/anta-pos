@@ -139,11 +139,12 @@ class HOWarehouse(Base):
     name: Mapped[str] = mapped_column(String(255), default="")
     supplier_in: Mapped[int] = mapped_column(Integer, default=0)
     store_out: Mapped[int] = mapped_column(Integer, default=0)
+    store_in: Mapped[int] = mapped_column(Integer, default=0)  # stock returned FROM a store back to the warehouse (via Store Transfer)
     on_hand: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
     def recalc(self) -> None:
-        self.on_hand = (self.supplier_in or 0) - (self.store_out or 0)
+        self.on_hand = (self.supplier_in or 0) + (self.store_in or 0) - (self.store_out or 0)
 
 
 class Sale(Base):

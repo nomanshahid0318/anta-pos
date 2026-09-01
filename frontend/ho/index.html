@@ -559,17 +559,18 @@ body{display:flex;height:100vh;overflow:hidden}
   <div id="screen-transfer" class="screen">
     <div style="max-width:800px">
       <div class="card">
-        <div class="card-title">🔄 Stock Transfer — Store to Store</div>
+        <div class="card-title">🔄 Stock Transfer — Store ↔ Store / Warehouse</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
           <div style="background:var(--red-light);border-radius:8px;padding:13px">
-            <div style="font-size:12px;font-weight:800;color:var(--red);margin-bottom:9px">📤 FROM Store</div>
-            <div class="form-group"><label class="form-label">From Store</label><select class="form-input" id="tr-from"></select></div>
+            <div style="font-size:12px;font-weight:800;color:var(--red);margin-bottom:9px">📤 FROM</div>
+            <div class="form-group"><label class="form-label">From</label><select class="form-input" id="tr-from"></select></div>
           </div>
           <div style="background:var(--green-light);border-radius:8px;padding:13px">
-            <div style="font-size:12px;font-weight:800;color:var(--green);margin-bottom:9px">📥 TO Store</div>
-            <div class="form-group"><label class="form-label">To Store</label><select class="form-input" id="tr-to"></select></div>
+            <div style="font-size:12px;font-weight:800;color:var(--green);margin-bottom:9px">📥 TO</div>
+            <div class="form-group"><label class="form-label">To</label><select class="form-input" id="tr-to"></select></div>
           </div>
         </div>
+        <p style="font-size:10.5px;color:var(--gray4);margin:6px 0 0">Includes "Head Office (Warehouse)" — use this to send stock from the warehouse to a store, or to send stock back from a store to the warehouse.</p>
         <div class="divider"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
           <div style="font-size:12px;font-weight:700">Transfer Lines</div>
@@ -579,6 +580,16 @@ body{display:flex;height:100vh;overflow:hidden}
         <tbody id="tr-lines"></tbody></table>
         <div class="form-group mt"><label class="form-label">Transfer Notes</label><input class="form-input" id="tr-notes" placeholder="Reason..."></div>
         <button class="btn btn-primary mt" onclick="doTransfer()">✅ Execute Transfer</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📤 Bulk Transfer (Excel/CSV)</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 10px">Columns: <b>From Store ID</b>, <b>To Store ID</b>, <b>Barcode</b>, <b>Qty</b>, Notes (optional). Use "HO" as the store ID for the warehouse. Rows are grouped by From/To pair automatically.</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="downloadTransferTemplate()">⬇️ Download Template</button>
+          <input type="file" id="tr-bulk-file" style="display:none" accept=".xlsx,.csv" onchange="uploadBulkTransfer(this.files[0])">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('tr-bulk-file').click()">📂 Upload File</button>
+        </div>
+        <div id="tr-bulk-result" style="margin-top:8px;font-size:12px"></div>
       </div>
       <div class="card"><div class="card-title">📋 Transfer History</div>
         <table><thead><tr><th>Ref</th><th>Date</th><th>From</th><th>To</th><th>Product</th><th>Qty</th><th>Status</th></tr></thead>

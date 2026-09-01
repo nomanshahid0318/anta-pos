@@ -306,7 +306,7 @@ async function removeCategory(name){
   if(res&&res.ok){DATA.categories=res.categories;renderCategoryOptions();toast('Category removed');}
   else toast('❌ '+((res&&res.msg)||'Failed'),'error');
 }
-function populateStoreSelects(id){const ids=id?[id]:['stgrn-store','tr-from','tr-to','pl-store','rpt-store','exp-store-filter','u-store','bs-store','recalc-store','fa-store'];const stores=DATA.stores.length?DATA.stores.filter(s=>s.StoreID!=='HO'):[{StoreID:'s1',Name:'Store 1 — Tripoli'},{StoreID:'s2',Name:'Store 2 — Benghazi'},{StoreID:'s3',Name:'Store 3 — Misrata'}];ids.forEach(selId=>{const el=$(selId);if(!el)return;const hasAll=!['stgrn-store','tr-from','tr-to','u-store','recalc-store','fa-store'].includes(selId);const storeList=(selId==='u-store'||selId==='fa-store')?[{StoreID:'HO',Name:'Head Office'},...stores]:stores;el.innerHTML=(hasAll?'<option value="all">All Stores</option>':'')+storeList.map(s=>`<option value="${s.StoreID}">${s.Name}</option>`).join('');});}
+function populateStoreSelects(id){const ids=id?[id]:['stgrn-store','tr-from','tr-to','pl-store','rpt-store','exp-store-filter','u-store','bs-store','recalc-store','fa-store'];const stores=DATA.stores.length?DATA.stores.filter(s=>s.StoreID!=='HO'):[{StoreID:'s1',Name:'Store 1 — Tripoli'},{StoreID:'s2',Name:'Store 2 — Benghazi'},{StoreID:'s3',Name:'Store 3 — Misrata'}];ids.forEach(selId=>{const el=$(selId);if(!el)return;const hasAll=!['stgrn-store','tr-from','tr-to','u-store','recalc-store','fa-store'].includes(selId);const storeList=(selId==='u-store'||selId==='fa-store'||selId==='tr-from'||selId==='tr-to')?[{StoreID:'HO',Name:'Head Office (Warehouse)'},...stores]:stores;el.innerHTML=(hasAll?'<option value="all">All Stores</option>':'')+storeList.map(s=>`<option value="${s.StoreID}">${s.Name}</option>`).join('');});}
 function renderDash(){const d=DATA.dashboard;const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};if(d){set('d-rev',fmt(d.totalRevenue||0));set('d-inv',d.totalInvoices||0);set('d-net',fmt(d.netRevenue||0));set('d-atv',fmt(d.atv||0));set('d-ret',fmt(d.totalReturns||0));set('d-ret-pct',d.totalRevenue?(d.totalReturns/d.totalRevenue*100).toFixed(1)+'% return rate':'0%');set('d-ho-stock',DATA.warehouse.filter(w=>(+w.OnHand||0)>0).length);
 const pm=d.paymentBreakdown||{},totR=d.totalRevenue||1;if($('d-pay'))$('d-pay').innerHTML=Object.entries(pm).map(([m,v])=>{const pct=Math.round(v/totR*100);return`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>${m}</span><span class="fw7">${fmt(v)} (${pct}%)</span></div><div style="background:var(--gray1);border-radius:4px;height:7px"><div style="background:var(--accent2);width:${pct}%;height:100%;border-radius:4px"></div></div></div>`;}).join('')||'<div style="color:var(--gray3);font-size:11px;padding:14px;text-align:center">Load data first</div>';
 if($('d-low'))$('d-low').innerHTML=(d.lowStock||[]).slice(0,8).map(i=>`<tr><td style="font-size:11px">${i.store||'—'}</td><td class="fw7" style="font-size:11px">${String(i.name||i.barcode||'').slice(0,28)}</td><td style="font-weight:800;color:${+i.onHand<=0?'var(--red)':'var(--amber)'}">${i.onHand}</td><td><button class="btn btn-green btn-sm" onclick="show('store-grn')">📦</button></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty-state"><div class="ico">✅</div><div class="title">All stock levels healthy</div><div class="sub">No low-stock alerts right now</div></div></td></tr>';}
@@ -776,6 +776,33 @@ function trBC(i,bc){
   },250);
 }
 async function doTransfer(){const from=$('tr-from').value,to=$('tr-to').value;if(from===to||!trLines.length){toast('Invalid transfer','error');return;}const stores=DATA.stores;const res=await api('/api/ho/transfer',{method:'POST',body:{date:today(),fromStoreId:from,fromStore:(stores.find(s=>s.StoreID===from)||{}).Name||from,toStoreId:to,toStore:(stores.find(s=>s.StoreID===to)||{}).Name||to,lines:trLines}});if(res&&res.ok){toast('✅ Transfer '+res.count);trLines=[];renderTrLines();await loadAll();}else toast('❌ Failed','error');}
+function downloadTransferTemplate(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['From Store ID,To Store ID,Barcode,Qty,Notes\nHO,s1,8001000000001,20,Restock\ns1,HO,8001000000001,5,Return excess\n'],{type:'text/csv'}));
+  a.download='transfer_template.csv';a.click();
+}
+async function uploadBulkTransfer(file){
+  if(!file)return;
+  const rowsRaw=await readExcel(file);
+  const storeName=id=>{if(id==='HO')return 'Head Office';const s=DATA.stores.find(x=>x.StoreID===id);return s?s.Name:id;};
+  const rows=rowsRaw.map(r=>({
+    fromStoreId:String(r['From Store ID']||r.fromStoreId||'').trim(),
+    toStoreId:String(r['To Store ID']||r.toStoreId||'').trim(),
+    barcode:cleanId(r.Barcode||r.barcode||''),
+    qty:+(r.Qty||r.qty||0),
+    notes:String(r.Notes||r.notes||''),
+  })).filter(r=>r.fromStoreId&&r.toStoreId&&r.barcode&&r.qty>0).map(r=>({...r,fromStore:storeName(r.fromStoreId),toStore:storeName(r.toStoreId)}));
+  if(!rows.length){toast('No valid rows found — check From/To/Barcode/Qty columns','error');return;}
+  if(!confirm(`Transfer ${rows.length} line(s)? Stock will move immediately.`))return;
+  const res=await api('/api/ho/transfers/bulk',{method:'POST',body:{rows}});
+  if(res&&res.ok){
+    let msg=`✅ ${res.count} line(s) transferred.`;
+    if(res.errors&&res.errors.length)msg+=` ⚠️ ${res.errors.length} issue(s): ${res.errors.join('; ')}`;
+    if($('tr-bulk-result'))$('tr-bulk-result').innerHTML=msg;
+    toast('✅ Bulk transfer complete');
+    await loadAll();
+  } else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
+}
 function renderTrHist(){if($('tr-hist'))$('tr-hist').innerHTML=DATA.transfers.slice(0,20).map(t=>`<tr><td class="fw7">${t.RefID}</td><td>${t.Date}</td><td>${t.FromStore}</td><td>${t.ToStore}</td><td>${(t.Name||'').slice(0,25)}</td><td>${t.Qty}</td><td><span class="badge badge-green">${t.Status}</span></td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:13px">No transfers</td></tr>';}
 let selectedProducts = new Set();
 function toggleAllProducts(cb){
@@ -3062,7 +3089,7 @@ function loadPOLinesForInvoice(){
   if($('twm-lines'))$('twm-lines').innerHTML=po.lines.map((l,i)=>`<tr>
     <td style="font-family:monospace;font-size:10px">${l.barcode}<input type="hidden" id="twm-name-${i}" value="${l.name}"></td>
     <td>${l.name}</td>
-    <td><input class="form-input" type="number" style="width:75px;padding:4px 7px" id="twm-qty-${i}" value="${l.qtyReceived||l.qtyOrdered}"></td>
+    <td><input class="form-input" type="number" style="width:75px;padding:4px 7px" id="twm-qty-${i}" value="${l.qtyReceived!=null?l.qtyReceived:0}" title="Enter the quantity the SUPPLIER'S INVOICE actually bills for — this is pre-filled from what was received, not what was ordered, so a short-shipment shows up as a real mismatch instead of being hidden."></td>
     <td><input class="form-input" type="number" style="width:85px;padding:4px 7px" id="twm-cost-${i}" value="${l.unitCost}"></td>
   </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:12px">No lines</td></tr>';
   window.__twmCurrentLines=po.lines;
