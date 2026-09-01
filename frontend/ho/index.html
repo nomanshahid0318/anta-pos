@@ -72,6 +72,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <button class="btn btn-ghost btn-sm" onclick="hoLogout()" title="Logout">🚪 <span class="btn-label-text">Logout</span></button>
   </div>
   <div class="sync-bar"><div class="dot offline" id="sync-dot"></div><div><div id="sync-lbl" style="font-size:10px">Offline</div><div id="sync-last" style="font-size:9px;opacity:.6">—</div></div></div>
+  <div class="sidebar-search"><span class="sidebar-search-ico">🔍</span><input id="sidebar-search-input" placeholder="Search menu..." oninput="filterSidebarNav(this.value)"></div>
   <nav>
     <div class="nav-sec">Overview</div>
     <div class="nav-item active" onclick="show('dashboard')"><span class="ico">🏢</span>HO Dashboard</div>
@@ -165,49 +166,49 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="dash-hero">
       <div class="dash-hero-top">
         <div>
-          <div class="dash-hero-eyebrow">HEAD OFFICE · ALL STORES</div>
-          <div class="dash-hero-status" id="dash-status">Click Load Live Data after admin login</div>
+          <div class="dash-hero-eyebrow" data-i18n="dash_eyebrow">HEAD OFFICE · ALL STORES</div>
+          <div class="dash-hero-status" id="dash-status" data-i18n="dash_click_load">Click Load Live Data after admin login</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="loadAll()" style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25)">🔄 Load Live Data</button>
+        <button class="btn btn-primary btn-sm" onclick="loadAll()" style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25)"><span data-i18n="dash_load_live">🔄 Load Live Data</span></button>
       </div>
       <div class="dash-hero-body">
         <div>
-          <div class="dash-hero-metric-label">Total Revenue</div>
+          <div class="dash-hero-metric-label" data-i18n="dash_total_revenue">Total Revenue</div>
           <div class="dash-hero-metric-value" id="d-rev">LYD 0</div>
         </div>
         <div class="dash-hero-stats">
-          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Net Revenue</div><div class="dash-hero-stat-value" id="d-net">LYD 0</div><div class="dash-hero-stat-sub">after returns</div></div>
-          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Invoices</div><div class="dash-hero-stat-value" id="d-inv">0</div><div class="dash-hero-stat-sub">all stores</div></div>
-          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Avg Basket</div><div class="dash-hero-stat-value" id="d-atv">LYD 0</div><div class="dash-hero-stat-sub">blended</div></div>
-          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Returns</div><div class="dash-hero-stat-value" id="d-ret">LYD 0</div><div class="dash-hero-stat-sub" id="d-ret-pct">0%</div></div>
-          <div class="dash-hero-stat"><div class="dash-hero-stat-label">HO Warehouse</div><div class="dash-hero-stat-value" id="d-ho-stock">0</div><div class="dash-hero-stat-sub">SKUs in stock</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label" data-i18n="dash_net_revenue">Net Revenue</div><div class="dash-hero-stat-value" id="d-net">LYD 0</div><div class="dash-hero-stat-sub" data-i18n="dash_after_returns">after returns</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label" data-i18n="dash_invoices">Invoices</div><div class="dash-hero-stat-value" id="d-inv">0</div><div class="dash-hero-stat-sub" data-i18n="dash_all_stores">all stores</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label" data-i18n="dash_avg_basket">Avg Basket</div><div class="dash-hero-stat-value" id="d-atv">LYD 0</div><div class="dash-hero-stat-sub" data-i18n="dash_blended">blended</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label" data-i18n="dash_returns">Returns</div><div class="dash-hero-stat-value" id="d-ret">LYD 0</div><div class="dash-hero-stat-sub" id="d-ret-pct">0%</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label" data-i18n="dash_ho_warehouse">HO Warehouse</div><div class="dash-hero-stat-value" id="d-ho-stock">0</div><div class="dash-hero-stat-sub" data-i18n="dash_skus_in_stock">SKUs in stock</div></div>
         </div>
       </div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="show('products')">➕ Add Product</button>
-      <button class="btn btn-ghost btn-sm" onclick="show('purchase-orders')">📝 New Purchase Order</button>
-      <button class="btn btn-ghost btn-sm" onclick="show('customers')">🧑‍🤝‍🧑 Add Customer</button>
-      <button class="btn btn-ghost btn-sm" onclick="show('supplier-grn')">📦 Receive Stock</button>
-      <button class="btn btn-ghost btn-sm" onclick="show('reports')">📈 View Reports</button>
+      <button class="btn btn-ghost btn-sm" onclick="show('products')"><span data-i18n="dash_add_product">➕ Add Product</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="show('purchase-orders')"><span data-i18n="dash_new_po">📝 New Purchase Order</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="show('customers')"><span data-i18n="dash_add_customer">🧑‍🤝‍🧑 Add Customer</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="show('supplier-grn')"><span data-i18n="dash_receive_stock">📦 Receive Stock</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="show('reports')"><span data-i18n="dash_view_reports">📈 View Reports</span></button>
     </div>
     <div class="card" style="margin-bottom:16px">
-      <div class="card-title">🏆 Store Leaderboard — Revenue</div>
+      <div class="card-title"><span data-i18n="dash_leaderboard_title">🏆 Store Leaderboard — Revenue</span></div>
       <div class="leaderboard" id="store-cards"></div>
     </div>
     <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:14px">
       <div class="card">
-        <div class="card-title">📈 Revenue — Last 7 Days</div>
+        <div class="card-title"><span data-i18n="dash_revenue_7d">📈 Revenue — Last 7 Days</span></div>
         <div id="d-trend"></div>
       </div>
       <div class="card">
-        <div class="card-title">🧾 Recent Activity</div>
+        <div class="card-title"><span data-i18n="dash_recent_activity">🧾 Recent Activity</span></div>
         <div id="d-activity" style="max-height:230px;overflow-y:auto"></div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div class="card"><div class="card-title">💳 Payment Breakdown</div><div id="d-pay"></div></div>
-      <div class="card"><div class="card-title">⚠️ Low Stock — All Stores</div><table><thead><tr><th>Store</th><th>Product</th><th>Stock</th><th>Action</th></tr></thead><tbody id="d-low"></tbody></table></div>
+      <div class="card"><div class="card-title"><span data-i18n="dash_payment_breakdown">💳 Payment Breakdown</span></div><div id="d-pay"></div></div>
+      <div class="card"><div class="card-title"><span data-i18n="dash_low_stock">⚠️ Low Stock — All Stores</span></div><table><thead><tr><th data-i18n="dash_th_store">Store</th><th data-i18n="dash_th_product">Product</th><th data-i18n="dash_th_stock">Stock</th><th data-i18n="dash_th_action">Action</th></tr></thead><tbody id="d-low"></tbody></table></div>
     </div>
   </div>
 

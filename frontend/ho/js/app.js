@@ -96,7 +96,7 @@ function setSyncStatus(state,label){[$('sync-dot'),$('top-dot')].forEach(d=>{if(
   if(state==='syncing'){
     if(!_hoLoadTimer){_hoLoadStart=Date.now();_hoTickLoadLabel();_hoLoadTimer=setInterval(_hoTickLoadLabel,1000);}
   }else if(_hoLoadTimer){clearInterval(_hoLoadTimer);_hoLoadTimer=null;}
-  if(state!=='syncing'){const l=$('sync-lbl');if(l)l.textContent=state==='online'?'🟢 Connected':'🔴 Offline';const tl=$('top-lbl');if(tl)tl.textContent=state==='online'?'Online':'Offline';}
+  if(state!=='syncing'){const l=$('sync-lbl');if(l)l.textContent=state==='online'?'🟢 '+hoT('status_connected'):'🔴 '+hoT('status_offline');const tl=$('top-lbl');if(tl)tl.textContent=state==='online'?hoT('status_online'):hoT('status_offline');}
   const sl=$('sync-last');if(sl&&label)sl.textContent=label;isOnline=state==='online';}
 let _hoAutoRefreshTimer=null,_hoAutoRefreshing=false;
 function startHoAutoRefresh(){
@@ -208,7 +208,7 @@ if(wh&&wh.data)DATA.warehouse=wh.data;if(sgrns&&sgrns.data)DATA.supplierGRNs=sgr
 if(sups&&sups.data)suppliers=sups.data;if(suptx&&suptx.data)supplierTxns=suptx.data;if(caps&&caps.data)capitalEntries=caps.data;
 if(bs&&bs.data)bsEntries=bs.data.map(b=>({id:b.id,type:b.type,desc:b.desc,amount:b.amount,date:b.date}));
 if(cf&&cf.data){cfItems={investing:[],financing:[]};cf.data.forEach(c=>{if(!cfItems[c.section])cfItems[c.section]=[];cfItems[c.section].push({label:c.label,value:c.value});});}
-setSyncStatus('online','Loaded: '+new Date().toLocaleTimeString());if($('dash-status'))$('dash-status').textContent='Live data loaded: '+new Date().toLocaleTimeString();
+setSyncStatus('online','Loaded: '+new Date().toLocaleTimeString());if($('dash-status'))$('dash-status').textContent=hoT('dash_data_loaded')+': '+new Date().toLocaleTimeString();
 renderDash();populateStoreSelects();try{await loadCategories();}catch(_e){}
 if(currentScreenName()==='products'){try{await fetchAndRenderProductsPage();}catch(_e){}}
 toast('✅ All data loaded!');}catch(e){setSyncStatus('offline','Error');toast('❌ '+e.message,'error');}}
@@ -315,7 +315,7 @@ const sb=DATA.dashboard?.storeBreakdown||[];
 const lbRows=stores.map(s=>{const b=sb.find(x=>x.store===s.Name||x.store===s.StoreID||x.name===s.Name);return {name:s.Name,rev:b?(b.revenue||0):null,invoices:b?(b.invoices||0):0,returns:b?(b.returns||0):0,hasData:!!b};}).sort((a,b)=>(b.rev||0)-(a.rev||0));
 const maxRev=Math.max(...lbRows.map(r=>r.rev||0),1);
 if($('store-cards'))$('store-cards').innerHTML=lbRows.map((r,i)=>{
-  if(!r.hasData)return `<div class="lb-row"><div class="lb-rank">${i+1}</div><div class="lb-name">${r.name}</div><div class="lb-track"></div><div class="lb-stats"><span class="badge badge-gray">No data</span></div></div>`;
+  if(!r.hasData)return `<div class="lb-row"><div class="lb-rank">${i+1}</div><div class="lb-name">${r.name}</div><div class="lb-track"></div><div class="lb-stats"><span class="badge badge-gray">${hoT('dash_no_data')}</span></div></div>`;
   const pct=Math.max(3,Math.round(r.rev/maxRev*100));
   const net=r.rev-r.returns;
   return `<div class="lb-row">
@@ -323,12 +323,12 @@ if($('store-cards'))$('store-cards').innerHTML=lbRows.map((r,i)=>{
     <div class="lb-name">${r.name}</div>
     <div class="lb-track"><div class="lb-fill" style="width:${pct}%"></div></div>
     <div class="lb-stats">
-      <div><div class="lb-stat-value">${fmt(r.rev)}</div><div class="lb-stat-label">Revenue</div></div>
-      <div><div class="lb-stat-value">${r.invoices}</div><div class="lb-stat-label">Invoices</div></div>
-      <div><div class="lb-stat-value">${fmt(net)}</div><div class="lb-stat-label">Net</div></div>
+      <div><div class="lb-stat-value">${fmt(r.rev)}</div><div class="lb-stat-label">${hoT('dash_lb_revenue')}</div></div>
+      <div><div class="lb-stat-value">${r.invoices}</div><div class="lb-stat-label">${hoT('dash_lb_invoices')}</div></div>
+      <div><div class="lb-stat-value">${fmt(net)}</div><div class="lb-stat-label">${hoT('dash_lb_net')}</div></div>
     </div>
   </div>`;
-}).join('')||'<div class="lb-empty">No store data yet — click Load Live Data</div>';
+}).join('')||`<div class="lb-empty">${hoT('dash_no_store_data')}</div>`;
 renderRevenueTrend();renderActivityFeed();}
 function renderRevenueTrend(){
   const el=$('d-trend');
@@ -339,12 +339,12 @@ function renderRevenueTrend(){
   (DATA.sales||[]).forEach(s=>{if(byDay[s.Date]!==undefined)byDay[s.Date]+=(+s.Total||0);});
   const max=Math.max(...days.map(d=>byDay[d]),1);
   const total=days.reduce((a,d)=>a+byDay[d],0);
-  if(!total){el.innerHTML='<div style="text-align:center;color:var(--gray3);padding:30px;font-size:12px">No sales in the last 7 days yet</div>';return;}
+  if(!total){el.innerHTML=`<div style="text-align:center;color:var(--gray3);padding:30px;font-size:12px">${hoT('dash_no_sales_7d')}</div>`;return;}
   el.innerHTML=`<div class="bar-wrap" style="height:120px">${days.map(d=>{
     const v=byDay[d];const h=Math.max(4,Math.round(v/max*100));
-    const lbl=new Date(d+'T00:00:00').toLocaleDateString(undefined,{weekday:'short'});
+    const lbl=new Date(d+'T00:00:00').toLocaleDateString((localStorage.getItem('anta_lang')==='ar')?'ar':'en',{weekday:'short'});
     return `<div class="bar-grp" title="${d}: ${fmt(v)}"><div class="bar" style="height:${h}px;background:var(--accent2)"></div><div class="bar-lbl">${lbl}</div></div>`;
-  }).join('')}</div><div style="margin-top:10px;font-size:11px;color:var(--gray4)">7-day total: <b style="color:var(--navy)">${fmt(total)}</b></div>`;
+  }).join('')}</div><div style="margin-top:10px;font-size:11px;color:var(--gray4)">${hoT('dash_7day_total')}: <b style="color:var(--navy)">${fmt(total)}</b></div>`;
 }
 function renderActivityFeed(){
   const el=$('d-activity');
@@ -3355,6 +3355,23 @@ document.addEventListener('keydown',e=>{
     }
   }catch(e){}
 })();
+function filterSidebarNav(q){
+  const query=(q||'').trim().toLowerCase();
+  const items=document.querySelectorAll('#sidebar .nav-item[onclick]');
+  const secs=document.querySelectorAll('#sidebar .nav-sec');
+  items.forEach(el=>{
+    const label=(el.querySelector('.nav-label-text')?.textContent||el.textContent||'').toLowerCase();
+    el.style.display=(!query||label.includes(query))?'':'none';
+  });
+  secs.forEach(sec=>{
+    let sib=sec.nextElementSibling,hasVisible=false;
+    while(sib&&!sib.classList.contains('nav-sec')){
+      if(sib.classList.contains('nav-item')&&sib.style.display!=='none')hasVisible=true;
+      sib=sib.nextElementSibling;
+    }
+    sec.style.display=(!query||hasVisible)?'':'none';
+  });
+}
 function toggleSidebarCollapse(){
   const sb=document.getElementById('sidebar');
   if(!sb)return;
@@ -3426,9 +3443,23 @@ const HO_I18N = {
     payroll:'Payroll', attendance:'Attendance', costcenters:'Cost Centers & Projects', addons:'Cheques',
     budget:'Budget vs Actual', 'three-way-match':'Invoice Matching', 'stock-counts':'Stock Take / Physical Count',
     shifts:'Cashier Shifts', 'employee-advances':'Employee Advances', 'accrued-expenses':'Accrued Expenses',
+    dash_data_loaded:'Live data loaded', dash_click_load:'Click Load Live Data after admin login',
+    status_online:'Online', status_offline:'Offline', status_connected:'Connected',
     overview:'Overview', stock:'Stock Management', finance:'Finance', admin:'Admin', products_sec:'Products',
     reports_sec:'Reports', lang_btn:'العربية / EN', switch_ar:'تم التبديل إلى العربية', switch_en:'Switched to English',
-    logout:'Logout', refresh:'Refresh'
+    logout:'Logout', refresh:'Refresh',
+    dash_eyebrow:'HEAD OFFICE · ALL STORES', dash_click_load:'Click Load Live Data after admin login',
+    dash_load_live:'🔄 Load Live Data', dash_total_revenue:'Total Revenue', dash_net_revenue:'Net Revenue',
+    dash_after_returns:'after returns', dash_invoices:'Invoices', dash_all_stores:'all stores',
+    dash_avg_basket:'Avg Basket', dash_blended:'blended', dash_returns:'Returns', dash_ho_warehouse:'HO Warehouse',
+    dash_skus_in_stock:'SKUs in stock', dash_add_product:'➕ Add Product', dash_new_po:'📝 New Purchase Order',
+    dash_add_customer:'🧑\u200d🤝\u200d🧑 Add Customer', dash_receive_stock:'📦 Receive Stock', dash_view_reports:'📈 View Reports',
+    dash_leaderboard_title:'🏆 Store Leaderboard — Revenue', dash_revenue_7d:'📈 Revenue — Last 7 Days',
+    dash_recent_activity:'🧾 Recent Activity', dash_payment_breakdown:'💳 Payment Breakdown',
+    dash_low_stock:'⚠️ Low Stock — All Stores', dash_th_store:'Store', dash_th_product:'Product',
+    dash_th_stock:'Stock', dash_th_action:'Action', dash_no_data:'No data', dash_lb_revenue:'Revenue',
+    dash_lb_invoices:'Invoices', dash_lb_net:'Net', dash_no_store_data:'No store data yet — click Load Live Data',
+    dash_no_sales_7d:'No sales in the last 7 days yet', dash_7day_total:'7-day total'
   },
   ar: {
     dashboard:'لوحة المكتب الرئيسي', 'stores-view':'كل المتاجر', warehouse:'مستودع المكتب', 'supplier-grn':'استلام من المورد',
@@ -3442,9 +3473,23 @@ const HO_I18N = {
     payroll:'الرواتب', attendance:'الحضور والانصراف', costcenters:'مراكز التكلفة والمشاريع', addons:'الشيكات',
     budget:'الموازنة مقابل الفعلي', 'three-way-match':'مطابقة الفواتير', 'stock-counts':'الجرد الفعلي للمخزون',
     shifts:'ورديات الكاشير', 'employee-advances':'سلف الموظفين', 'accrued-expenses':'المصروفات المستحقة',
+    dash_data_loaded:'تم تحميل البيانات الحية', dash_click_load:'اضغط لتحميل البيانات الحية بعد تسجيل دخول المدير',
+    status_online:'متصل', status_offline:'غير متصل', status_connected:'متصل بالخادم',
     overview:'نظرة عامة', stock:'إدارة المخزون', finance:'المالية', admin:'الإدارة', products_sec:'المنتجات',
     reports_sec:'التقارير', lang_btn:'EN / العربية', switch_ar:'تم التبديل إلى العربية', switch_en:'تم التبديل إلى الإنجليزية',
-    logout:'تسجيل الخروج', refresh:'تحديث'
+    logout:'تسجيل الخروج', refresh:'تحديث',
+    dash_eyebrow:'المكتب الرئيسي · كل المتاجر', dash_click_load:'اضغط تحميل البيانات الحية بعد تسجيل دخول المدير',
+    dash_load_live:'🔄 تحميل البيانات الحية', dash_total_revenue:'إجمالي الإيرادات', dash_net_revenue:'صافي الإيرادات',
+    dash_after_returns:'بعد المرتجعات', dash_invoices:'الفواتير', dash_all_stores:'كل المتاجر',
+    dash_avg_basket:'متوسط الفاتورة', dash_blended:'إجمالي', dash_returns:'المرتجعات', dash_ho_warehouse:'مستودع المكتب',
+    dash_skus_in_stock:'منتج متوفر', dash_add_product:'➕ إضافة منتج', dash_new_po:'📝 أمر شراء جديد',
+    dash_add_customer:'🧑\u200d🤝\u200d🧑 إضافة عميل', dash_receive_stock:'📦 استلام مخزون', dash_view_reports:'📈 عرض التقارير',
+    dash_leaderboard_title:'🏆 ترتيب المتاجر — الإيرادات', dash_revenue_7d:'📈 الإيرادات — آخر 7 أيام',
+    dash_recent_activity:'🧾 النشاط الأخير', dash_payment_breakdown:'💳 توزيع طرق الدفع',
+    dash_low_stock:'⚠️ مخزون منخفض — كل المتاجر', dash_th_store:'المتجر', dash_th_product:'المنتج',
+    dash_th_stock:'المخزون', dash_th_action:'إجراء', dash_no_data:'لا توجد بيانات', dash_lb_revenue:'الإيرادات',
+    dash_lb_invoices:'الفواتير', dash_lb_net:'الصافي', dash_no_store_data:'لا توجد بيانات بعد — اضغط تحميل البيانات الحية',
+    dash_no_sales_7d:'لا توجد مبيعات في آخر 7 أيام', dash_7day_total:'إجمالي 7 أيام'
   }
 };
 function hoT(key){
@@ -3460,6 +3505,10 @@ function applyLang(){
     r.setAttribute('dir', lang==='ar' ? 'rtl' : 'ltr');
     if (document.body) document.body.setAttribute('dir', lang==='ar' ? 'rtl' : 'ltr');
 
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (key) el.textContent = hoT(key);
+    });
     document.querySelectorAll('.nav-item[onclick]').forEach(el => {
       const oc = el.getAttribute('onclick') || '';
       const m = oc.match(/show\('([^']+)'\)/);
