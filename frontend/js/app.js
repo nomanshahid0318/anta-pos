@@ -856,7 +856,12 @@ function renderQuick() {
     .filter((p) => p.active !== 'N')
     .map((p) => {
       const s = getStock(p.barcode);
-      return `<div onclick="addToCart('${p.barcode}')" style="padding:9px;border:1.5px solid var(--gray2);border-radius:8px;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.borderColor='var(--accent2)';this.style.background='#f0f7ff'" onmouseout="this.style.borderColor='var(--gray2)';this.style.background='#fff'"><div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:1px">${p.name}</div><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:800;color:var(--accent)">${fmt(p.retail)}</span><span class="badge ${s <= 0 ? 'badge-red' : s <= p.reorder ? 'badge-amber' : 'badge-green'}">${s <= 0 ? 'OUT' : s}</span></div></div>`;
+      const stockClass = s <= 0 ? 'stock-out' : s <= p.reorder ? 'stock-low' : 'stock-ok';
+      const stockLabel = s <= 0 ? 'OUT' : s + ' left';
+      return `<div class="prod-tile ${stockClass}" ${s<=0?'':`onclick="addToCart('${p.barcode}')"`}>
+        <div class="prod-tile-name">${p.name}</div>
+        <div class="prod-tile-foot"><span class="prod-tile-price">${fmt(p.retail)}</span><span class="prod-tile-stock">${stockLabel}</span></div>
+      </div>`;
     })
     .join('');
 }
