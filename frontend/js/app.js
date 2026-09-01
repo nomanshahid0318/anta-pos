@@ -1,3 +1,51 @@
+// ============ THEME CUSTOMIZATION SYSTEM ============
+const THEME_PRESETS=[
+  {name:'ANTA Red',navy:'#101b36',accent:'#e0294d',accent2:'#2e5aeb'},
+  {name:'Ocean',navy:'#0c2340',accent:'#00a8a8',accent2:'#0077b6'},
+  {name:'Emerald',navy:'#0b2e23',accent:'#059669',accent2:'#0d9488'},
+  {name:'Sunset',navy:'#3d1e12',accent:'#ea580c',accent2:'#f59e0b'},
+  {name:'Royal',navy:'#241b3d',accent:'#7c3aed',accent2:'#a855f7'},
+  {name:'Charcoal Gold',navy:'#1a1a1a',accent:'#c9a227',accent2:'#8a7530'},
+  {name:'Slate',navy:'#1e293b',accent:'#0ea5e9',accent2:'#64748b'},
+  {name:'Burgundy',navy:'#2d1220',accent:'#9f1239',accent2:'#be185d'},
+];
+function _hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
+function _rgbToHex([r,g,b]){return '#'+[r,g,b].map(c=>Math.max(0,Math.min(255,Math.round(c))).toString(16).padStart(2,'0')).join('');}
+function _shadeDarken(hex,pct){const [r,g,b]=_hexToRgb(hex);return _rgbToHex([r*(1-pct),g*(1-pct),b*(1-pct)]);}
+function _shadeLighten(hex,pct){const [r,g,b]=_hexToRgb(hex);return _rgbToHex([r+(255-r)*pct,g+(255-g)*pct,b+(255-b)*pct]);}
+function deriveTheme(navy,accent,accent2){
+  return {
+    navy, navy2:_shadeLighten(navy,0.18), blue:_shadeLighten(navy,0.30),
+    accent, accentDark:_shadeDarken(accent,0.18),
+    accent2, accent2Light:_shadeLighten(accent2,0.92),
+  };
+}
+function applyTheme(t){
+  const r=document.documentElement.style;
+  r.setProperty('--navy',t.navy); r.setProperty('--navy2',t.navy2); r.setProperty('--blue',t.blue);
+  r.setProperty('--accent',t.accent); r.setProperty('--accent-dark',t.accentDark);
+  r.setProperty('--accent2',t.accent2); r.setProperty('--accent2-light',t.accent2Light);
+}
+function saveTheme(navy,accent,accent2){
+  const t=deriveTheme(navy,accent,accent2);
+  applyTheme(t);
+  localStorage.setItem('anta_theme',JSON.stringify({navy,accent,accent2}));
+  try{ api('/api/settings',{method:'PUT',body:{appTheme:JSON.stringify({navy,accent,accent2})}}); }catch(e){}
+}
+function loadSavedTheme(){
+  try{
+    const saved=localStorage.getItem('anta_theme');
+    if(saved){ const c=JSON.parse(saved); applyTheme(deriveTheme(c.navy,c.accent,c.accent2)); return c; }
+  }catch(e){}
+  return null;
+}
+function resetTheme(){
+  localStorage.removeItem('anta_theme');
+  applyTheme(deriveTheme(THEME_PRESETS[0].navy,THEME_PRESETS[0].accent,THEME_PRESETS[0].accent2));
+  try{ api('/api/settings',{method:'PUT',body:{appTheme:''}}); }catch(e){}
+}
+// Apply saved theme immediately on script load (before most rendering) to avoid a flash of default colors.
+loadSavedTheme();
 /* ============================================================
    ANTA Shoes POS v4 — Database-backed client (no Google Sheets)
    ============================================================ */
@@ -508,6 +556,7 @@ function show(name) {
     document.getElementById('s-policy').value = DB.settings.policy || '';
     renderBanksList();
     updateActivityLog();
+    renderThemeUI();
   }
   const sb = document.getElementById('sidebar');
   if (sb) sb.classList.remove('open');
@@ -2313,6 +2362,7 @@ function applyRoleUI(){
 async function loadAppSettings(){
   const res = await api('/api/settings');
   if(!res || !res.ok) return;
+  syncThemeFromServer(res.appTheme);
   const sn=document.getElementById('s-name'); if(sn) sn.value = res.store_name||'';
   const pn=document.getElementById('s-pos-name'); if(pn) pn.value = res.pos_name||'';
   const pol=document.getElementById('s-policy'); if(pol) pol.value = res.policy||'';
@@ -2339,3 +2389,46 @@ async function loadAppSettings(){
     } catch (e2) {}
   }
 })();
+function syncThemeFromServer(appThemeJson){
+  if(!appThemeJson)return;
+  try{
+    const c=JSON.parse(appThemeJson);
+    const local=localStorage.getItem('anta_theme');
+    if(JSON.stringify(c)!==local){
+      applyTheme(deriveTheme(c.navy,c.accent,c.accent2));
+      localStorage.setItem('anta_theme',JSON.stringify(c));
+    }
+  }catch(e){}
+}
+function renderThemeUI(){
+  const current=JSON.parse(localStorage.getItem('anta_theme')||'null')||THEME_PRESETS[0];
+  if(document.getElementById('theme-navy'))document.getElementById('theme-navy').value=current.navy;
+  if(document.getElementById('theme-accent'))document.getElementById('theme-accent').value=current.accent;
+  if(document.getElementById('theme-accent2'))document.getElementById('theme-accent2').value=current.accent2;
+  const grid=document.getElementById('theme-preset-grid');
+  if(grid)grid.innerHTML=THEME_PRESETS.map((p,i)=>`
+    <div onclick="applyPresetTheme(${i})" style="cursor:pointer;border:2px solid ${current.navy===p.navy&&current.accent===p.accent?'var(--accent2)':'var(--gray1)'};border-radius:10px;padding:8px;text-align:center;transition:.15s" title="${p.name}">
+      <div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-bottom:6px">
+        <div style="flex:2;background:${p.navy}"></div><div style="flex:1;background:${p.accent}"></div><div style="flex:1;background:${p.accent2}"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--gray5)">${p.name}</div>
+    </div>`).join('');
+}
+function applyPresetTheme(i){
+  const p=THEME_PRESETS[i];
+  saveTheme(p.navy,p.accent,p.accent2);
+  renderThemeUI();
+}
+function previewTheme(){
+  const navy=document.getElementById('theme-navy').value,accent=document.getElementById('theme-accent').value,accent2=document.getElementById('theme-accent2').value;
+  applyTheme(deriveTheme(navy,accent,accent2));
+}
+function applyCustomTheme(){
+  const navy=document.getElementById('theme-navy').value,accent=document.getElementById('theme-accent').value,accent2=document.getElementById('theme-accent2').value;
+  saveTheme(navy,accent,accent2);
+  renderThemeUI();
+}
+function resetThemeUI(){
+  resetTheme();
+  renderThemeUI();
+}

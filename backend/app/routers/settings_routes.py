@@ -29,6 +29,7 @@ class SettingsUpdate(BaseModel):
     storeStaffLiabilityPercent: Optional[float] = None  # % of a "Store Staff" shortage charged to the employee; rest stays a company Shrinkage Expense
     monthlyDayoffEntitlement: Optional[float] = None  # paid rest days per employee per month
     lateFineAmount: Optional[float] = None  # deducted per "late" attendance mark
+    appTheme: Optional[str] = None  # JSON string {navy, accent, accent2} — user's custom color theme
 
 
 def _get_map(db: Session) -> dict[str, str]:
@@ -79,6 +80,7 @@ def get_settings(
         "storeStaffLiabilityPercent": float(m.get("store_staff_liability_percent", 50)),
         "monthlyDayoffEntitlement": float(m.get("monthly_dayoff_entitlement", 4)),
         "lateFineAmount": float(m.get("late_fine_amount", 10)),
+        "appTheme": m.get("app_theme", ""),
         "store_id": user.store_id,
         "store_name": store.name if store else user.store_name,
     }
@@ -114,6 +116,8 @@ def update_settings(
         _put(db, "monthly_dayoff_entitlement", str(body.monthlyDayoffEntitlement))
     if body.lateFineAmount is not None:
         _put(db, "late_fine_amount", str(body.lateFineAmount))
+    if body.appTheme is not None:
+        _put(db, "app_theme", body.appTheme)
     if body.store_name is not None:
         sid = body.store_id or user.store_id
         store = db.query(Store).filter(Store.store_id == sid).first()

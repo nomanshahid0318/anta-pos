@@ -1,3 +1,51 @@
+// ============ THEME CUSTOMIZATION SYSTEM ============
+const THEME_PRESETS=[
+  {name:'ANTA Red',navy:'#101b36',accent:'#e0294d',accent2:'#2e5aeb'},
+  {name:'Ocean',navy:'#0c2340',accent:'#00a8a8',accent2:'#0077b6'},
+  {name:'Emerald',navy:'#0b2e23',accent:'#059669',accent2:'#0d9488'},
+  {name:'Sunset',navy:'#3d1e12',accent:'#ea580c',accent2:'#f59e0b'},
+  {name:'Royal',navy:'#241b3d',accent:'#7c3aed',accent2:'#a855f7'},
+  {name:'Charcoal Gold',navy:'#1a1a1a',accent:'#c9a227',accent2:'#8a7530'},
+  {name:'Slate',navy:'#1e293b',accent:'#0ea5e9',accent2:'#64748b'},
+  {name:'Burgundy',navy:'#2d1220',accent:'#9f1239',accent2:'#be185d'},
+];
+function _hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
+function _rgbToHex([r,g,b]){return '#'+[r,g,b].map(c=>Math.max(0,Math.min(255,Math.round(c))).toString(16).padStart(2,'0')).join('');}
+function _shadeDarken(hex,pct){const [r,g,b]=_hexToRgb(hex);return _rgbToHex([r*(1-pct),g*(1-pct),b*(1-pct)]);}
+function _shadeLighten(hex,pct){const [r,g,b]=_hexToRgb(hex);return _rgbToHex([r+(255-r)*pct,g+(255-g)*pct,b+(255-b)*pct]);}
+function deriveTheme(navy,accent,accent2){
+  return {
+    navy, navy2:_shadeLighten(navy,0.18), blue:_shadeLighten(navy,0.30),
+    accent, accentDark:_shadeDarken(accent,0.18),
+    accent2, accent2Light:_shadeLighten(accent2,0.92),
+  };
+}
+function applyTheme(t){
+  const r=document.documentElement.style;
+  r.setProperty('--navy',t.navy); r.setProperty('--navy2',t.navy2); r.setProperty('--blue',t.blue);
+  r.setProperty('--accent',t.accent); r.setProperty('--accent-dark',t.accentDark);
+  r.setProperty('--accent2',t.accent2); r.setProperty('--accent2-light',t.accent2Light);
+}
+function saveTheme(navy,accent,accent2){
+  const t=deriveTheme(navy,accent,accent2);
+  applyTheme(t);
+  localStorage.setItem('anta_theme',JSON.stringify({navy,accent,accent2}));
+  try{ api('/api/settings',{method:'PUT',body:{appTheme:JSON.stringify({navy,accent,accent2})}}); }catch(e){}
+}
+function loadSavedTheme(){
+  try{
+    const saved=localStorage.getItem('anta_theme');
+    if(saved){ const c=JSON.parse(saved); applyTheme(deriveTheme(c.navy,c.accent,c.accent2)); return c; }
+  }catch(e){}
+  return null;
+}
+function resetTheme(){
+  localStorage.removeItem('anta_theme');
+  applyTheme(deriveTheme(THEME_PRESETS[0].navy,THEME_PRESETS[0].accent,THEME_PRESETS[0].accent2));
+  try{ api('/api/settings',{method:'PUT',body:{appTheme:''}}); }catch(e){}
+}
+// Apply saved theme immediately on script load (before most rendering) to avoid a flash of default colors.
+loadSavedTheme();
 /* ANTA Head Office v4 — DB API client (no Google Sheets) */
 const DEFAULT_API=(location.origin&&location.origin.startsWith('http'))?location.origin:'http://127.0.0.1:8765';
 let CFG={apiUrl:localStorage.getItem('anta_ho_api')||DEFAULT_API,token:localStorage.getItem('anta_ho_token')||''};
@@ -126,7 +174,7 @@ if(name==='transfer'){renderTrHist();populateStoreSelects();}if(name==='products
 if(name==='pl'){plPreset();populateStoreSelects('pl-store');loadPL();}if(name==='expenses-ho'){populateStoreSelects('exp-store-filter');populateStoreSelects('ho-exp-store');if($('ho-exp-date'))$('ho-exp-date').value=today();loadExpenses();populateExpenseCCDropdowns();}if(name==='promotions')loadPromosHO();if(name==='accounts'){loadTrialBalance();loadCOA();loadJournals();}if(name==='license')loadLicense();
 if(name==='reports'){rptPreset();populateStoreSelects('rpt-store');}if(name==='inventory-ho'){invAllCurrentPage=1;fetchAndRenderInvAll();}
 if(name==='stores-admin')renderStoresAdmin();if(name==='users'){renderUsers();populateStoreSelects('u-store');}if(name==='banks')renderBanks();
-if(name==='settings'){if($('api-url'))$('api-url').value=CFG.apiUrl;loadSettingsForm();}
+if(name==='settings'){if($('api-url'))$('api-url').value=CFG.apiUrl;loadSettingsForm();renderThemeUI();}
 if(name==='balance-sheet'){if($('bs-date'))$('bs-date').value=today();loadBalanceSheet();}
 if(name==='cashflow'){cfPreset();loadCashFlow();}if(name==='handovers'){populateStoreSelects('handover-store-filter');loadHOHandovers();}if(name==='supplier-accounts'){renderSupplierAccounts();if($('sup-txn-date'))$('sup-txn-date').value=today();}
 if(name==='capital'){if($('cap-date'))$('cap-date').value=today();renderCapital();}
@@ -145,6 +193,7 @@ async function fetchInBatches(fns,batchSize){
 }
 function currentScreenName(){const el=document.querySelector('.screen.active');return el?el.id.replace('screen-',''):'';}
 async function loadAll(){if(!CFG.token){toast('Login first','warn');return;}setSyncStatus('syncing','Loading...');toast('🔄 Loading live data...','info');
+api('/api/settings').then(r=>{if(r&&r.ok)syncThemeFromServer(r.appTheme);}).catch(()=>{});
 try{const [dash,sales,banks,stores,users,exps,wh,sgrns,stgrns,trs,sups,suptx,caps,bs,cf]=await fetchInBatches([
 ()=>api('/api/dashboard'),()=>api('/api/sales?limit=500'),()=>api('/api/banks'),()=>api('/api/stores/all'),()=>api('/api/auth/users'),()=>api('/api/expenses?limit=300'),
 ()=>api('/api/ho/warehouse'),()=>api('/api/ho/supplier-grns'),()=>api('/api/ho/store-grns'),()=>api('/api/ho/transfers'),()=>api('/api/ho/suppliers'),()=>api('/api/ho/supplier-txns'),()=>api('/api/ho/capital'),()=>api('/api/ho/bs-entries'),()=>api('/api/ho/cf-items')],4);
@@ -261,7 +310,25 @@ function renderDash(){const d=DATA.dashboard;const set=(id,v)=>{const el=$(id);i
 const pm=d.paymentBreakdown||{},totR=d.totalRevenue||1;if($('d-pay'))$('d-pay').innerHTML=Object.entries(pm).map(([m,v])=>{const pct=Math.round(v/totR*100);return`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>${m}</span><span class="fw7">${fmt(v)} (${pct}%)</span></div><div style="background:var(--gray1);border-radius:4px;height:7px"><div style="background:var(--accent2);width:${pct}%;height:100%;border-radius:4px"></div></div></div>`;}).join('')||'<div style="color:var(--gray3);font-size:11px;padding:14px;text-align:center">Load data first</div>';
 if($('d-low'))$('d-low').innerHTML=(d.lowStock||[]).slice(0,8).map(i=>`<tr><td style="font-size:11px">${i.store||'—'}</td><td class="fw7" style="font-size:11px">${String(i.name||i.barcode||'').slice(0,28)}</td><td style="font-weight:800;color:${+i.onHand<=0?'var(--red)':'var(--amber)'}">${i.onHand}</td><td><button class="btn btn-green btn-sm" onclick="show('store-grn')">📦</button></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty-state"><div class="ico">✅</div><div class="title">All stock levels healthy</div><div class="sub">No low-stock alerts right now</div></div></td></tr>';}
 const stores=DATA.stores.length?DATA.stores.filter(s=>s.StoreID!=='HO'):[{StoreID:'s1',Name:'Store 1 — Tripoli'},{StoreID:'s2',Name:'Store 2 — Benghazi'},{StoreID:'s3',Name:'Store 3 — Misrata'}];
-const sb=DATA.dashboard?.storeBreakdown||[];if($('store-cards'))$('store-cards').innerHTML=stores.map(s=>{const b=sb.find(x=>x.store===s.Name||x.store===s.StoreID||x.name===s.Name);return`<div class="store-card"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><div style="font-weight:800;color:var(--navy)">${s.Name}</div><span class="badge ${b?'badge-green':'badge-gray'}">${b?'✅ Live':'No Data'}</span></div>${b?`<div class="store-kpis"><div class="store-kpi"><div class="store-kpi-label">Revenue</div><div class="store-kpi-value">${fmt(b.revenue||0)}</div></div><div class="store-kpi"><div class="store-kpi-label">Invoices</div><div class="store-kpi-value">${b.invoices||0}</div></div><div class="store-kpi"><div class="store-kpi-label">Returns</div><div class="store-kpi-value">${fmt(b.returns||0)}</div></div><div class="store-kpi"><div class="store-kpi-label">Net</div><div class="store-kpi-value">${fmt((b.revenue||0)-(b.returns||0))}</div></div></div>`:'<div style="text-align:center;padding:16px;color:var(--gray3);font-size:12px">No data</div>'}</div>`;}).join('');renderRevenueTrend();renderActivityFeed();}
+const sb=DATA.dashboard?.storeBreakdown||[];
+const lbRows=stores.map(s=>{const b=sb.find(x=>x.store===s.Name||x.store===s.StoreID||x.name===s.Name);return {name:s.Name,rev:b?(b.revenue||0):null,invoices:b?(b.invoices||0):0,returns:b?(b.returns||0):0,hasData:!!b};}).sort((a,b)=>(b.rev||0)-(a.rev||0));
+const maxRev=Math.max(...lbRows.map(r=>r.rev||0),1);
+if($('store-cards'))$('store-cards').innerHTML=lbRows.map((r,i)=>{
+  if(!r.hasData)return `<div class="lb-row"><div class="lb-rank">${i+1}</div><div class="lb-name">${r.name}</div><div class="lb-track"></div><div class="lb-stats"><span class="badge badge-gray">No data</span></div></div>`;
+  const pct=Math.max(3,Math.round(r.rev/maxRev*100));
+  const net=r.rev-r.returns;
+  return `<div class="lb-row">
+    <div class="lb-rank ${i===0?'rank-1':''}">${i+1}</div>
+    <div class="lb-name">${r.name}</div>
+    <div class="lb-track"><div class="lb-fill" style="width:${pct}%"></div></div>
+    <div class="lb-stats">
+      <div><div class="lb-stat-value">${fmt(r.rev)}</div><div class="lb-stat-label">Revenue</div></div>
+      <div><div class="lb-stat-value">${r.invoices}</div><div class="lb-stat-label">Invoices</div></div>
+      <div><div class="lb-stat-value">${fmt(net)}</div><div class="lb-stat-label">Net</div></div>
+    </div>
+  </div>`;
+}).join('')||'<div class="lb-empty">No store data yet — click Load Live Data</div>';
+renderRevenueTrend();renderActivityFeed();}
 function renderRevenueTrend(){
   const el=$('d-trend');
   if(!el)return;
@@ -3079,9 +3146,55 @@ async function saveThresholds(){
   if(res&&res.ok)toast('✅ Thresholds saved');
   else toast('❌ Failed to save','error');
 }
+function syncThemeFromServer(appThemeJson){
+  if(!appThemeJson)return;
+  try{
+    const c=JSON.parse(appThemeJson);
+    const local=localStorage.getItem('anta_theme');
+    if(JSON.stringify(c)!==local){
+      applyTheme(deriveTheme(c.navy,c.accent,c.accent2));
+      localStorage.setItem('anta_theme',JSON.stringify(c));
+    }
+  }catch(e){}
+}
+function renderThemeUI(){
+  const current=JSON.parse(localStorage.getItem('anta_theme')||'null')||THEME_PRESETS[0];
+  if($('theme-navy'))$('theme-navy').value=current.navy;
+  if($('theme-accent'))$('theme-accent').value=current.accent;
+  if($('theme-accent2'))$('theme-accent2').value=current.accent2;
+  if($('theme-preset-grid'))$('theme-preset-grid').innerHTML=THEME_PRESETS.map((p,i)=>`
+    <div onclick="applyPresetTheme(${i})" style="cursor:pointer;border:2px solid ${current.navy===p.navy&&current.accent===p.accent?'var(--accent2)':'var(--gray1)'};border-radius:10px;padding:8px;text-align:center;transition:.15s" title="${p.name}">
+      <div style="display:flex;height:26px;border-radius:6px;overflow:hidden;margin-bottom:6px">
+        <div style="flex:2;background:${p.navy}"></div><div style="flex:1;background:${p.accent}"></div><div style="flex:1;background:${p.accent2}"></div>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--gray5)">${p.name}</div>
+    </div>`).join('');
+}
+function applyPresetTheme(i){
+  const p=THEME_PRESETS[i];
+  saveTheme(p.navy,p.accent,p.accent2);
+  toast(`🎨 ${p.name} theme applied`);
+  renderThemeUI();
+}
+function previewTheme(){
+  const navy=$('theme-navy').value,accent=$('theme-accent').value,accent2=$('theme-accent2').value;
+  applyTheme(deriveTheme(navy,accent,accent2));
+}
+function applyCustomTheme(){
+  const navy=$('theme-navy').value,accent=$('theme-accent').value,accent2=$('theme-accent2').value;
+  saveTheme(navy,accent,accent2);
+  toast('✅ Custom theme saved');
+  renderThemeUI();
+}
+function resetThemeUI(){
+  resetTheme();
+  toast('↩️ Reset to default theme');
+  renderThemeUI();
+}
 async function loadSettingsForm(){
   const res=await api('/api/settings');
   if(!res||!res.ok)return;
+  syncThemeFromServer(res.appTheme);
   _pendingLogoDataUrl=undefined;
   if($('co-name'))$('co-name').value=res.company_name||'';
   if($('co-currency'))$('co-currency').value=res.currency||'LYD';

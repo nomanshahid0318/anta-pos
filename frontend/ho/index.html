@@ -160,9 +160,27 @@ body{display:flex;height:100vh;overflow:hidden}
 
   <!-- DASHBOARD -->
   <div id="screen-dashboard" class="screen active">
-    <div style="background:linear-gradient(135deg,var(--navy),var(--blue));border-radius:11px;padding:13px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;color:#fff">
-      <div style="flex:1"><div style="font-size:11px;opacity:.7">HEAD OFFICE MASTER DASHBOARD</div><div id="dash-status" style="font-size:11px;opacity:.6;margin-top:2px">Click Load Live Data after admin login</div></div>
-      <button class="btn btn-primary btn-sm" onclick="loadAll()">🔄 Load Live Data</button>
+    <div class="dash-hero">
+      <div class="dash-hero-top">
+        <div>
+          <div class="dash-hero-eyebrow">HEAD OFFICE · ALL STORES</div>
+          <div class="dash-hero-status" id="dash-status">Click Load Live Data after admin login</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadAll()" style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25)">🔄 Load Live Data</button>
+      </div>
+      <div class="dash-hero-body">
+        <div>
+          <div class="dash-hero-metric-label">Total Revenue</div>
+          <div class="dash-hero-metric-value" id="d-rev">LYD 0</div>
+        </div>
+        <div class="dash-hero-stats">
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Net Revenue</div><div class="dash-hero-stat-value" id="d-net">LYD 0</div><div class="dash-hero-stat-sub">after returns</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Invoices</div><div class="dash-hero-stat-value" id="d-inv">0</div><div class="dash-hero-stat-sub">all stores</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Avg Basket</div><div class="dash-hero-stat-value" id="d-atv">LYD 0</div><div class="dash-hero-stat-sub">blended</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label">Returns</div><div class="dash-hero-stat-value" id="d-ret">LYD 0</div><div class="dash-hero-stat-sub" id="d-ret-pct">0%</div></div>
+          <div class="dash-hero-stat"><div class="dash-hero-stat-label">HO Warehouse</div><div class="dash-hero-stat-value" id="d-ho-stock">0</div><div class="dash-hero-stat-sub">SKUs in stock</div></div>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="show('products')">➕ Add Product</button>
@@ -171,15 +189,10 @@ body{display:flex;height:100vh;overflow:hidden}
       <button class="btn btn-ghost btn-sm" onclick="show('supplier-grn')">📦 Receive Stock</button>
       <button class="btn btn-ghost btn-sm" onclick="show('reports')">📈 View Reports</button>
     </div>
-    <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-label">Total Revenue</div><div class="kpi-value" id="d-rev">LYD 0</div><div class="kpi-sub">all stores</div></div>
-      <div class="kpi blue"><div class="kpi-label">Total Invoices</div><div class="kpi-value" id="d-inv">0</div><div class="kpi-sub">all stores</div></div>
-      <div class="kpi green"><div class="kpi-label">Net Revenue</div><div class="kpi-value" id="d-net">LYD 0</div><div class="kpi-sub">after returns</div></div>
-      <div class="kpi amber"><div class="kpi-label">Avg Basket</div><div class="kpi-value" id="d-atv">LYD 0</div><div class="kpi-sub">blended</div></div>
-      <div class="kpi purple"><div class="kpi-label">Returns</div><div class="kpi-value" id="d-ret">LYD 0</div><div class="kpi-sub" id="d-ret-pct">0%</div></div>
-      <div class="kpi teal"><div class="kpi-label">HO Warehouse</div><div class="kpi-value" id="d-ho-stock">0</div><div class="kpi-sub">SKUs in stock</div></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">🏆 Store Leaderboard — Revenue</div>
+      <div class="leaderboard" id="store-cards"></div>
     </div>
-    <div class="store-cards" id="store-cards"></div>
     <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:14px">
       <div class="card">
         <div class="card-title">📈 Revenue — Last 7 Days</div>
@@ -1263,6 +1276,21 @@ body{display:flex;height:100vh;overflow:hidden}
 
   <div id="screen-settings" class="screen">
     <div style="max-width:600px">
+      <div class="card">
+        <div class="card-title">🎨 Theme</div>
+        <p style="font-size:11px;color:var(--gray4);margin:0 0 12px">Pick a preset or set your own colors — applies instantly everywhere, and follows your login to any device.</p>
+        <div id="theme-preset-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--gray4);text-transform:uppercase;margin:4px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--gray1)">Custom Colors</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="form-label">Primary (Navy)</label><input type="color" id="theme-navy" style="width:100%;height:38px;border:1.5px solid var(--gray2);border-radius:8px;cursor:pointer" onchange="previewTheme()"></div>
+          <div class="form-group"><label class="form-label">Accent</label><input type="color" id="theme-accent" style="width:100%;height:38px;border:1.5px solid var(--gray2);border-radius:8px;cursor:pointer" onchange="previewTheme()"></div>
+          <div class="form-group"><label class="form-label">Accent 2</label><input type="color" id="theme-accent2" style="width:100%;height:38px;border:1.5px solid var(--gray2);border-radius:8px;cursor:pointer" onchange="previewTheme()"></div>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:10px">
+          <button class="btn btn-primary btn-sm" onclick="applyCustomTheme()">✅ Apply &amp; Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="resetThemeUI()">↩️ Reset to Default</button>
+        </div>
+      </div>
       <div class="card" style="border:2px solid var(--accent2)">
         <div class="card-title" style="color:var(--accent2)">☁️ Google Sheets Connection</div>
         <div class="form-group"><label class="form-label">API Base URL</label><input class="form-input" id="api-url" placeholder="http://127.0.0.1:8765"></div>
