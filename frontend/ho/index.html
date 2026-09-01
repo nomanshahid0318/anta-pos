@@ -115,7 +115,8 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('audit-log')" data-role="admin"><span class="ico">🕵️</span>Audit Log</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
     <div class="nav-item" onclick="show('costcenters')" data-role="admin,manager,accountant"><span class="ico">🏷️</span>Cost Centers</div>
-    <div class="nav-item" onclick="show('addons')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cheques &amp; Budget</div>
+    <div class="nav-item" onclick="show('addons')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cheques</div>
+    <div class="nav-item" onclick="show('budget')" data-role="admin,manager,accountant"><span class="ico">📊</span>Budget</div>
     <div class="nav-item" onclick="show('settings')" data-role="admin"><span class="ico">⚙️</span>Settings</div>
   </nav>
 </div>
@@ -1126,7 +1127,7 @@ body{display:flex;height:100vh;overflow:hidden}
           <tbody id="users-table-emp"></tbody></table>
         </div>
         <div id="ut-panel-login" style="display:none">
-          <table><thead><tr><th>Name</th><th>User ID</th><th>Employee Code</th><th>POS/HO Login</th><th>Actions</th></tr></thead>
+          <table><thead><tr><th>Name</th><th>Store</th><th>User ID</th><th>Employee Code</th><th>POS/HO Login</th><th>Actions</th></tr></thead>
           <tbody id="users-table-login"></tbody></table>
         </div>
       </div>
@@ -1251,7 +1252,7 @@ body{display:flex;height:100vh;overflow:hidden}
         <table><thead><tr><th>Party</th><th>Amount</th><th>Due</th><th></th></tr></thead><tbody id="chq-due-table"></tbody></table>
       </div>
     </div>
-    <div class="card" style="margin-bottom:14px">
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="card-title" style="margin:0">📋 All Cheques</div>
         <select class="form-input" style="width:150px;padding:5px 9px" id="chq-filter" onchange="loadCheques()">
@@ -1260,6 +1261,10 @@ body{display:flex;height:100vh;overflow:hidden}
       </div>
       <table><thead><tr><th>Direction</th><th>Number</th><th>Party</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody id="chq-table"></tbody></table>
     </div>
+  </div>
+
+  <!-- BUDGET -->
+  <div id="screen-budget" class="screen">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div class="card-title" style="margin:0">📊 Budget vs Actual</div>
