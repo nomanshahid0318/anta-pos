@@ -104,7 +104,7 @@ async function pinSubmit(){
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
   if($('login-empcode'))$('login-empcode').value='';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects',addons:'Cheques & Budget','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
@@ -113,6 +113,7 @@ if(name==='stock-counts'){populateSCStoreSelect();loadStockCounts();}
 if(name==='payroll'){populatePRStoreSelect();loadPayrollRuns();}
 if(name==='attendance'){populateAttStoreSelects();loadAttendanceDay();loadAttendanceSummary();}
 if(name==='costcenters'){populateCCStoreSelect();loadCostCenters();loadProjects();loadCCReport();loadProjectReport();}
+if(name==='addons'){if($('bud-month')&&!$('bud-month').value)$('bud-month').value=today().slice(0,7);loadCheques();loadChequesDueSoon();loadBudgetReport();}
 if(name==='three-way-match'){populateTWMPOSelect();loadSupplierInvoices();}
 if(name==='dashboard')renderDash();if(name==='stores-view')renderStoresView();if(name==='warehouse')renderWarehouse();
 if(name==='audit-log'){loadAuditLog();}
@@ -151,7 +152,7 @@ if(dash&&dash.ok){DATA.dashboard=dash;generateNotifications(dash);}
 if(sales&&sales.data)DATA.sales=sales.data.map(s=>({...s,Date:s.date,Total:s.total,Payment:s.payment,Store:s.store,StoreID:s.storeId}));
 if(Array.isArray(banks))DATA.banks=banks.map(b=>({BankID:b.bank_id,Name:b.name,Device:b.device,Active:b.active?'Y':'N'}));
 const storeRows=Array.isArray(stores)?stores:(stores&&Array.isArray(stores.data)?stores.data:[]);if(storeRows.length||Array.isArray(stores)||(stores&&stores.data))DATA.stores=storeRows.map(s=>({StoreID:s.store_id||s.StoreID,Name:s.name||s.Name,City:s.city||s.City||'',Address:s.address||s.Address||'',Manager:s.manager||s.Manager||'',Phone:s.phone||s.Phone||'',Active:(s.active===false||s.Active==='N')?'N':'Y'}));
-if(Array.isArray(users))DATA.users=users.map(u=>({UserID:u.user_id,StoreID:u.store_id,StoreName:u.store_name,Name:u.name,Role:u.role,Active:u.active?'Y':'N',PosLoginEnabled:u.posLoginEnabled!==false,EmployeeCode:u.employeeCode||'',StandardSalary:u.standardSalary||0}));
+if(Array.isArray(users))DATA.users=users.map(u=>({UserID:u.user_id,StoreID:u.store_id,StoreName:u.store_name,Name:u.name,Role:u.role,Active:u.active?'Y':'N',PosLoginEnabled:u.posLoginEnabled!==false,EmployeeCode:u.employeeCode||'',StandardSalary:u.standardSalary||0,CommissionRate:u.commissionRate||0}));
 if(exps&&exps.data)DATA.expenses=exps.data.map(e=>({...e,Date:e.date,Amount:e.amount,Store:e.store,StoreID:e.storeId,Category:e.category,Description:e.description,PayMethod:e.payMethod}));
 if(wh&&wh.data)DATA.warehouse=wh.data;if(sgrns&&sgrns.data)DATA.supplierGRNs=sgrns.data;if(stgrns&&stgrns.data)DATA.storeGRNs=stgrns.data;if(trs&&trs.data)DATA.transfers=trs.data;
 if(sups&&sups.data)suppliers=sups.data;if(suptx&&suptx.data)supplierTxns=suptx.data;if(caps&&caps.data)capitalEntries=caps.data;
@@ -1277,7 +1278,7 @@ async function deleteUserRow(userId){
   else toast('❌ '+((res&&(res.detail||res.msg))||'Failed'),'error');
 }
 let editingUserId=null;
-function showAddUser(){editingUserId=null;if($('user-form')){$('user-form').style.display='flex';['u-nm','u-pin','u-empcode','u-salary'].forEach(id=>{if($(id))$(id).value='';});if($('u-role'))$('u-role').value='cashier';if($('u-pin'))$('u-pin').placeholder='4-digit PIN';if($('u-empcode'))$('u-empcode').placeholder='e.g. EMP1234 (leave blank to auto-generate)';if($('u-login-enabled'))$('u-login-enabled').checked=true;toggleUserPinField();const t=document.querySelector('#user-form .modal-title');if(t)t.textContent='➕ Add User';}}
+function showAddUser(){editingUserId=null;if($('user-form')){$('user-form').style.display='flex';['u-nm','u-pin','u-empcode','u-salary','u-commission'].forEach(id=>{if($(id))$(id).value='';});if($('u-role'))$('u-role').value='cashier';if($('u-pin'))$('u-pin').placeholder='4-digit PIN';if($('u-empcode'))$('u-empcode').placeholder='e.g. EMP1234 (leave blank to auto-generate)';if($('u-login-enabled'))$('u-login-enabled').checked=true;toggleUserPinField();const t=document.querySelector('#user-form .modal-title');if(t)t.textContent='➕ Add User';}}
 function toggleUserPinField(){
   const enabled=$('u-login-enabled')?$('u-login-enabled').checked:true;
   if($('u-pin-group'))$('u-pin-group').style.display=enabled?'block':'none';
@@ -1301,6 +1302,7 @@ function editUser(userId){
   if($('u-pin')){$('u-pin').value='';$('u-pin').placeholder='Leave blank to keep current PIN';}
   if($('u-empcode'))$('u-empcode').value=u.EmployeeCode||'';
   if($('u-salary'))$('u-salary').value=u.StandardSalary||0;
+  if($('u-commission'))$('u-commission').value=u.CommissionRate||0;
   if($('u-login-enabled'))$('u-login-enabled').checked=u.PosLoginEnabled!==false;
   toggleUserPinField();
   const t=document.querySelector('#user-form .modal-title');if(t)t.textContent='✏️ Edit User — '+u.Name;
@@ -1330,6 +1332,7 @@ async function saveUser(){
     posLoginEnabled:loginEnabled,
     employeeCode:($('u-empcode')&&$('u-empcode').value.trim())||undefined,
     standardSalary:+(($('u-salary')&&$('u-salary').value)||0),
+    commissionRate:+(($('u-commission')&&$('u-commission').value)||0),
   };
   if(editingUserId)body.user_id=editingUserId;
   const pin=$('u-pin').value.trim();
@@ -1950,8 +1953,28 @@ function renderCustTable(list){
     <td class="fw7">${c.name}</td><td>${c.phone||'—'}</td><td>${c.visitCount||0}</td>
     <td>${fmt(c.totalSpent||0)}</td><td>${(c.loyaltyPoints||0).toFixed(0)} <span style="color:var(--gray4);font-size:10px">(${fmt(c.loyaltyPointsValue||0)})</span></td>
     <td>${c.lastVisit||'—'}</td>
-    <td><button class="btn btn-ghost btn-sm" onclick="openCustDetail('${c.id}')">👁️ View</button></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openCustDetail('${c.id}')">👁️ View</button> <button class="btn btn-ghost btn-sm" onclick="openCustStatement('${c.id}')">📄 Statement</button></td>
   </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:16px">No customers yet</td></tr>';
+}
+async function openCustStatement(id){
+  const res=await api(`/api/ho/customers/${encodeURIComponent(id)}/statement`);
+  if(!res||!res.ok){toast('Failed to load statement','error');return;}
+  const rows=(res.lines||[]).map(l=>`<tr><td style="padding:5px 0">${l.date}</td><td>${l.type} — ${l.reference}</td><td style="text-align:right">${l.debit?fmt(l.debit):''}</td><td style="text-align:right">${l.credit?fmt(l.credit):''}</td><td style="text-align:right;font-weight:700">${fmt(l.balance)}</td></tr>`).join('');
+  const html=`<div style="max-width:600px;margin:0 auto;padding:30px;font-family:Arial,sans-serif;color:#111">
+    <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #1a2540;padding-bottom:12px">
+      <div style="font-size:20px;font-weight:900;color:#1a2540">Customer Account Statement</div>
+      <div style="font-size:13px;margin-top:3px">${res.customerName} ${res.phone?'— '+res.phone:''}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid #ccc;text-align:left"><th style="padding:5px 0">Date</th><th>Transaction</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="5" style="text-align:center;padding:14px;color:#999">No transactions yet</td></tr>'}</tbody></table>
+    <div style="display:flex;justify-content:space-between;align-items:center;background:#1a2540;color:#fff;border-radius:8px;padding:12px 16px;margin-top:14px">
+      <span style="font-weight:700">CLOSING BALANCE</span><span style="font-size:19px;font-weight:900">${fmt(res.closingBalance)}</span>
+    </div>
+  </div>`;
+  const modal=document.getElementById('report-print-modal');
+  if(!modal){toast('Print container missing','error');return;}
+  modal.innerHTML=html;
+  setTimeout(()=>window.print(),80);
 }
 async function loadTopCustomers(){
   const res=await api('/api/customers-top/list?limit=20');
@@ -2897,6 +2920,65 @@ async function loadProjectReport(){
   const res=await api('/api/ho/pl-by-project');
   if(!res||!res.ok)return;
   if($('prjrpt-table'))$('prjrpt-table').innerHTML=(res.data||[]).map(d=>`<tr><td>${d.projectName}</td><td class="fw7">${fmt(d.totalExpense)}</td></tr>`).join('')||'<tr><td colspan="2" style="text-align:center;color:var(--gray3);padding:10px">No project-tagged expenses yet</td></tr>';
+}
+
+// ---------- Cheques ----------
+async function loadCheques(){
+  const dir=$('chq-filter')?$('chq-filter').value:'';
+  const res=await api('/api/cheques'+(dir?`?direction=${dir}`:''));
+  if(!res||!res.ok)return;
+  if($('chq-table'))$('chq-table').innerHTML=(res.data||[]).map(c=>`<tr>
+    <td><span class="badge ${c.direction==='receivable'?'badge-green':'badge-amber'}">${c.direction}</span></td>
+    <td>${c.chequeNumber||'—'}</td><td>${c.partyName}</td><td class="fw7">${fmt(c.amount)}</td><td>${c.dueDate}</td>
+    <td><span class="badge ${c.status==='cleared'?'badge-green':c.status==='bounced'?'badge-red':c.status==='cancelled'?'badge-gray':'badge-amber'}">${c.status}</span></td>
+    <td>
+      ${c.status==='pending'?`<button class="btn btn-ghost btn-sm" onclick="updateChequeStatus('${c.id}','deposited')">🏦 Deposit</button>`:''}
+      ${c.status==='deposited'?`<button class="btn btn-ghost btn-sm" style="color:var(--green)" onclick="updateChequeStatus('${c.id}','cleared')">✅ Cleared</button> <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="updateChequeStatus('${c.id}','bounced')">⚠️ Bounced</button>`:''}
+      ${(c.status==='pending')?`<button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="updateChequeStatus('${c.id}','cancelled')">✕</button>`:''}
+    </td>
+  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--gray3);padding:14px">No cheques yet</td></tr>';
+}
+async function loadChequesDueSoon(){
+  const res=await api('/api/cheques/due-soon?days=7');
+  if(!res||!res.ok)return;
+  if($('chq-due-table'))$('chq-due-table').innerHTML=(res.data||[]).map(c=>`<tr><td>${c.partyName}</td><td class="fw7">${fmt(c.amount)}</td><td>${c.dueDate}</td><td><span class="badge ${c.direction==='receivable'?'badge-green':'badge-amber'}">${c.direction}</span></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:10px">None due soon</td></tr>';
+}
+async function addCheque(){
+  const amount=+(($('chq-amount')&&$('chq-amount').value)||0);
+  const due=$('chq-due')?$('chq-due').value:'';
+  const party=($('chq-party')&&$('chq-party').value.trim())||'';
+  if(!amount||!due||!party){toast('Party, Amount, and Due Date required','error');return;}
+  const res=await api('/api/cheques',{method:'POST',body:{
+    direction:$('chq-direction').value,chequeNumber:$('chq-number').value,bankName:$('chq-bank').value,
+    partyName:party,partyType:$('chq-direction').value==='receivable'?'customer':'supplier',
+    amount,dueDate:due,
+  }});
+  if(res&&res.ok){toast('✅ Cheque saved');['chq-number','chq-bank','chq-party','chq-amount','chq-due'].forEach(id=>{if($(id))$(id).value='';});loadCheques();loadChequesDueSoon();}
+  else toast('❌ Failed','error');
+}
+async function updateChequeStatus(id,status){
+  if(status==='bounced'&&!confirm('Mark this cheque as bounced?'))return;
+  const res=await api(`/api/cheques/${encodeURIComponent(id)}/status?status=${status}`,{method:'PUT'});
+  if(res&&res.ok){toast('✅ Updated');loadCheques();loadChequesDueSoon();}
+  else toast('❌ Failed','error');
+}
+
+// ---------- Budget vs Actual ----------
+async function loadBudgetReport(){
+  const month=$('bud-month')?$('bud-month').value:'';
+  if(!month)return;
+  const res=await api(`/api/ho/budget-vs-actual?month=${month}`);
+  if(!res||!res.ok)return;
+  if($('bud-table'))$('bud-table').innerHTML=(res.data||[]).map(d=>`<tr><td class="fw7">${d.category}</td><td>${fmt(d.budget)}</td><td>${fmt(d.actual)}</td><td style="color:${d.variance<0?'var(--red)':'var(--green)'}">${d.variance>0?'+':''}${fmt(d.variance)}${d.variancePercent!=null?` (${d.variancePercent}%)`:''}</td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--gray3);padding:14px">No budgets or expenses this month</td></tr>';
+}
+async function setBudget(){
+  const month=$('bud-month')?$('bud-month').value:'';
+  const category=($('bud-cat')&&$('bud-cat').value.trim())||'';
+  const amount=+(($('bud-amt')&&$('bud-amt').value)||0);
+  if(!month||!category||!amount){toast('Month, Category, and Amount required','error');return;}
+  const res=await api('/api/ho/budgets',{method:'POST',body:{month,category,amount}});
+  if(res&&res.ok){toast('✅ Budget set');$('bud-cat').value='';$('bud-amt').value='';loadBudgetReport();}
+  else toast('❌ Failed','error');
 }
 let __twmPOList=[],__twmList=[],__twmCurrent=null;
 async function populateTWMPOSelect(){

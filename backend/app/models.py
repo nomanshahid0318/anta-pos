@@ -53,6 +53,7 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     pos_login_enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # False = payroll/records-only staff, no POS/HO login
     standard_salary: Mapped[float] = mapped_column(Float, default=0.0)  # default monthly base salary, auto-filled into new Payroll entries
+    commission_rate: Mapped[float] = mapped_column(Float, default=0.0)  # % of each sale they make, added to Payroll as an Allowance
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     store: Mapped["Store"] = relationship(back_populates="users")
@@ -87,6 +88,8 @@ class Product(Base):
     retail: Mapped[float] = mapped_column(Float, default=0.0)  # CURRENT selling price — changes over time
     original_price: Mapped[float] = mapped_column(Float, default=0.0)  # price set when FIRST created — stays fixed
     reorder: Mapped[int] = mapped_column(Integer, default=5)
+    warranty_days: Mapped[int] = mapped_column(Integer, default=0)  # 0 = no warranty tracked
+    serial_tracked: Mapped[bool] = mapped_column(Boolean, default=False)  # if true, each unit needs a serial number at sale time
     opening: Mapped[int] = mapped_column(Integer, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

@@ -201,6 +201,8 @@ def create_sale(
                     customer.first_visit = date
                 sale.loyalty_points_earned = earned
             post_sale_journal(db, sale)
+            from ..routers.addons import record_sale_commission
+            record_sale_commission(db, sale, user.user_id)
             db.commit()
         except IntegrityError as e:
             db.rollback()

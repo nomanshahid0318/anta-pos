@@ -115,6 +115,7 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('audit-log')" data-role="admin"><span class="ico">🕵️</span>Audit Log</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
     <div class="nav-item" onclick="show('costcenters')" data-role="admin,manager,accountant"><span class="ico">🏷️</span>Cost Centers</div>
+    <div class="nav-item" onclick="show('addons')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cheques &amp; Budget</div>
     <div class="nav-item" onclick="show('settings')" data-role="admin"><span class="ico">⚙️</span>Settings</div>
   </nav>
 </div>
@@ -1126,6 +1127,7 @@ body{display:flex;height:100vh;overflow:hidden}
             <div class="form-group"><label class="form-label">Store</label><select class="form-input" id="u-store"></select></div>
             <div class="form-group"><label class="form-label">Role</label><select class="form-input" id="u-role" onchange="onRoleChange()"><option value="cashier">Cashier</option><option value="sales_staff">Sales Staff</option><option value="assistant">Assistant</option><option value="cleaner">Cleaner</option><option value="manager">Manager</option><option value="merchandiser">Merchandiser</option><option value="warehouse">Warehouse</option><option value="accountant">Accountant</option><option value="admin">Admin</option></select></div>
             <div class="form-group"><label class="form-label">Standard Monthly Salary (LYD)</label><input class="form-input" type="number" id="u-salary" placeholder="0"></div>
+            <div class="form-group"><label class="form-label">Sales Commission % (per sale they make)</label><input class="form-input" type="number" id="u-commission" placeholder="0" step="0.5"></div>
           </div>
 
           <div style="font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--gray4);text-transform:uppercase;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--gray1)">🔑 Login Access</div>
@@ -1213,6 +1215,49 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="card-title">📊 P&amp;L by Project</div>
         <table><thead><tr><th>Project</th><th>Total Expense</th></tr></thead><tbody id="prjrpt-table"></tbody></table>
       </div>
+    </div>
+  </div>
+
+  <!-- CHEQUES & BUDGET -->
+  <div id="screen-addons" class="screen">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">🧾 Record a Cheque</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Direction</label><select class="form-input" id="chq-direction"><option value="receivable">Receivable (customer paid us)</option><option value="payable">Payable (we paid supplier)</option></select></div>
+          <div class="form-group"><label class="form-label">Cheque Number</label><input class="form-input" id="chq-number" placeholder="000123"></div>
+          <div class="form-group"><label class="form-label">Bank</label><input class="form-input" id="chq-bank" placeholder="Bank name"></div>
+          <div class="form-group"><label class="form-label">Party Name</label><input class="form-input" id="chq-party" placeholder="Customer/Supplier name"></div>
+          <div class="form-group"><label class="form-label">Amount (LYD)</label><input class="form-input" type="number" id="chq-amount" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Due Date</label><input class="form-input" type="date" id="chq-due"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addCheque()">💾 Save Cheque</button>
+      </div>
+      <div class="card">
+        <div class="card-title">⏰ Due Soon (next 7 days)</div>
+        <table><thead><tr><th>Party</th><th>Amount</th><th>Due</th><th></th></tr></thead><tbody id="chq-due-table"></tbody></table>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title" style="margin:0">📋 All Cheques</div>
+        <select class="form-input" style="width:150px;padding:5px 9px" id="chq-filter" onchange="loadCheques()">
+          <option value="">All</option><option value="receivable">Receivable</option><option value="payable">Payable</option>
+        </select>
+      </div>
+      <table><thead><tr><th>Direction</th><th>Number</th><th>Party</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody id="chq-table"></tbody></table>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="card-title" style="margin:0">📊 Budget vs Actual</div>
+        <input class="form-input" type="month" style="width:150px;padding:5px 9px" id="bud-month" onchange="loadBudgetReport()">
+      </div>
+      <div style="display:flex;gap:6px;margin:10px 0">
+        <input class="form-input" style="width:160px;padding:5px 7px" id="bud-cat" placeholder="Category (e.g. Rent)">
+        <input class="form-input" type="number" style="width:130px;padding:5px 7px" id="bud-amt" placeholder="Budget amount">
+        <button class="btn btn-primary btn-sm" onclick="setBudget()">💾 Set Budget</button>
+      </div>
+      <table><thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th></tr></thead><tbody id="bud-table"></tbody></table>
     </div>
   </div>
 

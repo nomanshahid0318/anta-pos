@@ -71,6 +71,7 @@ def init_db() -> None:
     from . import models_stockcount  # noqa: F401
     from . import models_payroll  # noqa: F401
     from . import models_attendance  # noqa: F401
+    from . import models_addons  # noqa: F401
     from .seed import seed_if_empty
 
     # Ensure parent dir exists for sqlite
@@ -109,6 +110,8 @@ def _auto_migrate() -> None:
             "season": "VARCHAR(64) DEFAULT ''",
             "gender": "VARCHAR(32) DEFAULT ''",
             "original_price": "FLOAT DEFAULT 0",
+            "warranty_days": "INTEGER DEFAULT 0",
+            "serial_tracked": "BOOLEAN DEFAULT FALSE",
         },
         "promotions": {
             "start_time": "VARCHAR(8) DEFAULT ''",
@@ -140,6 +143,7 @@ def _auto_migrate() -> None:
             "pos_login_enabled": "BOOLEAN DEFAULT TRUE",
             "employee_code": "VARCHAR(16) DEFAULT ''",
             "standard_salary": "FLOAT DEFAULT 0",
+            "commission_rate": "FLOAT DEFAULT 0",
         },
         "payroll_entries": {
             "employee_code": "VARCHAR(16) DEFAULT ''",
