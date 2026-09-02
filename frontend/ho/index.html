@@ -74,20 +74,27 @@ body{display:flex;height:100vh;overflow:hidden}
   <div class="sync-bar"><div class="dot offline" id="sync-dot"></div><div><div id="sync-lbl" style="font-size:10px">Offline</div><div id="sync-last" style="font-size:9px;opacity:.6">—</div></div></div>
   <div class="sidebar-search"><span class="sidebar-search-ico">🔍</span><input id="sidebar-search-input" placeholder="Search menu..." oninput="filterSidebarNav(this.value)"></div>
   <nav>
-    <div class="nav-sec">Overview</div>
+    <div class="nav-sec" onclick="toggleNavSec('overview')"><span class="nav-sec-label">Overview</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-overview">
     <div class="nav-item active" onclick="show('dashboard')"><span class="ico">🏢</span>HO Dashboard</div>
     <div class="nav-item" onclick="show('stores-view')" data-role="admin,manager"><span class="ico">🗺️</span>All Stores</div>
-    <div class="nav-sec">Stock Management</div>
+    </div>
+    <div class="nav-sec" onclick="toggleNavSec('stock')"><span class="nav-sec-label">Stock Management</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-stock">
     <div class="nav-item" onclick="show('warehouse')" data-role="admin,manager,warehouse"><span class="ico">🏭</span>HO Warehouse</div>
     <div class="nav-item" onclick="show('purchase-orders')" data-role="admin,manager,warehouse"><span class="ico">📝</span>Purchase Orders</div>
     <div class="nav-item" onclick="show('three-way-match')" data-role="admin,accountant,manager"><span class="ico">🔍</span>Invoice Matching</div>
     <div class="nav-item" onclick="show('supplier-grn')" data-role="admin,manager,warehouse"><span class="ico">📦</span>Supplier GRN</div>
     <div class="nav-item" onclick="show('store-grn')" data-role="admin,manager,warehouse"><span class="ico">🚚</span>Send to Stores (GRN)</div>
     <div class="nav-item" onclick="show('transfer')" data-role="admin,manager,warehouse"><span class="ico">🔄</span>Store Transfer</div>
-    <div class="nav-sec">Products</div>
+    </div>
+    <div class="nav-sec" onclick="toggleNavSec('products')"><span class="nav-sec-label">Products</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-products">
     <div class="nav-item" onclick="show('products')" data-role="admin,manager,merchandiser"><span class="ico">👟</span>Product Master</div>
     <div class="nav-item" onclick="show('barcode-labels')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🏷️</span>Barcode Labels</div>
-    <div class="nav-sec">Finance</div>
+    </div>
+    <div class="nav-sec" onclick="toggleNavSec('finance')"><span class="nav-sec-label">Finance</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-finance">
     <div class="nav-item" onclick="show('pl')" data-role="admin,manager,accountant"><span class="ico">📊</span>P&L Statement</div>
     <div class="nav-item" onclick="show('balance-sheet')" data-role="admin,manager,accountant"><span class="ico">⚖️</span>Balance Sheet</div>
     <div class="nav-item" onclick="show('cashflow')" data-role="admin,manager,accountant"><span class="ico">💰</span>Cash Flow</div>
@@ -101,7 +108,12 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('employee-advances')" data-role="admin,manager,accountant"><span class="ico">🤲</span>Employee Advances</div>
     <div class="nav-item" onclick="show('accrued-expenses')" data-role="admin,manager,accountant"><span class="ico">⏳</span>Accrued Expenses</div>
     <div class="nav-item" onclick="show('shifts')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cashier Shifts</div>
-    <div class="nav-sec">Reports</div>
+    <div class="nav-item" onclick="show('costcenters')" data-role="admin,manager,accountant"><span class="ico">🏷️</span>Cost Centers</div>
+    <div class="nav-item" onclick="show('addons')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cheques</div>
+    <div class="nav-item" onclick="show('budget')" data-role="admin,manager,accountant"><span class="ico">📊</span>Budget</div>
+    </div>
+    <div class="nav-sec" onclick="toggleNavSec('reports')"><span class="nav-sec-label">Reports</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-reports">
     <div class="nav-item" onclick="show('customers')" data-role="admin,manager,accountant"><span class="ico">🧑‍🤝‍🧑</span>Customers</div>
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
@@ -109,17 +121,17 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('payroll')" data-role="admin,manager,accountant"><span class="ico">💵</span>Payroll</div>
     <div class="nav-item" onclick="show('attendance')" data-role="admin,manager,warehouse"><span class="ico">🗓️</span>Attendance</div>
     <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
-    <div class="nav-sec">Admin</div>
+    </div>
+    <div class="nav-sec" onclick="toggleNavSec('admin')"><span class="nav-sec-label">Admin</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-admin">
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
     <div class="nav-item" onclick="show('license')" data-role="admin"><span class="ico">🔑</span>License</div>
     <div class="nav-item" onclick="show('stores-admin')" data-role="admin"><span class="ico">🏪</span>Manage Stores</div>
     <div class="nav-item" onclick="show('users')" data-role="admin"><span class="ico">👥</span>Users & PINs</div>
     <div class="nav-item" onclick="show('audit-log')" data-role="admin"><span class="ico">🕵️</span>Audit Log</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
-    <div class="nav-item" onclick="show('costcenters')" data-role="admin,manager,accountant"><span class="ico">🏷️</span>Cost Centers</div>
-    <div class="nav-item" onclick="show('addons')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cheques</div>
-    <div class="nav-item" onclick="show('budget')" data-role="admin,manager,accountant"><span class="ico">📊</span>Budget</div>
     <div class="nav-item" onclick="show('settings')" data-role="admin"><span class="ico">⚙️</span>Settings</div>
+    </div>
   </nav>
 </div>
 

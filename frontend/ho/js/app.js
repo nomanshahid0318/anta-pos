@@ -152,7 +152,7 @@ async function pinSubmit(){
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
   if($('login-empcode'))$('login-empcode').value='';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects',addons:'Cheques',budget:'Budget vs Actual','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'")){n.classList.add('active');const grp=n.closest('.nav-sec-group');if(grp&&grp.classList.contains('collapsed'))toggleNavSec(grp.id.replace('navsec-',''),true);}});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects',addons:'Cheques',budget:'Budget vs Actual','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
@@ -3357,6 +3357,10 @@ document.addEventListener('keydown',e=>{
       if(sb)sb.classList.add('collapsed');
     }
   }catch(e){}
+  try{
+    const saved=JSON.parse(localStorage.getItem('anta_navsec_collapsed')||'{}');
+    Object.keys(saved).forEach(key=>{ if(saved[key]) toggleNavSec(key,false); });
+  }catch(e){}
 })();
 function filterSidebarNav(q){
   const query=(q||'').trim().toLowerCase();
@@ -3367,13 +3371,25 @@ function filterSidebarNav(q){
     el.style.display=(!query||label.includes(query))?'':'none';
   });
   secs.forEach(sec=>{
-    let sib=sec.nextElementSibling,hasVisible=false;
-    while(sib&&!sib.classList.contains('nav-sec')){
-      if(sib.classList.contains('nav-item')&&sib.style.display!=='none')hasVisible=true;
-      sib=sib.nextElementSibling;
-    }
+    const grp=sec.nextElementSibling;
+    if(!grp||!grp.classList.contains('nav-sec-group')){sec.style.display='';return;}
+    const hasVisible=[...grp.querySelectorAll('.nav-item')].some(el=>el.style.display!=='none');
     sec.style.display=(!query||hasVisible)?'':'none';
+    if(query&&hasVisible)toggleNavSec(grp.id.replace('navsec-',''),true);
   });
+}
+function toggleNavSec(key,forceExpand){
+  const grp=document.getElementById('navsec-'+key);
+  const hdr=grp?grp.previousElementSibling:null;
+  if(!grp||!hdr)return;
+  const collapsed=(forceExpand!==undefined)?!forceExpand:!grp.classList.contains('collapsed');
+  grp.classList.toggle('collapsed',collapsed);
+  hdr.classList.toggle('collapsed',collapsed);
+  try{
+    const saved=JSON.parse(localStorage.getItem('anta_navsec_collapsed')||'{}');
+    saved[key]=collapsed;
+    localStorage.setItem('anta_navsec_collapsed',JSON.stringify(saved));
+  }catch(e){}
 }
 function toggleSidebarCollapse(){
   const sb=document.getElementById('sidebar');
@@ -3528,15 +3544,16 @@ function applyLang(){
       el.setAttribute('title', label);
     });
     document.querySelectorAll('.nav-sec').forEach(el => {
-      const raw = (el.getAttribute('data-sec') || el.textContent || '').trim().toLowerCase();
+      const labelEl = el.querySelector('.nav-sec-label') || el;
+      const raw = (el.getAttribute('data-sec') || labelEl.textContent || '').trim().toLowerCase();
       const map = {
         'overview':'overview', 'stock management':'stock', 'products':'products_sec',
         'finance':'finance', 'reports':'reports_sec', 'admin':'admin'
       };
-      const k = map[raw] || map[el.textContent.trim().toLowerCase()];
+      const k = map[raw] || map[labelEl.textContent.trim().toLowerCase()];
       if (k) {
-        if (!el.getAttribute('data-sec')) el.setAttribute('data-sec', el.textContent.trim());
-        el.textContent = hoT(k);
+        if (!el.getAttribute('data-sec')) el.setAttribute('data-sec', labelEl.textContent.trim());
+        labelEl.textContent = hoT(k);
       }
     });
     document.querySelectorAll('[data-i18n]').forEach(el => {
