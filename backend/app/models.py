@@ -306,6 +306,7 @@ class SupplierGRN(Base):
     currency: Mapped[str] = mapped_column(String(8), default="LYD")
     exchange_rate: Mapped[float] = mapped_column(Float, default=1.0)  # 1 [currency] = this many LYD, at GRN time
     unit_cost_original: Mapped[float] = mapped_column(Float, default=0.0)  # unit_cost in `currency`, before conversion — 0/unused when currency=LYD
+    landed_cost_per_unit: Mapped[float] = mapped_column(Float, default=0.0)  # portion of unit_cost that came from allocated freight/commission/customs/transportation (LYD) — already included in unit_cost, kept separately for transparency
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 

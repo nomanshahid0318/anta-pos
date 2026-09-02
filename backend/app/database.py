@@ -167,6 +167,7 @@ def _auto_migrate() -> None:
             "currency": "VARCHAR(8) DEFAULT 'LYD'",
             "exchange_rate": "FLOAT DEFAULT 1",
             "unit_cost_original": "FLOAT DEFAULT 0",
+            "landed_cost_per_unit": "FLOAT DEFAULT 0",
         },
         "supplier_txns": {
             "currency": "VARCHAR(8) DEFAULT 'LYD'",

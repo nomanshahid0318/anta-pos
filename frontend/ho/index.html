@@ -392,6 +392,16 @@ body{display:flex;height:100vh;overflow:hidden}
             <div class="form-group" id="sgrn-rate-group" style="display:none"><label class="form-label">Exchange Rate (1 unit = ? LYD)</label><input class="form-input" type="number" id="sgrn-rate" placeholder="5.30" step="0.01"></div>
           </div>
           <p id="sgrn-currency-note" style="font-size:10.5px;color:var(--gray4);margin:-4px 0 8px;display:none">Enter each item's Cost below in the currency selected above — the system converts to LYD automatically for stock value, COGS, and everything else.</p>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--gray4);text-transform:uppercase;margin:8px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--gray1)">📦 Landed Cost (optional — added to unit cost automatically)</div>
+          <p style="font-size:10.5px;color:var(--gray4);margin:0 0 8px">Freight, commission, customs & clearance, and transportation for this whole shipment — spread across the items below by their share of the invoice value, so COGS and stock value reflect the true delivered cost, not just the supplier's price. In the currency selected above.</p>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Freight</label><input class="form-input" type="number" id="sgrn-freight" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">Commission</label><input class="form-input" type="number" id="sgrn-commission" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">Customs &amp; Clearance</label><input class="form-input" type="number" id="sgrn-customs" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">Transportation</label><input class="form-input" type="number" id="sgrn-transport" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">Other</label><input class="form-input" type="number" id="sgrn-other-landed" placeholder="0.00"></div>
+            <div class="form-group"><label class="form-label">Other — Note</label><input class="form-input" id="sgrn-other-landed-note" placeholder="e.g. handling fee"></div>
+          </div>
           <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="sgrn-notes" placeholder="Season, batch, etc."></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
             <div style="font-size:12px;font-weight:700;color:var(--navy)">Line Items</div>

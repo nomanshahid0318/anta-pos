@@ -60,6 +60,12 @@ class SGRNIn(BaseModel):
     notes: str = ""
     currency: str = "LYD"
     exchangeRate: float = 1.0  # 1 [currency] = this many LYD
+    freightCost: float = 0.0  # landed-cost add-ons for this shipment, in `currency` — allocated across lines by value, capitalized into unit cost (not expensed directly)
+    commissionCost: float = 0.0
+    customsCost: float = 0.0
+    transportationCost: float = 0.0
+    otherLandedCost: float = 0.0
+    otherLandedCostNote: str = ""
     lines: list[SGRNLine]
 
 
@@ -634,7 +640,7 @@ def inventory_all_count(db: Annotated[Session, Depends(get_db)], user: Annotated
 GRN_CHUNK_SIZE = 500
 
 
-def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, existing_wh: dict, existing_products: dict, seen_new_barcodes: set, store_qty_map: dict) -> float:
+def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, existing_wh: dict, existing_products: dict, seen_new_barcodes: set, store_qty_map: dict, landed_cost_map: dict | None = None) -> float:
     """Apply one Supplier GRN line to the session (no commit). Returns the
     line's total cost. Raises on failure — caller decides how to handle it.
 
@@ -647,17 +653,27 @@ def _apply_grn_line(db: Session, grn_id: str, date: str, body: "SGRNIn", line, e
     for both warehouse and store stock). This keeps cost accurate even
     when the same product is bought again later at a different price,
     instead of freezing at whatever the first-ever purchase cost was.
+
+    Landed cost: freight/commission/customs/transportation entered on the
+    whole GRN batch are allocated across lines by value share (a line
+    that was 20% of the invoice's total value absorbs 20% of the
+    overhead) and folded straight into unit_cost — so COGS and inventory
+    valuation reflect the TRUE delivered cost, not just the supplier's
+    invoice price. landed_cost_per_unit is kept on the row too, purely
+    for "why is this line's cost higher than the invoice said" transparency.
     """
     currency = (getattr(body, "currency", "LYD") or "LYD").upper()
     rate = float(getattr(body, "exchangeRate", 1.0) or 1.0)
     cost_original = float(line.cost or 0)
-    cost_lyd = round(cost_original * rate, 4) if currency != "LYD" else cost_original
+    cost_lyd_invoice = round(cost_original * rate, 4) if currency != "LYD" else cost_original
+    landed_per_unit = round((landed_cost_map or {}).get(line.barcode, 0.0), 4)
+    cost_lyd = round(cost_lyd_invoice + landed_per_unit, 4)
     tc = (line.qty or 0) * cost_lyd
     db.add(SupplierGRN(
         grn_id=grn_id, date=date, supplier=body.supplier or "", invoice_no=body.invoiceNo or "",
         barcode=line.barcode, name=line.name or "", qty=line.qty or 0, unit_cost=cost_lyd,
         total_cost=tc, currency=currency, exchange_rate=rate,
-        unit_cost_original=cost_original if currency != "LYD" else 0, notes=body.notes or "",
+        unit_cost_original=cost_original if currency != "LYD" else 0, landed_cost_per_unit=landed_per_unit, notes=body.notes or "",
     ))
     wh = existing_wh.get(line.barcode)
     old_wh_qty = int(wh.on_hand or 0) if wh else 0
@@ -766,6 +782,40 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
     date = body.date or today_str()
     lines = [l for l in body.lines if l.barcode and l.qty]
 
+    # Landed cost: freight/commission/customs/transportation are entered
+    # once for the whole shipment (in the GRN's currency), then spread
+    # across every line by its share of the invoice's total value — a
+    # line worth 20% of the shipment absorbs 20% of the overhead. This is
+    # what actually makes these costs flow into COGS/inventory value,
+    # instead of just sitting as a note nobody re-adds by hand.
+    rate = float(body.exchangeRate or 1.0)
+    currency = (body.currency or "LYD").upper()
+    total_landed_original = (body.freightCost or 0) + (body.commissionCost or 0) + (body.customsCost or 0) + (body.transportationCost or 0) + (body.otherLandedCost or 0)
+    total_landed_lyd = round(total_landed_original * rate, 4) if currency != "LYD" else round(total_landed_original, 4)
+    landed_cost_map: dict[str, float] = {}
+    if total_landed_lyd > 0 and lines:
+        line_value_lyd: dict[str, float] = {}
+        for l in lines:
+            cost_lyd = round(float(l.cost or 0) * rate, 4) if currency != "LYD" else float(l.cost or 0)
+            line_value_lyd[l.barcode] = line_value_lyd.get(l.barcode, 0.0) + (l.qty or 0) * cost_lyd
+        total_invoice_value = sum(line_value_lyd.values())
+        line_qty: dict[str, int] = {}
+        for l in lines:
+            line_qty[l.barcode] = line_qty.get(l.barcode, 0) + (l.qty or 0)
+        if total_invoice_value > 0:
+            for barcode, value in line_value_lyd.items():
+                allocated = total_landed_lyd * (value / total_invoice_value)
+                landed_cost_map[barcode] = allocated / line_qty[barcode] if line_qty[barcode] else 0.0
+        else:
+            # Every line was entered at zero cost (e.g. a free sample
+            # shipment) — value-based allocation has nothing to divide
+            # by, so split the overhead evenly across units instead.
+            total_qty = sum(line_qty.values())
+            if total_qty > 0:
+                per_unit = total_landed_lyd / total_qty
+                for barcode in line_qty:
+                    landed_cost_map[barcode] = per_unit
+
     count = 0
     total_cost = 0.0
     results: list[dict] = []
@@ -786,7 +836,7 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
         try:
             chunk_cost = 0.0
             for line in chunk:
-                chunk_cost += _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes, store_qty_map)
+                chunk_cost += _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes, store_qty_map, landed_cost_map)
             db.commit()
             total_cost += chunk_cost
             count += len(chunk)
@@ -799,7 +849,7 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
             seen_new_barcodes = set()
             for line in chunk:
                 try:
-                    tc = _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes, store_qty_map)
+                    tc = _apply_grn_line(db, grn_id, date, body, line, existing_wh, existing_products, seen_new_barcodes, store_qty_map, landed_cost_map)
                     db.commit()
                     total_cost += tc
                     count += 1
@@ -809,7 +859,8 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
                     results.append({"barcode": line.barcode, "name": line.name or "", "status": "failed", "reason": str(line_err)})
         db.expunge_all()  # release this chunk's objects so memory doesn't accumulate
 
-    if body.supplier and total_cost > 0:
+    total_cost_goods_only = round(total_cost - total_landed_lyd, 2)
+    if body.supplier and total_cost_goods_only > 0:
         sup = db.query(Supplier).filter(Supplier.name == body.supplier).first()
         if not sup:
             sid = f"SUP{int(time.time())}"
@@ -818,16 +869,21 @@ def supplier_grn(body: SGRNIn, db: Annotated[Session, Depends(get_db)], user: An
             db.flush()
         currency = (body.currency or "LYD").upper()
         rate = float(body.exchangeRate or 1.0)
-        amount_original = round(total_cost / rate, 2) if currency != "LYD" and rate else 0
+        amount_original = round(total_cost_goods_only / rate, 2) if currency != "LYD" and rate else 0
         db.add(SupplierTxn(
             txn_id=f"STXN-{int(time.time()*1000)}", supplier_id=sup.supplier_id, supplier_name=sup.name,
-            date=date, type="invoice", amount=total_cost, reference=body.invoiceNo or grn_id,
+            date=date, type="invoice", amount=total_cost_goods_only, reference=body.invoiceNo or grn_id,
             notes=f"Auto from supplier GRN {grn_id}", currency=currency, exchange_rate=rate, amount_original=amount_original,
         ))
         db.commit()
 
     failed = sum(1 for r in results if r["status"] == "failed")
-    return {"ok": True, "status": "ok", "count": count, "grnId": grn_id, "results": results, "errors": [f"{r['barcode']}: {r['reason']}" for r in results if r["status"] == "failed"]}
+    return {
+        "ok": True, "status": "ok", "count": count, "grnId": grn_id, "results": results,
+        "errors": [f"{r['barcode']}: {r['reason']}" for r in results if r["status"] == "failed"],
+        "landedCostTotal": total_landed_lyd,
+        "landedCostNote": "Freight/commission/customs/transportation for this shipment were capitalized into each item's unit cost (COGS-ready) — record the actual payment to whoever this is owed (freight forwarder, customs broker, etc.) separately in Supplier Accounts or Expenses; it wasn't added to the goods supplier's payable." if total_landed_lyd > 0 else "",
+    }
 
 
 @router.delete("/supplier-grn/{grn_id}")

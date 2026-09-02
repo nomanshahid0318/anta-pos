@@ -426,13 +426,14 @@ function toggleSGRNRate(){
 async function saveSGRN(){
   if(!sgrnLines.length){toast('Add lines','error');return;}
   const grnId=$('sgrn-id').value||('SGRN-'+Date.now().toString().slice(-6));
-  const meta={grnId,date:$('sgrn-date').value,supplier:$('sgrn-supplier').value,invoiceNo:$('sgrn-inv').value,notes:$('sgrn-notes').value,currency:($('sgrn-currency')&&$('sgrn-currency').value)||'LYD',exchangeRate:+(($('sgrn-rate')&&$('sgrn-rate').value)||1)};
+  const meta={grnId,date:$('sgrn-date').value,supplier:$('sgrn-supplier').value,invoiceNo:$('sgrn-inv').value,notes:$('sgrn-notes').value,currency:($('sgrn-currency')&&$('sgrn-currency').value)||'LYD',exchangeRate:+(($('sgrn-rate')&&$('sgrn-rate').value)||1),freightCost:+(($('sgrn-freight')&&$('sgrn-freight').value)||0),commissionCost:+(($('sgrn-commission')&&$('sgrn-commission').value)||0),customsCost:+(($('sgrn-customs')&&$('sgrn-customs').value)||0),transportationCost:+(($('sgrn-transport')&&$('sgrn-transport').value)||0),otherLandedCost:+(($('sgrn-other-landed')&&$('sgrn-other-landed').value)||0),otherLandedCostNote:($('sgrn-other-landed-note')&&$('sgrn-other-landed-note').value)||''};
   const startTime=Date.now();
   const logRows=[];
   const CHUNK=300;
   let saved=0,failed=0;
   bupShow('sgrn-bup');
   bupUpdate({prefix:'sgrn-bup',status:'⏳ Saving GRN… keep this tab open',done:0,total:sgrnLines.length,startTime});
+  let landedCostNote='';
   for(let i=0;i<sgrnLines.length;i+=CHUNK){
     const chunk=sgrnLines.slice(i,i+CHUNK);
     const res=await api('/api/ho/supplier-grn',{method:'POST',body:{...meta,lines:chunk}});
@@ -440,6 +441,7 @@ async function saveSGRN(){
       res.results.forEach(r=>logRows.push(r));
       saved+=res.results.filter(r=>r.status==='saved').length;
       failed+=res.results.filter(r=>r.status==='failed').length;
+      if(res.landedCostNote)landedCostNote=res.landedCostNote;
     } else {
       chunk.forEach(l=>logRows.push({barcode:l.barcode||'?',name:l.name||'',status:'failed',reason:(res&&(res.detail||res.msg))||'request failed — no response from server'}));
       failed+=chunk.length;
@@ -450,6 +452,7 @@ async function saveSGRN(){
   setTimeout(()=>bupHide('sgrn-bup'),2500);
   if(saved){
     toast(`✅ GRN ${grnId} — ${saved} item(s) saved`+(failed?`, ${failed} failed — see downloaded log`:''),failed?'warn':'ok');
+    if(landedCostNote)setTimeout(()=>toast('ℹ️ '+landedCostNote,'info'),600);
     window.__lastGrnLines=sgrnLines.slice();
     if($('sgrn-print-labels'))$('sgrn-print-labels').style.display='inline-block';
     sgrnLines=[];renderSGRNLines();$('sgrn-id').value='SGRN-'+Date.now().toString().slice(-6);
