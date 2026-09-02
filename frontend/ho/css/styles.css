@@ -48,16 +48,19 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI Variable','S
 #sidebar{width:var(--sidebar);background:linear-gradient(185deg,var(--navy) 0%,#0c1526 100%);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;overflow-x:hidden;transition:width .25s var(--ease);position:relative;padding:10px}
 #sidebar.collapsed{width:68px;padding:10px 8px}
 #sidebar.collapsed .brand{padding:10px 4px;justify-content:center}
-#sidebar.collapsed .brand-text,#sidebar.collapsed .brand-sub,#sidebar.collapsed .ho-tag,#sidebar.collapsed .nav-label-text,#sidebar.collapsed .nav-sec,#sidebar.collapsed #ho-user-name,#sidebar.collapsed .sync-bar>div:last-child,#sidebar.collapsed .sidebar-search{display:none}
-#sidebar.collapsed .brand>div{display:none}
+.nav-label-text,.brand-text,.brand-sub,.ho-tag,.nav-sec,#ho-user-name,.sidebar-search,.btn-label-text{transition:opacity .15s var(--ease),max-width .2s var(--ease);opacity:1;max-width:200px;overflow:hidden;white-space:nowrap}
+.sync-bar>div:last-child{transition:opacity .15s var(--ease),max-width .2s var(--ease);opacity:1;max-width:200px;overflow:hidden}
+#sidebar.collapsed .nav-label-text,#sidebar.collapsed .brand-text,#sidebar.collapsed .brand-sub,#sidebar.collapsed .ho-tag,#sidebar.collapsed .nav-sec,#sidebar.collapsed #ho-user-name,#sidebar.collapsed .sync-bar>div:last-child,#sidebar.collapsed .sidebar-search,#sidebar.collapsed .btn-label-text{opacity:0;max-width:0;margin:0;padding:0;transition:opacity .1s var(--ease),max-width .18s var(--ease) .04s}
+#sidebar.collapsed .nav-sec,#sidebar.collapsed .brand>div{max-height:0;overflow:hidden}
+#sidebar.collapsed .brand>div{display:block;transition:opacity .12s var(--ease)}
+#sidebar .nav-item{transition:background .14s var(--ease),padding .2s var(--ease),justify-content .2s var(--ease)}
 #sidebar.collapsed .nav-item{justify-content:center;padding:10px 0}
 #sidebar.collapsed .nav-item.active{transform:none}
-#sidebar.collapsed .nav-item .ico{width:auto;font-size:17px}
+#sidebar.collapsed .nav-item .ico{width:auto;font-size:17px;transition:font-size .2s var(--ease)}
 #sidebar.collapsed .sync-bar{padding:8px 4px;justify-content:center;margin-bottom:6px}
-#sidebar.collapsed div[style*="padding:0 14px 10px"]{padding:0 4px 8px;justify-content:center}
-#sidebar.collapsed div[style*="padding:0 14px 10px"] #ho-user-name{display:none}
-#sidebar.collapsed div[style*="padding:0 14px 10px"] button{padding:6px}
-#sidebar.collapsed div[style*="padding:0 14px 10px"] .btn-label-text{display:none}
+#sidebar.collapsed div[style*="padding:0 14px 10px"]{padding:0 4px 8px;justify-content:center;transition:padding .2s var(--ease)}
+#sidebar.collapsed div[style*="padding:0 14px 10px"] #ho-user-name{opacity:0;max-width:0}
+#sidebar.collapsed div[style*="padding:0 14px 10px"] button{padding:6px;transition:padding .2s var(--ease)}
 .sidebar-collapse-btn{position:absolute;top:18px;right:-11px;width:22px;height:22px;border-radius:50%;background:var(--navy2);border:2px solid rgba(255,255,255,.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;z-index:60;transition:transform .2s var(--ease),background .15s var(--ease),border-color .15s var(--ease);box-shadow:0 2px 6px rgba(0,0,0,.3)}
 .sidebar-collapse-btn:hover{background:var(--accent2);border-color:var(--accent2);transform:scale(1.15)}
 #sidebar.collapsed .sidebar-collapse-btn:hover{transform:rotate(180deg) scale(1.15)}
@@ -214,8 +217,8 @@ select.form-input{cursor:pointer}
   #sidebar{position:fixed;inset:0 auto 0 0;z-index:900;transform:translateX(-100%);transition:transform .22s var(--ease);box-shadow:var(--shadow-lg)}
   #sidebar.open{transform:translateX(0)}
   #sidebar.collapsed{width:var(--sidebar)}
-  #sidebar.collapsed .brand-text,#sidebar.collapsed .brand-sub,#sidebar.collapsed .ho-tag,#sidebar.collapsed .nav-label-text,#sidebar.collapsed .nav-sec,#sidebar.collapsed #ho-user-name{display:block}
-  #sidebar.collapsed .brand>div{display:block}
+  #sidebar.collapsed .brand-text,#sidebar.collapsed .brand-sub,#sidebar.collapsed .ho-tag,#sidebar.collapsed .nav-label-text,#sidebar.collapsed .nav-sec,#sidebar.collapsed #ho-user-name,#sidebar.collapsed .sync-bar>div:last-child,#sidebar.collapsed .sidebar-search,#sidebar.collapsed .btn-label-text{opacity:1;max-width:200px;max-height:none;margin:revert;padding:revert}
+  #sidebar.collapsed .brand>div{display:block;max-height:none}
   #sidebar.collapsed .nav-item{justify-content:flex-start;padding:9px 15px}
   #sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(10,14,26,.5);z-index:890}
   #sidebar-backdrop.open{display:block}
