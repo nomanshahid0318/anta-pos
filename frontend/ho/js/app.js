@@ -143,6 +143,9 @@ async function pinSubmit(){
     if(app){app.style.display='flex';app.classList.add('open');}
     try{setSyncStatus('online','Logged in as '+(user.name||role));}catch(_err){}
     try{await loadAll();}catch(_err){console.error(_err); toast('Loaded with some errors','warn');}
+    try{
+      document.querySelectorAll('.nav-sec-group').forEach(grp=>toggleNavSec(grp.id.replace('navsec-',''),false));
+    }catch(_err){}
     try{show('dashboard');}catch(_err){}
     startHoAutoRefresh();
     return;
@@ -3335,6 +3338,9 @@ document.addEventListener('keydown',e=>{
       if($('login-screen'))$('login-screen').style.display='none';
       const app=$('app'); if(app){app.style.display='flex';app.classList.add('open');}
       try{await loadAll();}catch(_e){}
+      try{
+        document.querySelectorAll('.nav-sec-group').forEach(grp=>toggleNavSec(grp.id.replace('navsec-',''),false));
+      }catch(_e){}
       try{show('dashboard');}catch(_e){}
       startHoAutoRefresh();
       return;
@@ -3358,8 +3364,10 @@ document.addEventListener('keydown',e=>{
     }
   }catch(e){}
   try{
-    const saved=JSON.parse(localStorage.getItem('anta_navsec_collapsed')||'{}');
-    Object.keys(saved).forEach(key=>{ if(saved[key]) toggleNavSec(key,false); });
+    document.querySelectorAll('.nav-sec-group').forEach(grp=>{
+      const key=grp.id.replace('navsec-','');
+      toggleNavSec(key,false);
+    });
   }catch(e){}
 })();
 function filterSidebarNav(q){
@@ -3385,11 +3393,6 @@ function toggleNavSec(key,forceExpand){
   const collapsed=(forceExpand!==undefined)?!forceExpand:!grp.classList.contains('collapsed');
   grp.classList.toggle('collapsed',collapsed);
   hdr.classList.toggle('collapsed',collapsed);
-  try{
-    const saved=JSON.parse(localStorage.getItem('anta_navsec_collapsed')||'{}');
-    saved[key]=collapsed;
-    localStorage.setItem('anta_navsec_collapsed',JSON.stringify(saved));
-  }catch(e){}
 }
 function toggleSidebarCollapse(){
   const sb=document.getElementById('sidebar');
