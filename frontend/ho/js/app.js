@@ -155,7 +155,7 @@ async function pinSubmit(){
   pinEntry=''; if($('pin-display'))$('pin-display').textContent='----';
   if($('login-empcode'))$('login-empcode').value='';
 }
-function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'")){n.classList.add('active');const grp=n.closest('.nav-sec-group');if(grp&&grp.classList.contains('collapsed'))toggleNavSec(grp.id.replace('navsec-',''),true);}});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects',addons:'Cheques',budget:'Budget vs Actual','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
+function show(name){const sb=$('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();window.__currentScreen=name;try{localStorage.setItem('anta_ho_last_screen',name);}catch(e){}if($('content'))$('content').scrollTop=0;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const s=$('screen-'+name);if(s)s.classList.add('active');document.querySelectorAll('.nav-item').forEach(n=>{if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'")){n.classList.add('active');const grp=n.closest('.nav-sec-group');if(grp&&grp.classList.contains('collapsed'))toggleNavSec(grp.id.replace('navsec-',''),true);}});const titles={dashboard:'HO Dashboard','stores-view':'All Stores',warehouse:'HO Warehouse','supplier-grn':'Supplier GRN','store-grn':'Send Stock to Stores',transfer:'Stock Transfer',products:'Product Master',pl:'P&L Summary','expenses-ho':'Expenses',reports:'Sales Reports','inventory-ho':'Inventory — All Stores','stores-admin':'Manage Stores',users:'Users & PINs',banks:'Banks & Payments',settings:'Settings','balance-sheet':'Balance Sheet',cashflow:'Cash Flow','supplier-accounts':'Supplier Accounts',capital:'Capital & Equity','fixed-assets':'Fixed Assets','prepaid-expenses':'Prepaid Expenses','employee-advances':'Employee Advances','accrued-expenses':'Accrued Expenses',shifts:'Cashier Shifts','stock-counts':'Stock Take / Physical Count',payroll:'Payroll',attendance:'Attendance',costcenters:'Cost Centers & Projects',addons:'Cheques',budget:'Budget vs Actual','three-way-match':'Invoice Matching','purchase-orders':'Purchase Orders',customers:'Customers','stock-aging':'Stock Aging','audit-log':'Audit Log','barcode-labels':'Barcode Labels',accounts:'Chart of Accounts',handovers:'Cash Handovers',license:'License',promotions:'Promotions'};if($('screen-title'))$('screen-title').textContent=titles[name]||name;
 if(name==='prepaid-expenses'){populatePrepaidStoreSelect();loadPrepaidExpenses();}
 if(name==='employee-advances'){populateAdvStoreSelect();loadEmployeeAdvances();}
 if(name==='accrued-expenses'){populateAccStoreSelect();loadAccruedExpenses();}
@@ -3338,10 +3338,12 @@ document.addEventListener('keydown',e=>{
       if($('login-screen'))$('login-screen').style.display='none';
       const app=$('app'); if(app){app.style.display='flex';app.classList.add('open');}
       try{await loadAll();}catch(_e){}
+      let restoreScreen='dashboard';
+      try{restoreScreen=localStorage.getItem('anta_ho_last_screen')||'dashboard';}catch(_e){}
       try{
         document.querySelectorAll('.nav-sec-group').forEach(grp=>toggleNavSec(grp.id.replace('navsec-',''),false));
       }catch(_e){}
-      try{show('dashboard');}catch(_e){}
+      try{show(restoreScreen);}catch(_e){try{show('dashboard');}catch(_e2){}}
       startHoAutoRefresh();
       return;
     }
@@ -3391,6 +3393,15 @@ function toggleNavSec(key,forceExpand){
   const hdr=grp?grp.previousElementSibling:null;
   if(!grp||!hdr)return;
   const collapsed=(forceExpand!==undefined)?!forceExpand:!grp.classList.contains('collapsed');
+  if(!collapsed){
+    // True accordion — opening this section closes every other one.
+    document.querySelectorAll('.nav-sec-group').forEach(otherGrp=>{
+      if(otherGrp===grp)return;
+      const otherHdr=otherGrp.previousElementSibling;
+      otherGrp.classList.add('collapsed');
+      if(otherHdr)otherHdr.classList.add('collapsed');
+    });
+  }
   grp.classList.toggle('collapsed',collapsed);
   hdr.classList.toggle('collapsed',collapsed);
 }
