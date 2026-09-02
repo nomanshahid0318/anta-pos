@@ -105,12 +105,18 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('capital')" data-role="admin,manager,accountant"><span class="ico">🏦</span>Capital & Equity</div>
     <div class="nav-item" onclick="show('fixed-assets')" data-role="admin,manager,accountant"><span class="ico">🏗️</span>Fixed Assets</div>
     <div class="nav-item" onclick="show('prepaid-expenses')" data-role="admin,manager,accountant"><span class="ico">📆</span>Prepaid Expenses</div>
-    <div class="nav-item" onclick="show('employee-advances')" data-role="admin,manager,accountant"><span class="ico">🤲</span>Employee Advances</div>
     <div class="nav-item" onclick="show('accrued-expenses')" data-role="admin,manager,accountant"><span class="ico">⏳</span>Accrued Expenses</div>
-    <div class="nav-item" onclick="show('shifts')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cashier Shifts</div>
     <div class="nav-item" onclick="show('costcenters')" data-role="admin,manager,accountant"><span class="ico">🏷️</span>Cost Centers</div>
     <div class="nav-item" onclick="show('addons')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cheques</div>
     <div class="nav-item" onclick="show('budget')" data-role="admin,manager,accountant"><span class="ico">📊</span>Budget</div>
+    </div>
+    <div class="nav-sec" onclick="toggleNavSec('hr')"><span class="nav-sec-label">HR</span><span class="nav-sec-arrow">▾</span></div>
+    <div class="nav-sec-group" id="navsec-hr">
+    <div class="nav-item" onclick="show('users')" data-role="admin"><span class="ico">👥</span>Employees / Users &amp; PINs</div>
+    <div class="nav-item" onclick="show('attendance')" data-role="admin,manager,warehouse"><span class="ico">🗓️</span>Attendance Sheet</div>
+    <div class="nav-item" onclick="show('shifts')" data-role="admin,manager,accountant"><span class="ico">🧾</span>Cashier Shifts</div>
+    <div class="nav-item" onclick="show('payroll')" data-role="admin,manager,accountant"><span class="ico">💵</span>Payroll Sheet</div>
+    <div class="nav-item" onclick="show('employee-advances')" data-role="admin,manager,accountant"><span class="ico">🤲</span>Employee Advances</div>
     </div>
     <div class="nav-sec" onclick="toggleNavSec('reports')"><span class="nav-sec-label">Reports</span><span class="nav-sec-arrow">▾</span></div>
     <div class="nav-sec-group" id="navsec-reports">
@@ -118,8 +124,6 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('reports')"><span class="ico">📈</span>Sales Reports</div>
     <div class="nav-item" onclick="show('inventory-ho')" data-role="admin,manager,warehouse"><span class="ico">🗃️</span>Inventory — All</div>
     <div class="nav-item" onclick="show('stock-counts')" data-role="admin,manager,warehouse"><span class="ico">📋</span>Stock Take</div>
-    <div class="nav-item" onclick="show('payroll')" data-role="admin,manager,accountant"><span class="ico">💵</span>Payroll</div>
-    <div class="nav-item" onclick="show('attendance')" data-role="admin,manager,warehouse"><span class="ico">🗓️</span>Attendance</div>
     <div class="nav-item" onclick="show('stock-aging')" data-role="admin,manager,merchandiser,warehouse"><span class="ico">🐢</span>Stock Aging</div>
     </div>
     <div class="nav-sec" onclick="toggleNavSec('admin')"><span class="nav-sec-label">Admin</span><span class="nav-sec-arrow">▾</span></div>
@@ -127,7 +131,6 @@ body{display:flex;height:100vh;overflow:hidden}
     <div class="nav-item" onclick="show('promotions')" data-role="admin,merchandiser"><span class="ico">🏷️</span>Promotions</div>
     <div class="nav-item" onclick="show('license')" data-role="admin"><span class="ico">🔑</span>License</div>
     <div class="nav-item" onclick="show('stores-admin')" data-role="admin"><span class="ico">🏪</span>Manage Stores</div>
-    <div class="nav-item" onclick="show('users')" data-role="admin"><span class="ico">👥</span>Users & PINs</div>
     <div class="nav-item" onclick="show('audit-log')" data-role="admin"><span class="ico">🕵️</span>Audit Log</div>
     <div class="nav-item" onclick="show('banks')" data-role="admin"><span class="ico">🏦</span>Banks & Payments</div>
     <div class="nav-item" onclick="show('settings')" data-role="admin"><span class="ico">⚙️</span>Settings</div>
@@ -862,7 +865,7 @@ body{display:flex;height:100vh;overflow:hidden}
       <div class="card"><div class="card-title">Top Products</div><div id="rpt-prod"></div></div>
     </div>
     <div class="card"><div class="card-title">Transactions</div>
-      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Invoice</th><th>Date</th><th>Time</th><th>Store</th><th>Customer</th><th>Items</th><th>Units</th><th>Barcode</th><th>Products</th><th>Subtotal</th><th>Discount</th><th>Cost</th><th>Profit</th><th>Margin%</th><th>Payment</th><th>Ref</th><th>Total</th></tr></thead>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th>Type</th><th>Invoice</th><th>Date</th><th>Time</th><th>Store</th><th>Customer</th><th>Items</th><th>Units</th><th>Barcode</th><th>Products</th><th>Subtotal</th><th>Discount</th><th>Cost</th><th>Profit</th><th>Margin%</th><th>Payment</th><th>Ref</th><th>Total</th></tr></thead>
       <tbody id="rpt-txns"></tbody></table></div>
     </div>
   </div>

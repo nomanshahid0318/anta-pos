@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import CurrentUser, get_current_user
 from ..database import get_db
-from ..models import Inventory, Product, Return, Sale
+from ..models import Exchange, Inventory, Product, Return, Sale
 from ..schemas import DashboardOut, ReportOut
 from ..services.inventory import get_stock, auto_heal_store_inventory
 from ..utils import iso_now, today_str
@@ -149,19 +149,24 @@ def reports(
 ):
     q = db.query(Sale)
     rq = db.query(Return)
+    eq = db.query(Exchange)
     sid = store or (None if user.is_admin and user.store_id == "HO" else user.store_id)
     if sid and sid not in ("all", "HO"):
         q = q.filter(Sale.store_id == sid)
         rq = rq.filter(Return.store_id == sid)
+        eq = eq.filter(Exchange.store_id == sid)
     if date_from:
         q = q.filter(Sale.date >= date_from)
         rq = rq.filter(Return.date >= date_from)
+        eq = eq.filter(Exchange.date >= date_from)
     if date_to:
         q = q.filter(Sale.date <= date_to)
         rq = rq.filter(Return.date <= date_to)
+        eq = eq.filter(Exchange.date <= date_to)
 
     sales = q.order_by(Sale.id.desc()).all()
-    rets = rq.all()
+    rets = rq.order_by(Return.id.desc()).all()
+    exchs = eq.order_by(Exchange.id.desc()).all()
     rev = sum(s.total or 0 for s in sales)
     ret_amt = sum(r.amount or 0 for r in rets)
     inv = len(sales)
@@ -238,6 +243,54 @@ def reports(
             # A sale with no parsed line items (shouldn't normally happen) —
             # still show one row so the invoice isn't silently dropped.
             txns.append({**base_row, "barcodeList": "", "productList": "", "subtotal": float(s.subtotal or 0)})
+
+    for r in rets:
+        txns.append({
+            "id": r.ref_id,
+            "date": r.date,
+            "time": r.time,
+            "store": r.store,
+            "storeId": r.store_id,
+            "customer": "",
+            "payment": r.method,
+            "payRef": "",
+            "items": 1,
+            "units": r.qty,
+            "discount": 0,
+            "cost": 0,
+            "profit": 0,
+            "margin": 0,
+            "total": -abs(r.amount or 0),
+            "type": "return",
+            "synced": True,
+            "barcodeList": r.barcode or "—",
+            "productList": f"{r.product_name} x{r.qty}" + (f" (ref {r.orig_invoice})" if r.orig_invoice else ""),
+            "subtotal": -abs(r.amount or 0),
+        })
+    for e in exchs:
+        txns.append({
+            "id": e.ref_id,
+            "date": e.date,
+            "time": e.time,
+            "store": e.store,
+            "storeId": e.store_id,
+            "customer": e.customer,
+            "payment": e.payment,
+            "payRef": "",
+            "items": 1,
+            "units": e.new_qty,
+            "discount": 0,
+            "cost": 0,
+            "profit": 0,
+            "margin": 0,
+            "total": e.diff or 0,
+            "type": "exchange",
+            "synced": True,
+            "barcodeList": e.new_barcode or "—",
+            "productList": f"{e.old_name} x{e.old_qty} → {e.new_name} x{e.new_qty}",
+            "subtotal": e.diff or 0,
+        })
+    txns.sort(key=lambda t: (t.get("date") or "", t.get("time") or ""), reverse=True)
 
     products = sorted(prod_map.values(), key=lambda x: x["revenue"], reverse=True)[:50]
     total_cost = round(sum(p.get("cost", 0) for p in prod_map.values()), 2)
