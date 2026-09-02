@@ -80,9 +80,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI Variable','S
 .dot.online{background:#22c55e;box-shadow:0 0 6px #22c55e}.dot.offline{background:#f44336}.dot.syncing{background:#f59e0b;animation:pulse 1.1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 nav{flex:1;padding:2px 0}
-.nav-sec{padding:14px 10px 6px;color:rgba(255,255,255,.32);font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;animation:navFadeIn .3s var(--ease) backwards;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:color .15s var(--ease);user-select:none}
-.nav-sec:hover{color:rgba(255,255,255,.6)}
-.nav-sec-arrow{font-size:8px;transition:transform .2s var(--ease)}
+.nav-sec{margin:10px 8px 4px;padding:9px 12px;color:rgba(255,255,255,.75);font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;animation:navFadeIn .3s var(--ease) backwards;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:background .15s var(--ease),color .15s var(--ease);user-select:none;background:rgba(255,255,255,.07);border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+.nav-sec:first-child{margin-top:6px}
+.nav-sec:hover{background:rgba(255,255,255,.13);color:#fff}
+.nav-sec-arrow{font-size:10px;opacity:.7;transition:transform .2s var(--ease)}
 .nav-sec.collapsed .nav-sec-arrow{transform:rotate(-90deg)}
 .nav-sec-group{max-height:800px;overflow:hidden;transition:max-height .28s var(--ease)}
 .nav-sec-group.collapsed{max-height:0}
