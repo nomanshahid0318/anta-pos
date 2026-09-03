@@ -99,9 +99,13 @@ class BankIn(BaseModel):
 
 class ProductOut(BaseModel):
     barcode: str
+    itemNo: str = ""
     name: str
     brand: str = "ANTA"
     category: str = "Footwear"
+    midCategory: str = ""
+    collection: str = ""
+    description: str = ""
     size: str = ""
     color: str = ""
     department: str = ""
@@ -121,9 +125,13 @@ class ProductOut(BaseModel):
 
 class ProductIn(BaseModel):
     barcode: str
+    itemNo: str = ""
     name: str
     brand: str = "ANTA"
     category: str = "Footwear"
+    midCategory: str = ""
+    collection: str = ""
+    description: str = ""
     size: str = ""
     color: str = ""
     department: str = ""

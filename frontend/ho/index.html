@@ -684,27 +684,31 @@ body{display:flex;height:100vh;overflow:hidden}
         <div class="modal" style="width:700px">
           <div class="modal-title" id="add-prod-title">➕ Add / Edit Product</div>
           <div class="grid-2">
+            <div class="form-group"><label class="form-label">Item No.</label><input class="form-input" id="p-itemno" placeholder="Style/Item number"></div>
             <div class="form-group"><label class="form-label">Barcode *</label><input class="form-input" id="p-bc"></div>
             <div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="p-nm"></div>
             <div class="form-group"><label class="form-label">Brand</label><input class="form-input" id="p-br" value="ANTA"></div>
+            <div class="form-group"><label class="form-label">Gender Type</label><select class="form-input" id="p-gender"><option value="">—</option><option>Men</option><option>Women</option><option>Kids</option><option>Unisex</option></select></div>
             <div class="form-group"><label class="form-label">Category</label><select class="form-input" id="p-cat"></select></div>
+            <div class="form-group"><label class="form-label">Mid-category</label><input class="form-input" id="p-midcat" placeholder="e.g. Trail Running"></div>
+            <div class="form-group"><label class="form-label">Collection</label><input class="form-input" id="p-collection" placeholder="e.g. Summer 2026"></div>
             <div class="form-group"><label class="form-label">Size</label><input class="form-input" id="p-sz"></div>
             <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="p-color"></div>
             <div class="form-group"><label class="form-label">Department</label><input class="form-input" id="p-dept" placeholder="Footwear / Apparel"></div>
             <div class="form-group"><label class="form-label">Season</label><input class="form-input" id="p-season" placeholder="SS26 / AW25"></div>
-            <div class="form-group"><label class="form-label">Gender</label><select class="form-input" id="p-gender"><option value="">—</option><option>Men</option><option>Women</option><option>Kids</option><option>Unisex</option></select></div>
             <div class="form-group"><label class="form-label">Unit Cost (LYD)</label><input class="form-input" type="number" id="p-cost"></div>
             <div class="form-group"><label class="form-label">Original Price (first-ever price)</label><input class="form-input" type="number" id="p-orig" placeholder="Auto = same as Current Price if left blank"></div>
             <div class="form-group"><label class="form-label">Current Price / Retail (LYD)</label><input class="form-input" type="number" id="p-ret"></div>
             <div class="form-group"><label class="form-label">Reorder Level</label><input class="form-input" type="number" id="p-ro" value="5"></div>
           </div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="p-desc" rows="2" placeholder="Product description"></textarea></div>
           <div style="display:flex;gap:7px;margin-top:8px">
             <button class="btn btn-primary" onclick="saveProd()">💾 Save</button>
             <button class="btn btn-ghost" onclick="closeAddProd()">Cancel</button>
           </div>
         </div>
       </div>
-      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th><input type="checkbox" id="prod-select-all" onchange="toggleAllProducts(this)" title="Select/deselect this page only — use 'Select All Matching' above for everything"></th><th>Barcode</th><th>Unit Cost</th><th>Original Price</th><th>Current Price</th><th>Name</th><th>Brand</th><th>Category</th><th>Department</th><th>Season</th><th>Gender</th><th>Size</th><th>Color</th><th>Margin%</th><th>Reorder</th><th>Active</th><th>Actions</th></tr></thead>
+      <div class="table-wrapper" style="overflow-x:auto"><table><thead><tr><th><input type="checkbox" id="prod-select-all" onchange="toggleAllProducts(this)" title="Select/deselect this page only — use 'Select All Matching' above for everything"></th><th>Item No.</th><th>Barcode</th><th>Unit Cost</th><th>Original Price</th><th>Current Price</th><th>Name</th><th>Brand</th><th>Gender Type</th><th>Category</th><th>Mid-category</th><th>Collection</th><th>Department</th><th>Season</th><th>Size</th><th>Color</th><th>Margin%</th><th>Reorder</th><th>Active</th><th>Actions</th></tr></thead>
       <tbody id="prod-table"></tbody></table></div>
       <div id="prod-pagination"></div>
     </div>

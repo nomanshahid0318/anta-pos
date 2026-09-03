@@ -76,9 +76,13 @@ class Product(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     barcode: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    item_no: Mapped[str] = mapped_column(String(64), default="", index=True)  # style/item number — distinct from barcode, which is per size/color variant
     name: Mapped[str] = mapped_column(String(255))
     brand: Mapped[str] = mapped_column(String(64), default="ANTA")
     category: Mapped[str] = mapped_column(String(64), default="Footwear")
+    mid_category: Mapped[str] = mapped_column(String(64), default="")  # sub-category between Category and the specific product, e.g. Category=Running -> Mid-category=Trail Running
+    collection: Mapped[str] = mapped_column(String(64), default="")  # e.g. "Summer 2026", "ANTA Pro Series"
+    description: Mapped[str] = mapped_column(Text, default="")
     size: Mapped[str] = mapped_column(String(64), default="")
     color: Mapped[str] = mapped_column(String(64), default="")
     department: Mapped[str] = mapped_column(String(64), default="")

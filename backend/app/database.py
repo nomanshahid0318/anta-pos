@@ -112,6 +112,10 @@ def _auto_migrate() -> None:
             "original_price": "FLOAT DEFAULT 0",
             "warranty_days": "INTEGER DEFAULT 0",
             "serial_tracked": "BOOLEAN DEFAULT FALSE",
+            "item_no": "VARCHAR(64) DEFAULT ''",
+            "mid_category": "VARCHAR(64) DEFAULT ''",
+            "collection": "VARCHAR(64) DEFAULT ''",
+            "description": "TEXT DEFAULT ''",
         },
         "promotions": {
             "start_time": "VARCHAR(8) DEFAULT ''",

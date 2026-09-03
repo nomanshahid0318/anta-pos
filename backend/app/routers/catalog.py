@@ -148,9 +148,13 @@ def list_products(
         stock = stock_by_barcode.get(p.barcode, 0) if is_store_scoped else None
         out.append({
             "barcode": p.barcode,
+            "itemNo": getattr(p, "item_no", "") or "",
             "name": p.name,
             "brand": p.brand or "ANTA",
             "category": p.category or "",
+            "midCategory": getattr(p, "mid_category", "") or "",
+            "collection": getattr(p, "collection", "") or "",
+            "description": getattr(p, "description", "") or "",
             "size": p.size or "",
             "color": getattr(p, "color", "") or "",
             "department": getattr(p, "department", "") or "",
@@ -232,6 +236,10 @@ def save_product(
         row.name = body.name
         row.brand = body.brand
         row.category = body.category
+        row.mid_category = body.midCategory
+        row.collection = body.collection
+        row.description = body.description
+        row.item_no = body.itemNo
         row.size = body.size
         row.color = body.color
         row.department = body.department
@@ -259,9 +267,13 @@ def save_product(
     else:
         row = Product(
             barcode=body.barcode,
+            item_no=body.itemNo,
             name=body.name,
             brand=body.brand,
             category=body.category,
+            mid_category=body.midCategory,
+            collection=body.collection,
+            description=body.description,
             color=body.color,
             department=body.department,
             season=body.season,
@@ -282,9 +294,13 @@ def save_product(
         db.commit()
     return ProductOut(
         barcode=row.barcode,
+        itemNo=getattr(row, "item_no", "") or "",
         name=row.name,
         brand=row.brand,
         category=row.category,
+        midCategory=getattr(row, "mid_category", "") or "",
+        collection=getattr(row, "collection", "") or "",
+        description=getattr(row, "description", "") or "",
         size=row.size,
         color=getattr(row, "color", "") or "",
         department=getattr(row, "department", "") or "",
@@ -300,8 +316,8 @@ def save_product(
  
  
 PRODUCT_UPSERT_COLS = [
-    "name", "brand", "category", "size", "color", "department",
-    "season", "gender", "cost", "retail", "reorder", "opening", "active",
+    "item_no", "name", "brand", "category", "mid_category", "collection", "description",
+    "size", "color", "department", "season", "gender", "cost", "retail", "reorder", "opening", "active",
 ]
  
  
@@ -439,7 +455,8 @@ def bulk_save_products(
             # current retail price (same as the single add/edit form).
             row_original_price = item.retail
         valid_rows.append({
-            "barcode": item.barcode, "name": item.name, "brand": item.brand, "category": item.category,
+            "barcode": item.barcode, "item_no": item.itemNo, "name": item.name, "brand": item.brand, "category": item.category,
+            "mid_category": item.midCategory, "collection": item.collection, "description": item.description,
             "size": item.size, "color": item.color, "department": item.department, "season": item.season,
             "gender": item.gender, "cost": item.cost, "retail": item.retail, "reorder": item.reorder,
             "opening": item.opening, "active": item.active,

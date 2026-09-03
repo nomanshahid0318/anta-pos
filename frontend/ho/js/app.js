@@ -871,9 +871,13 @@ function editProduct(bc){
   showAddProd();
   const title=$('add-prod-title'); if(title)title.textContent='✏️ Edit Product';
   if($('p-bc'))$('p-bc').value=p.Barcode;
+  if($('p-itemno'))$('p-itemno').value=p.ItemNo||'';
   if($('p-nm'))$('p-nm').value=p.Name||'';
   if($('p-br'))$('p-br').value=p.Brand||'ANTA';
   if($('p-cat')){const catSel=$('p-cat');if(p.Category&&!Array.from(catSel.options).some(o=>o.value===p.Category)){const opt=document.createElement('option');opt.textContent=p.Category;catSel.appendChild(opt);}catSel.value=p.Category||'';}
+  if($('p-midcat'))$('p-midcat').value=p.MidCategory||'';
+  if($('p-collection'))$('p-collection').value=p.Collection||'';
+  if($('p-desc'))$('p-desc').value=p.Description||'';
   if($('p-sz'))$('p-sz').value=p.Size||'';
   if($('p-color'))$('p-color').value=p.Color||'';
   if($('p-dept'))$('p-dept').value=p.Department||'';
@@ -901,7 +905,7 @@ async function fetchAndRenderProductsPage(){
       api('/api/products?'+qs.toString()),
       api('/api/products/count?'+countQs.toString()),
     ]);
-    prodPageItems=Array.isArray(rows)?rows.map(p=>({...p,Barcode:p.barcode,Name:p.name,Brand:p.brand,Category:p.category,Department:p.department||'',Season:p.season||'',Gender:p.gender||'',Color:p.color||'',Size:p.size,Cost:p.cost,Retail:p.retail,OriginalPrice:p.originalPrice||0,Reorder:p.reorder,Opening:p.opening,Active:p.active?'Y':'N'})):[];
+    prodPageItems=Array.isArray(rows)?rows.map(p=>({...p,Barcode:p.barcode,ItemNo:p.itemNo||'',Name:p.name,Brand:p.brand,Category:p.category,MidCategory:p.midCategory||'',Collection:p.collection||'',Description:p.description||'',Department:p.department||'',Season:p.season||'',Gender:p.gender||'',Color:p.color||'',Size:p.size,Cost:p.cost,Retail:p.retail,OriginalPrice:p.originalPrice||0,Reorder:p.reorder,Opening:p.opening,Active:p.active?'Y':'N'})):[];
     prodTotalCount=(countRes&&typeof countRes.count==='number')?countRes.count:prodPageItems.length;
     prodFilteredList=prodPageItems; // kept in sync for anything still reading the old name
   }catch(_e){
@@ -917,7 +921,7 @@ function renderProductsTable(){
   // Redraws the table from the already-fetched page (prodPageItems) with
   // no server call — used for selection toggles etc. where nothing about
   // WHICH rows are shown has changed, only their checked state.
-  if($('prod-table'))$('prod-table').innerHTML=prodPageItems.map(p=>{const m=p.Cost&&p.Retail?((p.Retail-p.Cost)/p.Retail*100).toFixed(1):'—';const checked=selectedProducts.has(p.Barcode)?'checked':'';return`<tr><td><input type="checkbox" ${checked} onchange="toggleProduct('${p.Barcode}')"></td><td style="font-family:monospace;font-size:10px">${p.Barcode}</td><td>${fmt(p.Cost||0)}</td><td>${fmt(p.OriginalPrice||0)}</td><td>${fmt(p.Retail||0)}</td><td class="fw7">${p.Name}</td><td>${p.Brand||'ANTA'}</td><td>${p.Category||''}</td><td>${p.Department||''}</td><td>${p.Season||''}</td><td>${p.Gender||''}</td><td>${p.Size||'—'}</td><td>${p.Color||''}</td><td>${m}%</td><td>${p.Reorder||5}</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm" onclick="editProduct('${p.Barcode}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteProduct('${p.Barcode}')">🗑️</button></td></tr>`;}).join('')||'<tr><td colspan="17" style="text-align:center;color:var(--gray3);padding:18px">No products found</td></tr>';
+  if($('prod-table'))$('prod-table').innerHTML=prodPageItems.map(p=>{const m=p.Cost&&p.Retail?((p.Retail-p.Cost)/p.Retail*100).toFixed(1):'—';const checked=selectedProducts.has(p.Barcode)?'checked':'';return`<tr><td><input type="checkbox" ${checked} onchange="toggleProduct('${p.Barcode}')"></td><td style="font-size:10px">${p.ItemNo||'—'}</td><td style="font-family:monospace;font-size:10px">${p.Barcode}</td><td>${fmt(p.Cost||0)}</td><td>${fmt(p.OriginalPrice||0)}</td><td>${fmt(p.Retail||0)}</td><td class="fw7">${p.Name}</td><td>${p.Brand||'ANTA'}</td><td>${p.Gender||''}</td><td>${p.Category||''}</td><td>${p.MidCategory||''}</td><td>${p.Collection||''}</td><td>${p.Department||''}</td><td>${p.Season||''}</td><td>${p.Size||'—'}</td><td>${p.Color||''}</td><td>${m}%</td><td>${p.Reorder||5}</td><td><span class="badge badge-green">Active</span></td><td><button class="btn btn-ghost btn-sm" onclick="editProduct('${p.Barcode}')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="deleteProduct('${p.Barcode}')">🗑️</button></td></tr>`;}).join('')||'<tr><td colspan="20" style="text-align:center;color:var(--gray3);padding:18px">No products found</td></tr>';
   const selAll=$('prod-select-all');
   if(selAll)selAll.checked=prodPageItems.length>0&&prodPageItems.every(p=>selectedProducts.has(p.Barcode));
   updateProdSelectedInfo();
@@ -929,7 +933,7 @@ function renderProducts(){
 function showAddProd(){
   editingProductBarcode=null;
   const title=$('add-prod-title'); if(title)title.textContent='➕ Add / Edit Product';
-  ['p-bc','p-nm','p-sz','p-color','p-dept','p-season','p-cost','p-ret','p-orig'].forEach(id=>{if($(id))$(id).value='';});
+  ['p-bc','p-itemno','p-nm','p-sz','p-color','p-dept','p-season','p-cost','p-ret','p-orig','p-midcat','p-collection','p-desc'].forEach(id=>{if($(id))$(id).value='';});
   if($('p-br'))$('p-br').value='ANTA';
   if($('p-cat'))$('p-cat').selectedIndex=0;
   if($('p-gender'))$('p-gender').value='';
@@ -945,7 +949,9 @@ async function saveProd(){
   const bc=$('p-bc').value.trim(),nm=$('p-nm').value.trim();
   if(!bc||!nm){toast('Required fields','error');return;}
   const body={
-    barcode:bc,name:nm,brand:$('p-br').value,category:$('p-cat').value,size:$('p-sz').value,
+    barcode:bc,itemNo:$('p-itemno')?.value||'',name:nm,brand:$('p-br').value,category:$('p-cat').value,
+    midCategory:$('p-midcat')?.value||'',collection:$('p-collection')?.value||'',description:$('p-desc')?.value||'',
+    size:$('p-sz').value,
     color:$('p-color')?.value||'',department:$('p-dept')?.value||'',season:$('p-season')?.value||'',gender:$('p-gender')?.value||'',
     cost:+$('p-cost').value||0,retail:+$('p-ret').value||0,reorder:+($('p-ro')?.value)||5,
     active:true,
@@ -964,7 +970,7 @@ async function downloadProdTemplate(){
   const genders=['Men','Women','Kids','Unisex'];
   if(typeof ExcelJS==='undefined'){
     // Fallback: plain CSV (no dropdowns) if ExcelJS failed to load (e.g. offline)
-    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['Barcode,Name,Brand,Category,Department,Season,Gender,Size,Color,Cost,Original Price,Retail,Reorder\n8001000000009,ANTA Sample Shoe,ANTA,Running,Footwear,SS26,Men,42,White,120,180,180,5\n'],{type:'text/csv'}));a.download='products_template.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['Item No,Barcode,Name,Brand,Gender Type,Category,Mid-category,Collection,Description,Department,Season,Size,Color,Cost,Original Price,Retail,Reorder\nANT-2026-001,8001000000009,ANTA Sample Shoe,ANTA,Men,Running,Trail Running,Summer 2026,Lightweight trail running shoe,Footwear,SS26,42,White,120,180,180,5\n'],{type:'text/csv'}));a.download='products_template.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     return;
   }
   const wb=new ExcelJS.Workbook();
@@ -987,12 +993,16 @@ function normKey(k){return String(k||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 function pickField(rowNorm, aliases){for(const a of aliases){if(rowNorm[a]!==undefined&&rowNorm[a]!=='')return rowNorm[a];}return '';}
 const FIELD_ALIASES={
   barcode:['barcode','bar code','sku','itemcode','item code','code','productcode'],
-  name:['name','productname','itemname','description','title'],
+  itemno:['itemno','item no','item no.','itemnumber','item number','stylenumber','style number'],
+  name:['name','productname','itemname','title'],
   brand:['brand'],
   category:['category','cat'],
+  midcategory:['midcategory','mid category','mid-category','subcategory','sub category'],
+  collection:['collection'],
+  description:['description','desc'],
   department:['department','dept'],
   season:['season'],
-  gender:['gender','sex'],
+  gender:['gender','sex','gendertype','gender type'],
   size:['size'],
   color:['color','colour'],
   cost:['cost','unitcost','costprice','buyingprice'],
@@ -1105,7 +1115,7 @@ async function uploadProducts(file){
       logRows.push({barcode,name:'(blank)',status:'failed',reason:'missing Name in file — row skipped before upload'});
       return;
     }
-    const item={barcode,name,brand:get('brand')||'ANTA',category:get('category')||'',department:get('department')||'',season:get('season')||'',gender:get('gender')||'',size:get('size')||'',color:get('color')||'',cost:+(get('cost')||0),retail:+(get('retail')||0),reorder:+(get('reorder')||5),active:true};
+    const item={barcode,itemNo:get('itemno')||'',name,brand:get('brand')||'ANTA',category:get('category')||'',midCategory:get('midcategory')||'',collection:get('collection')||'',description:get('description')||'',department:get('department')||'',season:get('season')||'',gender:get('gender')||'',size:get('size')||'',color:get('color')||'',cost:+(get('cost')||0),retail:+(get('retail')||0),reorder:+(get('reorder')||5),active:true};
     const origPriceRaw=get('originalprice');
     if(origPriceRaw!==''&&origPriceRaw!==undefined)item.originalPrice=+origPriceRaw||0;
     if(byBarcode.has(barcode)){
